@@ -13,6 +13,11 @@ Figma 기본 export 는 이미지를 원본 해상도 그대로 넣고, 텍스�
 
 ## 설치
 
+**Figma Community**: [FeatherWeight – Light PDF Export (Real Fonts)](https://www.figma.com/community/plugin/1672509720278498323)
+— 현재 심사 중이며, 승인되면 위 링크에서 바로 설치할 수 있습니다.
+
+심사 전이거나 개발 빌드를 쓰려면:
+
 1. [Releases](../../releases) 에서 zip 을 받아 옮기지 않을 자리에 풉니다. 예: `~/figma-plugins/featherweight`
 2. Figma 데스크톱 → Plugins → Development → **Import plugin from manifest…** → 푼 폴더의 `manifest.json`
 
