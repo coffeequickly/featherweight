@@ -139,6 +139,10 @@ Featherweight 는 텍스트 문제 자체를 고칩니다:
 유의사항: 제출 전 결과 PDF 를 반드시 확인하세요. 결과물 사용과 직접 등록한
 폰트의 라이선스 준수는 사용자 책임입니다.
 
+### 카테고리 (폼에서 최대 2개)
+
+> Import & export (주) + Design tools (보조) — CPIE 와 같은 조합
+
 ### 태그
 
 pdf · export · fonts · compress · resume · portfolio · korean · ats
