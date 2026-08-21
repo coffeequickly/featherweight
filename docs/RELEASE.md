@@ -1,5 +1,9 @@
 # 릴리즈 플레이북 — Figma Community 공개
 
+> **상태 (2026-08-21): 심사 제출 완료** — https://www.figma.com/community/plugin/1672509720278498323
+> 지원 이메일: featherweight@jangwonseok.com · 승인되면 README 설치 절을 Community 링크로 교체.
+> 후속: 태그 보강(resume·portfolio·fonts·ats 등), 한국어 설명 추가 여부 확인.
+
 > 목표: Community 무료 공개.
 > 이름 확정: **Featherweight** (2026-08-21). Community 에 정확히 일치하는 플러그인 없음을 직접 확인.
 > 참고: "Featherlight — Compress, WebP & Batch Export"(Rational Mystic LLC, 유료, 사용 2명)라는
