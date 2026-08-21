@@ -158,5 +158,8 @@ pdf · export · fonts · compress · resume · portfolio · korean · ats
 3. zip 배포는 두 트랙이다:
    - **latest** — main 에 푸시하면 CI 가 latest 프리릴리즈를 자동 갱신 (항상 최신)
    - **정식 버전** — `npm version minor` → `git push --follow-tags` (v* Release 자동)
+   - **Figma 퍼블리시 자동화(선택)** — 로컬에서 `npx figcd auth` 로 토큰 발급 →
+     `gh secret set FIGMA_WEB_AUTHN_TOKEN` 등록하면, 태그 푸시가 Figma
+     "Publish new version" 까지 해준다 (figcd, 비공식 API — 깨지면 수동 클릭으로 복귀)
 4. Figma 데스크톱 → Plugins → Development → Publish → 리스팅 문안·면책조건 붙여넣기
 5. 심사 통과 후: README 의 설치 절을 Community 링크로 교체
