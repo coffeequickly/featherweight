@@ -40,51 +40,108 @@
 - 문서 데이터는 어떤 서버로도 나가지 않는다. "폰트 다운로드만" 이 심사관에게 명확해야 한다.
 - 플러그인 ID 는 퍼블리시 과정에서 Figma 가 발급한다 (`figma-plugin.id: "sheaf"` 는 로컬용).
 
-## 3. 리스팅 문안 초안
+## 3. 리스팅 문안 (2026-08-21 — 인기작 패턴 분석 반영)
 
-### 한국어
+> 참조: Compressed PDF and Image Exporter(143k 사용자)·Hypermatic 리스팅 분석.
+> 발견한 패턴 — ① 이름에 검색 키워드를 붙인다 ② 태그라인은 기능+키워드 압축 한 줄
+> ③ 설명은 문제 후킹 → 기능 불릿 → 사용 3단계 → 차별점 → 지원 순서.
+> 결정적 근거: CPIE 개발자가 댓글에서 "폰트 임베드는 못 한다. Figma 가 전부 아웃라인으로
+> 뽑는 게 근본 문제"라고 인정 — 이력서 사용자들이 "전부 텍스트라 용량이 안 준다"고 호소.
+> **우리 카피는 그 지점(진짜 폰트 임베드)을 정면에 세운다.**
 
-> **Featherweight — 가벼운 PDF, 진짜 폰트**
+### 이름 (퍼블리시 폼 Name)
+
+> **Featherweight – Light PDF Export (Real Fonts)**
+
+Community 검색은 이름 가중치가 커서 키워드를 이름에 붙이는 게 업계 관행
+(CPIE 도 "(PDF, PNG, JPG, WebP)" 를 이름에 달았다). 메뉴에 조금 길게 보이는 대신
+"pdf export" 검색에 잡힌다. 짧은 이름을 원하면 "Featherweight" 단독도 가능.
+
+### 태그라인 (검색 카드 한 줄)
+
+> EN: Tiny PDFs with real embedded fonts — selectable, searchable, ATS-ready. Résumés & portfolios from 10MB to <1MB.
 >
-> 선택한 프레임을 PDF 한 파일로 내보낸다. 이미지는 화면 크기에 맞춰 줄이고,
-> 텍스트는 아웃라인 대신 진짜 폰트로 임베드한다. 이력서·포트폴리오가 10MB 에서
-> 1MB 로 줄고, 본문이 선택·검색·복사되며, 채용 플랫폼 파서가 내용을 읽는다.
->
-> - 프레임 순서 조정·제외, 원본 문서는 절대 건드리지 않음
-> - 이미지 품질·해상도 상한 설정
-> - 한글 오픈 폰트 15종 자동 임베드 (Pretendard, 나눔, Gothic A1, Spoqa 등)
-> - 그 외 서체는 TTF/OTF 를 한 번만 넣으면 저장
-> - 처리 못 하는 텍스트는 원본 아웃라인 그대로 — 다른 폰트로 대체하지 않음
+> KR: 프레임을 가벼운 PDF 로 — 텍스트는 아웃라인이 아니라 진짜 폰트. 검색·복사되는 이력서·포트폴리오.
 
-### English
+### 설명 (Description)
 
-> **Featherweight — light PDFs with real fonts**
->
-> Export selected frames as a single PDF. Images are downscaled to their displayed
-> size; text is embedded as real subset fonts instead of vector outlines. A 10MB
-> portfolio becomes ~1MB, and the text is selectable, searchable, and readable by
-> ATS parsers.
->
-> - Reorder or exclude frames; your document is never modified
-> - Image quality and resolution caps
-> - 15 open-license Korean font families auto-embedded (Pretendard, Nanum, …)
-> - Add your own TTF/OTF once for any other typeface
-> - Unsupported text keeps its original outlines — never substituted
+Figma's built-in PDF export turns every letter into vector outlines. Your text
+can't be selected, searched, or read by résumé scanners (ATS) — and text-heavy
+documents balloon to 10–20MB that no compressor can shrink, because there are
+no images to compress.
 
-### 면책조건 (리스팅 하단 + README 공통)
+Featherweight fixes the text problem itself:
 
-> - Always proofread the exported PDF before submitting it anywhere. Text is
->   redrawn with real fonts and may differ subtly from Figma's rendering. You are
->   responsible for the files you produce with this plugin.
-> - Fonts you upload yourself are embedded into the PDF as-is. **It is your
->   responsibility to confirm that your font's license permits document
->   embedding.** All auto-downloaded fonts are SIL OFL and permit embedding.
-> - Network access is used only to download open-license fonts from
->   cdn.jsdelivr.net. Your document's content never leaves your machine. No
->   telemetry.
-> - Text is embedded in an extractable form, but no specific ATS parsing result
->   is guaranteed.
-> - Not affiliated with Figma, Inc.
+🪶 REAL FONTS, NOT OUTLINES
+Text is re-embedded as real subset fonts. It stays selectable, searchable,
+copy-pasteable, and ATS-parseable. A text-heavy résumé drops from ~10MB to
+under 1MB.
+
+🪶 SMART IMAGE DOWNSCALING
+Images are resized to their displayed size before export. Pick a preset —
+Sharp / Balanced / Smallest — or fine-tune quality, scale and resolution caps.
+
+HOW IT WORKS
+1. Select frames and run Featherweight
+2. Drag to reorder pages, exclude what you don't need
+3. Export — the save dialog is pre-filled with a timestamped file name
+
+WHAT MAKES IT DIFFERENT
+• 15 open-license Korean & Latin font families are downloaded and embedded
+  automatically (Pretendard, Nanum, Gothic A1, IBM Plex Sans KR, Spoqa…).
+  Add your own TTF/OTF once for anything else.
+• Never substitutes fonts. Anything it can't embed keeps its original
+  outlines — identical look, honestly reported with a reason you can click
+  to locate the exact layer on canvas.
+• 100% local. Your document never leaves your machine — network access is
+  used only to download open-license fonts (cdn.jsdelivr.net). No telemetry,
+  no account, no upload.
+• Free and open source (MIT): github.com/coffeequickly/FeatherWeight
+
+GOOD TO KNOW
+• Always proofread the exported PDF before submitting it anywhere. Text is
+  redrawn with real fonts and may differ subtly from Figma's rendering. You
+  are responsible for the files you produce.
+• Fonts you upload yourself are embedded as-is — confirming that your font's
+  license permits document embedding is your responsibility. All
+  auto-downloaded fonts are SIL OFL and permit embedding.
+• Rotated text, gradient/stroke/effect text and underlines keep their
+  original outlines (by design — never silently altered).
+• Text is embedded in an extractable form, but no specific ATS parsing
+  result is guaranteed. Not affiliated with Figma, Inc.
+
+---
+
+한국어
+
+Figma 기본 PDF 내보내기는 모든 글자를 벡터 아웃라인으로 바꿉니다. 텍스트가
+선택·검색되지 않고 채용 시스템(ATS)이 읽지 못하며, 텍스트 위주 문서는
+10~20MB 가 됩니다 — 압축할 이미지가 없어서 어떤 압축 도구로도 줄지 않습니다.
+
+Featherweight 는 텍스트 문제 자체를 고칩니다:
+
+🪶 아웃라인이 아니라 진짜 폰트 — 텍스트를 서브셋 폰트로 다시 임베드합니다.
+선택·검색·복사가 되고 ATS 가 읽습니다. 텍스트 위주 이력서가 10MB 에서 1MB
+아래로 줄어듭니다.
+
+🪶 이미지 다운스케일 — 화면 표시 크기에 맞춰 줄입니다. 프리셋(선명하게/균형/
+최소 용량) 또는 세부 조절.
+
+사용법: 프레임 선택 → 실행 → 드래그로 순서 조정 → 내보내기.
+
+• 한글 오픈 폰트 15종 자동 임베드 (Pretendard, 나눔, Gothic A1, Spoqa 등),
+  그 외 서체는 TTF/OTF 를 한 번만 등록
+• 절대 다른 폰트로 대체하지 않음 — 임베드 못 하는 텍스트는 원본 아웃라인
+  유지, 사유를 클릭하면 해당 레이어로 이동
+• 100% 로컬 — 문서는 어디에도 전송되지 않습니다 (네트워크는 오픈 폰트
+  다운로드 전용). 텔레메트리 없음. 무료 오픈소스(MIT).
+
+유의사항: 제출 전 결과 PDF 를 반드시 확인하세요. 결과물 사용과 직접 등록한
+폰트의 라이선스 준수는 사용자 책임입니다.
+
+### 태그
+
+pdf · export · fonts · compress · resume · portfolio · korean · ats
 
 ## 4. 출시 절차
 
