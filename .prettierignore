@@ -1,0 +1,7 @@
+build
+node_modules
+manifest.json
+package-lock.json
+tests/fixtures
+docs/
+*.css.d.ts

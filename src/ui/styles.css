@@ -1,0 +1,236 @@
+/* 380px 폭에서 넘치지 않게 하는 게 이 파일의 목적이다.
+   Figma 컴포넌트가 못 잡아 주는 부분만 최소로 손댄다. */
+
+/* create-figma-plugin 기본은 Inter(라틴) 기준이다.
+   - 글꼴: 시스템 UI 스택으로 — 한글이 폴백 혼합 없이 OS 네이티브로 나온다
+   - 줄높이: 16px 는 한글 글리프에 빠듯해 위아래가 깎여 보인다. 살짝 키운다 */
+:root {
+  --font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  --line-height-16: 18px;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* overflow: hidden 은 세로도 자른다 — g·j·y 꼬리가 잘리지 않게
+     클립 박스만 2px 내리고 레이아웃은 그대로 둔다 */
+  padding-bottom: 2px;
+  margin-bottom: -2px;
+}
+
+.rowBetween {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ── 프레임 목록 ───────────────────────────── */
+
+.frameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  margin: 0 -4px;
+  border-radius: 3px;
+}
+
+.frameRow:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.frameIndex {
+  flex: 0 0 14px;
+  text-align: right;
+}
+
+.frameThumb,
+.frameThumbEmpty {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: var(--figma-color-bg-secondary);
+  border-radius: 2px;
+}
+
+/* min-width:0 이 없으면 flex 아이템이 내용 너비만큼 버텨서 버튼을 밀어낸다 */
+.frameMeta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.frameActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.emptyState {
+  padding: 28px 0;
+  text-align: center;
+}
+
+/* ── 폰트 ─────────────────────────────────── */
+
+.fontRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+/* 행이 붙어 보여서 어느 정보가 어느 폰트 것인지 헷갈렸다 */
+.fontRow + .fontRow {
+  border-top: 1px solid var(--figma-color-border);
+}
+
+.fontRowMain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fontRowActions {
+  /* 파일이 있는 행에는 휴지통이 더 붙는다. 폭을 고정해야 버튼이 세로로 정렬된다 */
+  flex: 0 0 78px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+/* ── 설정 ─────────────────────────────────── */
+
+.settingRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+/* 라벨이 세로로 쪼개지던 문제: 폭 고정 + 줄바꿈 금지 */
+.settingLabel {
+  flex: 0 0 60px;
+  white-space: nowrap;
+}
+
+.settingControl {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settingValue {
+  flex: 0 0 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 결과 ─────────────────────────────────── */
+
+.reportLine {
+  font-variant-numeric: tabular-nums;
+}
+
+.reasonList {
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Text 컴포넌트끼리 붙으면 줄이 겹쳐 보인다. 줄 높이를 직접 준다. */
+.reasonItem {
+  line-height: 18px;
+  padding: 1px 0 3px;
+  margin-bottom: -2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 행 왼쪽(썸네일·이름)은 클릭하면 캔버스로, 끌면 순서 변경 */
+.frameMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.frameRow {
+  position: relative;
+  transition: transform 0.12s ease;
+}
+
+.frameRowDragging {
+  transition: none;
+  z-index: 2;
+  background: var(--figma-color-bg-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.frameRowDragging .frameMain {
+  cursor: grabbing;
+}
+
+.excludedRow {
+  padding: 2px 0;
+}
+
+/* ── 진행 바 ──────────────────────────────── */
+
+.progressBar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--figma-color-bg-secondary);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--figma-color-bg-brand);
+  transition: width 0.2s ease;
+}
+
+/* ── 리포트 사유 — 클릭하면 캔버스에서 찾아간다 ── */
+
+.clickable {
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.clickable:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+/* ── 세로 3단 레이아웃: 헤더·푸터 고정, 가운데만 스크롤 ── */
+
+.appRoot {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.appHeader,
+.appFooter {
+  flex: 0 0 auto;
+  padding: 0 16px;
+}
+
+.appScroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 16px;
+}
+
+.rowEnd {
+  display: flex;
+  justify-content: flex-end;
+}

@@ -1,0 +1,100 @@
+// 이미지 목표 크기 계산. Figma·DOM 의존 금지. (PRD FR-3)
+//
+// 핵심: 화면에 보이는 크기의 multiplier 배를 넘는 픽셀은 버린다.
+// 3000px 스크린샷을 600pt 박스에 넣어도 Figma 는 3000px 그대로 임베드한다.
+
+import { Settings } from './types'
+
+/** 이미지 fill 을 쓰는 노드 하나 */
+export type ImageUsage = {
+  nodeId: string
+  imageHash: string
+  /** 노드의 표시 크기 (px) */
+  width: number
+  height: number
+  scaleMode: 'FILL' | 'FIT' | 'CROP' | 'TILE'
+}
+
+export type ImagePlan = {
+  imageHash: string
+  targetLongEdge: number
+  nodeIds: string[]
+}
+
+export function displayedLongEdge(usage: ImageUsage): number {
+  return Math.max(usage.width, usage.height)
+}
+
+/** TILE 은 표시 크기와 픽셀 수의 관계가 단순하지 않아 건드리지 않는다. (PRD §3) */
+export function isProcessable(usage: ImageUsage): boolean {
+  return usage.scaleMode !== 'TILE' && displayedLongEdge(usage) > 0
+}
+
+export function targetFor(
+  usage: ImageUsage,
+  settings: Pick<Settings, 'multiplier' | 'maxEdge'>
+): number {
+  const wanted = Math.ceil(displayedLongEdge(usage) * settings.multiplier)
+  return Math.min(settings.maxEdge, wanted)
+}
+
+/**
+ * 같은 이미지를 여러 노드가 쓰면 가장 크게 쓰는 쪽에 맞춘다.
+ * 작은 쪽에 맞추면 큰 노드가 뭉개진다.
+ */
+export function planImageTargets(
+  usages: readonly ImageUsage[],
+  settings: Pick<Settings, 'multiplier' | 'maxEdge'>
+): ImagePlan[] {
+  const byHash = new Map<string, ImagePlan>()
+
+  for (const usage of usages) {
+    if (!isProcessable(usage)) continue
+
+    const target = targetFor(usage, settings)
+    const found = byHash.get(usage.imageHash)
+
+    if (found === undefined) {
+      byHash.set(usage.imageHash, {
+        imageHash: usage.imageHash,
+        targetLongEdge: target,
+        nodeIds: [usage.nodeId]
+      })
+      continue
+    }
+
+    found.targetLongEdge = Math.max(found.targetLongEdge, target)
+    if (!found.nodeIds.includes(usage.nodeId)) found.nodeIds.push(usage.nodeId)
+  }
+
+  return [...byHash.values()]
+}
+
+/** 원본이 이미 목표보다 작으면 키우지 않는다. */
+export function needsDownscale(originalLongEdge: number, targetLongEdge: number): boolean {
+  return originalLongEdge > targetLongEdge
+}
+
+/**
+ * 리사이즈 후 크기. 긴 변을 target 에 맞추고 짧은 변은 비율대로.
+ * 최소 1px 은 남긴다.
+ */
+export function scaledSize(
+  width: number,
+  height: number,
+  targetLongEdge: number
+): { width: number; height: number } {
+  const longEdge = Math.max(width, height)
+  if (longEdge <= targetLongEdge) return { width, height }
+
+  const scale = targetLongEdge / longEdge
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale))
+  }
+}
+
+/** 처리 결과가 원본보다 크면 원본을 쓴다. 압축했는데 커지는 경우가 실제로 있다. */
+export function keepsOriginal(originalBytes: number, processedBytes: number): boolean {
+  return processedBytes >= originalBytes
+}

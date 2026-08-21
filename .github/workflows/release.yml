@@ -1,0 +1,50 @@
+name: Release
+
+# 태그를 밀면 패키지를 만들어 Release 에 붙인다.
+#   npm version patch   → package.json 갱신 + v0.1.1 태그
+#   git push --follow-tags
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # 태그와 package.json 버전이 어긋나면 잘못된 이름의 zip 이 나간다
+      - name: 태그와 package.json 버전 대조
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "태그 v$TAG 와 package.json $PKG 가 다르다" >&2
+            exit 1
+          fi
+
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: node tools/package.mjs
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          body: |
+            압축을 풀고 Figma 데스크톱에서
+            **Plugins → Development → Import plugin from manifest…** 로 `manifest.json` 을 고르면 된다.
+            자세한 건 패키지 안 `INSTALL.md` 참고.
+
+            공개 폰트(Pretendard 등)는 플러그인이 내보낼 때 알아서 받아 온다.
+            그 외 서체만 UI 에서 파일을 한 번 넣으면 된다.

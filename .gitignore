@@ -1,0 +1,15 @@
+node_modules/
+build/
+manifest.json
+.DS_Store
+*.log
+
+# 개인 자산 — 커밋 금지 (PRD §12)
+fonts/*.ttf
+fonts/*.otf
+samples/
+*.pdf
+src/**/*.css.d.ts
+.venv/
+figma-plugins/
+dist/

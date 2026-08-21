@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # main 푸시마다 latest 프리릴리즈를 갱신한다
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # @create-figma-plugin/common 이 engines.node >= 22 를 요구한다
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+      - run: node tools/package.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: featherweight-plugin
+          path: dist/*.zip
+          retention-days: 30
+
+      # main 에 푸시될 때마다 "latest" 프리릴리즈를 최신 zip 으로 갈아끼운다.
+      # 태그가 옛 커밋에 남으면 헷갈리므로 지우고 다시 만든다.
+      # 검증된 버전이 필요하면 v* 태그 릴리즈를 쓴다 (release.yml).
+      - name: latest 프리릴리즈 갱신
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes || true
+          git push origin :refs/tags/latest || true
+          gh release create latest dist/*.zip \
+            --prerelease \
+            --title "latest — main 최신 빌드" \
+            --notes "main 커밋 ${GITHUB_SHA::7} 의 자동 빌드. 압축을 풀고 Figma 데스크톱에서 Plugins → Development → Import plugin from manifest… 로 manifest.json 을 고르면 된다. 검증된 버전은 v* 릴리즈를 쓰라."

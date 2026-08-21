@@ -1,0 +1,64 @@
+{
+  "name": "featherweight",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Figma plugin: export selected frames to a light PDF with real embedded fonts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coffeequickly/FeatherWeight.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "build-figma-plugin --typecheck --watch",
+    "build": "build-figma-plugin --typecheck --minify",
+    "watch": "build-figma-plugin --typecheck --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests && prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.{mjs,json}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.{mjs,json}\"",
+    "test": "vitest run",
+    "verify:catalog": "CATALOG_NET=1 vitest run tests/fontCatalog.net.test.ts tests/textPipeline.net.test.ts",
+    "compare": ".venv/bin/python tools/compare-pdf.py",
+    "install:local": "npm run build && node tools/install-local.mjs",
+    "package": "npm run build && node tools/package.mjs",
+    "ui:preview": "node tools/ui-preview.mjs"
+  },
+  "dependencies": {
+    "@create-figma-plugin/ui": "^4.0.3",
+    "@create-figma-plugin/utilities": "^4.0.3",
+    "fontkit": "^2.0.4",
+    "pdf-lib": "^1.17.1",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@create-figma-plugin/build": "^4.0.3",
+    "@eslint/js": "^9.39.0",
+    "@figma/plugin-typings": "^1.134.0",
+    "@types/fontkit": "^2.0.9",
+    "@types/jsdom": "^30.0.0",
+    "eslint": "^9.39.0",
+    "jsdom": "^27.0.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^4.1.11"
+  },
+  "figma-plugin": {
+    "editorType": [
+      "figma"
+    ],
+    "id": "sheaf",
+    "name": "Featherweight",
+    "main": "src/main.ts",
+    "ui": "src/ui.tsx",
+    "documentAccess": "dynamic-page",
+    "networkAccess": {
+      "allowedDomains": [
+        "https://cdn.jsdelivr.net"
+      ],
+      "reasoning": "Downloads the open-licensed fonts the document uses (Pretendard, Nanum, Gothic A1, etc. — all SIL OFL) so text can be embedded as real fonts instead of outlines. Nothing is uploaded; document content never leaves the machine."
+    }
+  }
+}
