@@ -136,19 +136,22 @@
 }
 
 .reasonList {
-  max-height: 120px;
+  max-height: 132px;
   overflow-y: auto;
-  padding-right: 4px;
 }
 
-/* Text 컴포넌트끼리 붙으면 줄이 겹쳐 보인다. 줄 높이를 직접 준다. */
+/* 음수 마진 트릭은 스크롤 높이 계산을 흐트러뜨려 1줄짜리에도 스크롤바를 만든다.
+   디센더 여유는 전역 줄높이(18px)가 이미 준다. */
 .reasonItem {
   line-height: 18px;
-  padding: 1px 0 3px;
-  margin-bottom: -2px;
+  padding: 2px 4px 2px 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.versionLine {
+  text-align: right;
 }
 
 /* 행 왼쪽(썸네일·이름)은 클릭하면 캔버스로, 끌면 순서 변경 */

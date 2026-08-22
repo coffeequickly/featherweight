@@ -20,6 +20,7 @@ import { t } from '../lib/i18n'
 import { sortItems } from '../lib/order'
 import { presetOf } from '../lib/presets'
 import { FrameFocusHandler, FrameItem, ResizeWindowHandler, SortMode } from '../lib/types'
+import { PLUGIN_VERSION } from './buildInfo'
 import { ExportFooter } from './ExportFooter'
 import { FontPanel, fontsSummaryText } from './FontPanel'
 import { FrameList } from './FrameList'
@@ -290,7 +291,13 @@ function AppBody(): JSX.Element {
           pageCount={visible.length}
           onExport={handleExport}
         />
-        <VerticalSpace space="medium" />
+        <VerticalSpace space="small" />
+        <div class="versionLine">
+          <Text>
+            <Muted>v{PLUGIN_VERSION}</Muted>
+          </Text>
+        </div>
+        <VerticalSpace space="extraSmall" />
       </div>
     </div>
   )
