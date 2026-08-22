@@ -1,5 +1,7 @@
 # Featherweight
 
+![Featherweight — Light PDF export with real fonts](docs/brand/cover-1920x960.png)
+
 Figma 프레임을 **가벼운 PDF** 로 내보내는 플러그인입니다.
 
 Figma 기본 export 는 이미지를 원본 해상도 그대로 넣고, 텍스트를 글리프 아웃라인(벡터
