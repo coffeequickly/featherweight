@@ -161,22 +161,26 @@ function AppBody(): JSX.Element {
   return (
     <div class="appRoot">
       <div class="appHeader">
+        <VerticalSpace space="extraSmall" />
         {/* Tabs 는 바 + 내용이 한 몸이지만, 내용은 스크롤 영역에 우리가 그린다 —
-            children 을 비워 바만 쓴다 */}
-        <Tabs
-          onValueChange={(value: string) => {
-            if (value === t('tab.export')) setTab('export')
-            else if (value === t('tab.images')) setTab('images')
-            else setTab('fonts')
-          }}
-          options={[
-            { value: t('tab.export'), children: null },
-            { value: t('tab.images'), children: null },
-            { value: t('tab.fonts'), children: null }
-          ]}
-          value={t(`tab.${tab}` as const)}
-        />
-        <Divider />
+            children 을 비워 바만 쓴다. 자체 하단 보더가 있으므로 Divider 는 안 그린다.
+            탭 안쪽 패딩(8+8) 때문에 텍스트가 본문 그리드(16px)에서 밀리는 것을
+            음수 마진으로 당겨 맞춘다 — 보더도 창 끝까지 닿는다. */}
+        <div class="tabsBar">
+          <Tabs
+            onValueChange={(value: string) => {
+              if (value === t('tab.export')) setTab('export')
+              else if (value === t('tab.images')) setTab('images')
+              else setTab('fonts')
+            }}
+            options={[
+              { value: t('tab.export'), children: null },
+              { value: t('tab.images'), children: null },
+              { value: t('tab.fonts'), children: null }
+            ]}
+            value={t(`tab.${tab}` as const)}
+          />
+        </div>
       </div>
 
       <div class="appScroll">
@@ -289,13 +293,13 @@ function AppBody(): JSX.Element {
           pageCount={visible.length}
           onExport={handleExport}
         />
-        <VerticalSpace space="small" />
+        <VerticalSpace space="extraSmall" />
         <div class="versionLine">
           <Text align="right">
             <Muted>v{PLUGIN_VERSION}</Muted>
           </Text>
         </div>
-        <VerticalSpace space="extraSmall" />
+        <VerticalSpace space="small" />
       </div>
     </div>
   )

@@ -244,3 +244,8 @@
   display: flex;
   justify-content: flex-end;
 }
+
+/* 탭 텍스트를 본문 16px 그리드에 맞추고, 탭 자체 보더를 창 끝까지 편다 */
+.tabsBar {
+  margin: 0 -16px;
+}
