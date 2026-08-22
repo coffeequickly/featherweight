@@ -2,7 +2,7 @@
 //
 // export 옵션으로는 이미지 품질을 못 건드리므로(C2) export 전에 fill 자체를 바꾼다.
 
-import { ImagePlan, ImageUsage, planImageTargets } from '../lib/imageTarget'
+import { ImagePlan, ImageUsage, planImageTargets, processFloor } from '../lib/imageTarget'
 import { Reason } from '../lib/types'
 import { Settings } from '../lib/types'
 import { awaitResponse, nextRequestId } from './bridge'
@@ -86,6 +86,9 @@ export async function shrinkImages(
   const plans = planImageTargets(usages, settings)
   if (plans.length === 0) return stats
 
+  // 프레임 예산 안에 드는 이미지는 손대지 않는다 — 작은 로고까지 열화시킬 이유가 없다
+  const floor = processFloor(settings, Math.max(root.width, root.height))
+
   const replacement = new Map<string, string>()
 
   for (let index = 0; index < plans.length; index += 1) {
@@ -94,7 +97,7 @@ export async function shrinkImages(
 
     const plan = plans[index]
     try {
-      const newHash = await shrinkOne(plan, settings, send, stats)
+      const newHash = await shrinkOne(plan, floor, settings, send, stats)
       if (newHash !== null) replacement.set(plan.imageHash, newHash)
     } catch (error) {
       stats.warnings.push({
@@ -113,6 +116,7 @@ export async function shrinkImages(
 
 async function shrinkOne(
   plan: ImagePlan,
+  floor: number,
   settings: Settings,
   send: ImageRequestSender,
   stats: ImageStats
@@ -122,6 +126,10 @@ async function shrinkOne(
     stats.warnings.push({ code: 'image.missing', params: { hash: plan.imageHash.slice(0, 8) } })
     return null
   }
+
+  // 픽셀 수만 먼저 본다 — 기준선 이하면 바이트를 UI 로 보낼 필요조차 없다
+  const size = await image.getSizeAsync()
+  if (Math.max(size.width, size.height) <= floor) return null
 
   const original = await image.getBytesAsync()
   stats.bytesBefore += original.length

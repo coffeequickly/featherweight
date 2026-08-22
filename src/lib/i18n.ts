@@ -69,8 +69,8 @@ const MESSAGES = {
   'presets.small': { en: 'Smallest', ko: '최소 용량' },
   'presets.custom': { en: 'Custom', ko: '직접' },
   'images.help': {
-    en: 'Keeps pixels up to a multiple of the displayed size. Smaller originals are left alone.',
-    ko: '화면에 보이는 크기의 배율만큼만 남기고 줄입니다. 원본이 더 작으면 그대로 둡니다.'
+    en: 'Only images larger than the frame budget are downscaled. Small images like logos pass through untouched.',
+    ko: '프레임 기준을 넘는 큰 이미지만 줄입니다. 로고처럼 작은 이미지는 재인코딩 없이 그대로 둡니다.'
   },
   'images.multiplier': { en: 'Scale', ko: '배율' },
   'images.maxEdge': { en: 'Max edge', ko: '상한' },

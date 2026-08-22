@@ -30,6 +30,18 @@ export function isProcessable(usage: ImageUsage): boolean {
   return usage.scaleMode !== 'TILE' && displayedLongEdge(usage) > 0
 }
 
+/**
+ * 이 크기 이하의 이미지는 아예 건드리지 않는다 — 리사이즈도, 재인코딩도.
+ * 기준은 "프레임 긴 변 × 배율": 프레임 예산 안에 드는 이미지(로고 등)를
+ * 다시 인코딩해 봐야 몇 KB 아끼자고 화질만 상한다. 열화는 큰 원본에서만 값어치가 있다.
+ */
+export function processFloor(
+  settings: Pick<Settings, 'multiplier' | 'maxEdge'>,
+  frameLongEdge: number
+): number {
+  return Math.min(settings.maxEdge, Math.ceil(frameLongEdge * settings.multiplier))
+}
+
 export function targetFor(
   usage: ImageUsage,
   settings: Pick<Settings, 'multiplier' | 'maxEdge'>

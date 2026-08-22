@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  processFloor,
   ImageUsage,
   isProcessable,
   keepsOriginal,
@@ -130,5 +131,19 @@ describe('keepsOriginal', () => {
     expect(keepsOriginal(1000, 1200)).toBe(true)
     expect(keepsOriginal(1000, 1000)).toBe(true)
     expect(keepsOriginal(1000, 800)).toBe(false)
+  })
+})
+
+describe('processFloor', () => {
+  it('프레임 긴 변 × 배율 — A4 프레임이면 그 예산 아래 이미지는 안 건드린다', () => {
+    expect(processFloor({ multiplier: 1.5, maxEdge: 2048 }, 842)).toBe(1263)
+  })
+
+  it('16:9 1920 프레임, 1x 면 1920 이 기준선이다', () => {
+    expect(processFloor({ multiplier: 1, maxEdge: 4096 }, 1920)).toBe(1920)
+  })
+
+  it('maxEdge 를 넘지 않는다', () => {
+    expect(processFloor({ multiplier: 2, maxEdge: 2048 }, 4000)).toBe(2048)
   })
 })
