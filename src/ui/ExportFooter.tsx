@@ -99,63 +99,63 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
   return (
     <Fragment>
       <VerticalSpace space="small" />
-      <div class="reportLine">
-        <Text>
-          {report.cancelled ? t('report.cancelledPrefix') : ''}
-          {t('report.summary', {
-            file: report.fileName,
-            pages: report.pageCount,
-            size: formatBytes(report.byteLength),
-            seconds: (report.elapsedMs / 1000).toFixed(1)
-          })}
-        </Text>
-      </div>
-      <VerticalSpace space="extraSmall" />
-      <div class="reportLine">
-        <Text>
-          <Muted>
-            {report.textDrawn > 0
-              ? t('report.textDrawn', { count: report.textDrawn })
-              : t('report.noText')}
-            {report.imagesProcessed > 0
-              ? t('report.images', {
-                  count: report.imagesProcessed,
-                  before: formatBytes(report.imageBytesBefore),
-                  after: formatBytes(report.imageBytesAfter)
-                })
-              : ''}
-          </Muted>
-        </Text>
-      </div>
+      <div class="reportCard">
+        <div class="reportLine">
+          <Text>
+            {report.cancelled ? t('report.cancelledPrefix') : ''}
+            {t('report.summary', {
+              file: report.fileName,
+              pages: report.pageCount,
+              size: formatBytes(report.byteLength),
+              seconds: (report.elapsedMs / 1000).toFixed(1)
+            })}
+          </Text>
+        </div>
+        <VerticalSpace space="extraSmall" />
+        <div class="reportLine">
+          <Text>
+            <Muted>
+              {report.textDrawn > 0
+                ? t('report.textDrawn', { count: report.textDrawn })
+                : t('report.noText')}
+              {report.imagesProcessed > 0
+                ? t('report.images', {
+                    count: report.imagesProcessed,
+                    before: formatBytes(report.imageBytesBefore),
+                    after: formatBytes(report.imageBytesAfter)
+                  })
+                : ''}
+            </Muted>
+          </Text>
+        </div>
 
-      {reasons.length === 0 ? null : (
-        <Fragment>
-          <VerticalSpace space="extraSmall" />
-          <Text>
-            <Muted>{t('report.outlines', { total, kinds: reasons.length })}</Muted>
-          </Text>
-          <VerticalSpace space="extraSmall" />
-          <Text>
-            <Muted>{t('report.clickHint')}</Muted>
-          </Text>
-          <div class="reasonList">
-            {reasons.map((item) => (
-              <div
-                key={item.reason}
-                class="reasonItem clickable"
-                onClick={() => emit<NodesFocusHandler>('nodes:focus', item.ids)}
-              >
-                <Text>
-                  <Muted>
-                    {item.reason}
-                    {item.count > 1 ? ` × ${item.count}` : ''}
-                  </Muted>
-                </Text>
-              </div>
-            ))}
-          </div>
-        </Fragment>
-      )}
+        {reasons.length === 0 ? null : (
+          <Fragment>
+            <VerticalSpace space="small" />
+            <Text>
+              <Muted>{t('report.outlines', { total, kinds: reasons.length })}</Muted>
+            </Text>
+            <VerticalSpace space="extraSmall" />
+            <div class="reasonList">
+              {reasons.map((item) => (
+                <div
+                  key={item.reason}
+                  class="reasonItem clickable"
+                  title={t('report.clickHint')}
+                  onClick={() => emit<NodesFocusHandler>('nodes:focus', item.ids)}
+                >
+                  <Text>
+                    <Muted>
+                      {item.reason}
+                      {item.count > 1 ? ` × ${item.count}` : ''}
+                    </Muted>
+                  </Text>
+                </div>
+              ))}
+            </div>
+          </Fragment>
+        )}
+      </div>
     </Fragment>
   )
 }

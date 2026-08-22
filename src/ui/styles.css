@@ -135,6 +135,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 결과를 디버그 출력이 아니라 "패널" 로 보이게 한다 */
+.reportCard {
+  background: var(--figma-color-bg-secondary);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
 .reasonList {
   max-height: 132px;
   overflow-y: auto;
