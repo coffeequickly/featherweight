@@ -42,12 +42,25 @@ export function processFloor(
   return Math.min(settings.maxEdge, Math.ceil(frameLongEdge * settings.multiplier))
 }
 
+/**
+ * 아무리 작게 표시돼도 이 아래로는 줄이지 않는다.
+ * 2383px 로고가 93pt 로 표시된다고 140px 로 뭉개면 줌·인쇄에서 바로 티가 난다 —
+ * 640px 이면 로고·아이콘이 선명함을 유지하면서도 원본 대비 충분히 가볍다.
+ */
+export const MIN_TARGET_LONG_EDGE = 640
+
+/**
+ * 원본이 이 바이트 이하면 픽셀이 커도 손대지 않는다.
+ * 용량 절감의 본질은 바이트다 — 40KB 를 1.5KB 로 만들자고 화질을 버릴 이유가 없다.
+ */
+export const KEEP_BYTES_FLOOR = 100_000
+
 export function targetFor(
   usage: ImageUsage,
   settings: Pick<Settings, 'multiplier' | 'maxEdge'>
 ): number {
   const wanted = Math.ceil(displayedLongEdge(usage) * settings.multiplier)
-  return Math.min(settings.maxEdge, wanted)
+  return Math.min(settings.maxEdge, Math.max(wanted, MIN_TARGET_LONG_EDGE))
 }
 
 /**

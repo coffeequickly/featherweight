@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  MIN_TARGET_LONG_EDGE,
   processFloor,
   ImageUsage,
   isProcessable,
@@ -36,12 +37,19 @@ describe('targetFor', () => {
     expect(targetFor(usage('n', 'h', 4000, 4000), SETTINGS)).toBe(2048)
   })
 
-  it('소수점은 올린다', () => {
-    expect(targetFor(usage('n', 'h', 101, 10), SETTINGS)).toBe(152)
+  it('소수점은 올린다 (하한 위에서)', () => {
+    expect(targetFor(usage('n', 'h', 501, 10), SETTINGS)).toBe(752)
   })
 
-  it('multiplier 1 이면 표시 크기 그대로', () => {
-    expect(targetFor(usage('n', 'h', 600, 400), { multiplier: 1, maxEdge: 4096 })).toBe(600)
+  it('multiplier 1 이고 하한보다 크면 표시 크기 그대로', () => {
+    expect(targetFor(usage('n', 'h', 800, 400), { multiplier: 1, maxEdge: 4096 })).toBe(800)
+  })
+
+  it('작게 표시돼도 하한(640) 아래로 줄이지 않는다 — 로고가 뭉개지지 않게', () => {
+    expect(targetFor(usage('n', 'h', 93, 31), SETTINGS)).toBe(MIN_TARGET_LONG_EDGE)
+    expect(targetFor(usage('n', 'h', 600, 400), { multiplier: 1, maxEdge: 4096 })).toBe(
+      MIN_TARGET_LONG_EDGE
+    )
   })
 })
 

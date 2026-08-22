@@ -2,7 +2,13 @@
 //
 // export 옵션으로는 이미지 품질을 못 건드리므로(C2) export 전에 fill 자체를 바꾼다.
 
-import { ImagePlan, ImageUsage, planImageTargets, processFloor } from '../lib/imageTarget'
+import {
+  ImagePlan,
+  ImageUsage,
+  KEEP_BYTES_FLOOR,
+  planImageTargets,
+  processFloor
+} from '../lib/imageTarget'
 import { Reason } from '../lib/types'
 import { Settings } from '../lib/types'
 import { awaitResponse, nextRequestId } from './bridge'
@@ -132,6 +138,10 @@ async function shrinkOne(
   if (Math.max(size.width, size.height) <= floor) return null
 
   const original = await image.getBytesAsync()
+
+  // 이미 가벼운 파일은 픽셀이 커도 그대로 둔다 — 절감의 본질은 바이트다
+  if (original.length <= KEEP_BYTES_FLOOR) return null
+
   stats.bytesBefore += original.length
 
   const reqId = nextRequestId('img')
