@@ -92,7 +92,7 @@ function AppBody(): JSX.Element {
     if (manual) return
 
     const HEADER = 56
-    const ROW = 40
+    const ROW = 44
     const LIST_PADDING = 24
     const SETTINGS = 140
     const FOOTER = 96

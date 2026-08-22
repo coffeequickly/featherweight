@@ -34,9 +34,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 3px 4px;
-  margin: 0 -4px;
-  border-radius: 3px;
+  /* 호버·드래그 배경이 내용에 딱 붙지 않게 숨통을 준다.
+     가로 패딩만큼 음수 마진 — 텍스트는 16px 그리드에 남는다 */
+  padding: 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
 }
 
 .frameRow:hover {
