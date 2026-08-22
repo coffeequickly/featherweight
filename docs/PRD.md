@@ -1,6 +1,6 @@
 # Sheaf PRD — v0.1 (Figma → 가벼운 PDF, 진짜 폰트)
 
-> repo: `github.com/coffeequickly/FeatherWeight` (구 figma-sheaf 비공개 레포에서 이전)
+> repo: `github.com/coffeequickly/featherweight` (구 figma-sheaf 비공개 레포에서 이전)
 > status: Draft v0.1 / 2026-08-20
 > 독자: Claude Code(구현 에이전트) + PO(QA 겸)
 > 사용법: 레포 루트에 `docs/PRD.md`로 두고, §12는 `CLAUDE.md`로 복사한다. 이 문서가 단일 진실 공급원이다.

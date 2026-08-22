@@ -5,7 +5,7 @@
   "description": "Figma plugin: export selected frames to a light PDF with real embedded fonts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/coffeequickly/FeatherWeight.git"
+    "url": "https://github.com/coffeequickly/featherweight.git"
   },
   "license": "MIT",
   "engines": {

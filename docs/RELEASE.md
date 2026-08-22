@@ -100,7 +100,7 @@ WHAT MAKES IT DIFFERENT
 • 100% local. Your document never leaves your machine — network access is
   used only to download open-license fonts (cdn.jsdelivr.net). No telemetry,
   no account, no upload.
-• Free and open source (MIT): github.com/coffeequickly/FeatherWeight
+• Free and open source (MIT): github.com/coffeequickly/featherweight
 
 GOOD TO KNOW
 • Always proofread the exported PDF before submitting it anywhere. Text is
