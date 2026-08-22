@@ -38,6 +38,28 @@ const FIGMA_VARS = `
 body { margin: 0; background: var(--figma-color-bg); }
 `
 
+// 다크 대푯값 — 픽셀 색이 아니라 정렬·대비를 보는 용도다
+const FIGMA_VARS_DARK = `
+:root {
+  color-scheme: dark;
+  --figma-color-bg: #2c2c2c;
+  --figma-color-bg-secondary: #383838;
+  --figma-color-bg-hover: #3f3f3f;
+  --figma-color-bg-brand: #0d99ff;
+  --figma-color-bg-disabled: #3a3a3a;
+  --figma-color-border: #444444;
+  --figma-color-border-strong: #5c5c5c;
+  --figma-color-text: #ffffff;
+  --figma-color-text-secondary: #a8a8a8;
+  --figma-color-text-disabled: #6a6a6a;
+  --figma-color-text-onbrand: #ffffff;
+  --figma-color-icon: #cccccc;
+  --figma-color-icon-secondary: #8c8c8c;
+  --figma-color-bg-warning-tertiary: #4a3a12;
+}
+body { margin: 0; background: var(--figma-color-bg); }
+`
+
 /** 메인 스레드가 보내는 메시지를 흉내 낸다. UI 가 듣는 이름만 보낸다. */
 const FIXTURE = {
   settings: {
@@ -112,7 +134,8 @@ const FIXTURE = {
       italic: false,
       nodeCount: 16,
       charCount: 261
-    }
+    },
+    { family: 'Nexa', style: 'Heavy', weight: 800, italic: false, nodeCount: 3, charCount: 42 }
   ],
   storedFonts: [
     {
@@ -143,6 +166,8 @@ function page(uiScript, query) {
   const bare = query.get('bare') === '1'
   const tab = query.get('tab') ?? ''
   const lang = query.get('lang') ?? ''
+  const dark = query.get('theme') === 'dark'
+  const frames = query.get('frames')
   const width = Number(query.get('w') ?? 380)
   const height = Number(query.get('h') ?? 560)
   return `<!doctype html>
@@ -165,7 +190,7 @@ function page(uiScript, query) {
 <script>
 const FIXTURE = ${JSON.stringify(FIXTURE)}
 const UI_SCRIPT = ${JSON.stringify(uiScript)}
-const VARS = ${JSON.stringify(FIGMA_VARS)}
+const VARS = ${JSON.stringify(dark ? FIGMA_VARS_DARK : FIGMA_VARS)}\nconst FRAME_COUNT = ${frames === null ? 'null' : Number(frames)}
 
 const iframe = document.getElementById('ui')
 iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VARS +
@@ -184,7 +209,15 @@ window.addEventListener('message', (event) => {
 
   if (name === 'ui:ready') {
     send('settings', FIXTURE.settings)
-    send('selection', FIXTURE.selection)
+    // ?frames=N 으로 목록 크기를 바꾼다 (0 = 빈 상태)
+    const selection = FRAME_COUNT === null
+      ? FIXTURE.selection
+      : Array.from({ length: FRAME_COUNT }, (_, i) => ({
+          ...FIXTURE.selection[i % FIXTURE.selection.length],
+          id: String(i + 1),
+          name: (i + 1).toString().padStart(2, '0') + ' ' + FIXTURE.selection[i % FIXTURE.selection.length].name.slice(3)
+        }))
+    send('selection', selection)
     send('fonts', FIXTURE.fonts)
     send('fonts:stored', FIXTURE.storedFonts)
   }

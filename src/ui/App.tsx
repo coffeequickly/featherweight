@@ -188,29 +188,30 @@ function AppBody(): JSX.Element {
           <Fragment>
             <VerticalSpace space="small" />
 
-            <div class="rowBetween">
-              <div class="ellipsis">
-                <Text>
-                  <Muted>
-                    {items.length === 0
-                      ? ''
-                      : `${t(`presets.${presetOf(settings)}` as const)}${
-                          fonts.length > 0 ? ` · ${fontsSummaryText(fonts, storedFonts)}` : ''
-                        }`}
-                  </Muted>
-                </Text>
-              </div>
-              <SegmentedControl
-                disabled={exporter.busy || items.length === 0}
-                onValueChange={(value: string) => handleSort(value as SortMode)}
-                options={[
-                  { value: 'position', children: t('app.sortPosition') },
-                  { value: 'name', children: t('app.sortName') }
-                ]}
-                value={sortMode}
-              />
-            </div>
-            <VerticalSpace space="small" />
+            {items.length === 0 ? null : (
+              <Fragment>
+                <div class="rowBetween">
+                  <div class="ellipsis">
+                    <Text>
+                      <Muted>
+                        {t(`presets.${presetOf(settings)}` as const)}
+                        {fonts.length > 0 ? ` · ${fontsSummaryText(fonts, storedFonts)}` : ''}
+                      </Muted>
+                    </Text>
+                  </div>
+                  <SegmentedControl
+                    disabled={exporter.busy}
+                    onValueChange={(value: string) => handleSort(value as SortMode)}
+                    options={[
+                      { value: 'position', children: t('app.sortPosition') },
+                      { value: 'name', children: t('app.sortName') }
+                    ]}
+                    value={sortMode}
+                  />
+                </div>
+                <VerticalSpace space="small" />
+              </Fragment>
+            )}
 
             <FrameList
               items={visible}

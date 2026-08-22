@@ -26,8 +26,9 @@ const MESSAGES = {
   'app.preparing': { en: 'Preparing…', ko: '준비 중…' },
   'app.cancel': { en: 'Cancel', ko: '취소' },
   'app.export': {
-    en: (p) => `Export PDF (${n(Number(p.count), 'page', 'pages')})`,
-    ko: 'PDF 내보내기 ({count}쪽)'
+    en: (p) =>
+      Number(p.count) > 0 ? `Export PDF (${n(Number(p.count), 'page', 'pages')})` : 'Export PDF',
+    ko: (p) => (Number(p.count) > 0 ? `PDF 내보내기 (${p.count}쪽)` : 'PDF 내보내기')
   },
   'app.retry': { en: 'Try again', ko: '다시 시도' },
   'tab.export': { en: 'Export', ko: '내보내기' },
