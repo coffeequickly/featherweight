@@ -60,7 +60,11 @@ class ErrorBoundary extends Component<{ children: ComponentChildren }, { crashed
 
 function AppBody(): JSX.Element {
   // 화면이 들고 있는 것: 탭·정렬·순서·제외. 메인에서 오는 것: useMainState.
-  const [tab, setTab] = useState<'export' | 'images' | 'fonts'>('export')
+  // 초기 탭 — ui-preview 캡처 자동화용 훅. Figma 안에서는 전역이 없어 항상 'export'.
+  const [tab, setTab] = useState<'export' | 'images' | 'fonts'>(() => {
+    const preset = (window as { __PREVIEW_TAB__?: string }).__PREVIEW_TAB__
+    return preset === 'images' || preset === 'fonts' ? preset : 'export'
+  })
   const [sortMode, setSortMode] = useState<SortMode>('position')
   const [excluded, setExcluded] = useState<string[]>([])
   const [manualOrder, setManualOrder] = useState<string[]>([])

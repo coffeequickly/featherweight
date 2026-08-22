@@ -49,29 +49,109 @@ const FIXTURE = {
     embedText: true
   },
   selection: [
-    { id: '1', name: '01 Cover', width: 595, height: 842, x: 0, y: 0, imageCount: 1, textCount: 24 },
-    { id: '2', name: '02 About me and the very long frame name that overflows', width: 595, height: 842, x: 700, y: 0, imageCount: 1, textCount: 22 },
-    { id: '3', name: '03 Project', width: 595, height: 842, x: 0, y: 900, imageCount: 8, textCount: 86 }
+    {
+      id: '1',
+      name: '01 Cover',
+      width: 595,
+      height: 842,
+      x: 0,
+      y: 0,
+      imageCount: 1,
+      textCount: 24
+    },
+    {
+      id: '2',
+      name: '02 About me and the very long frame name that overflows',
+      width: 595,
+      height: 842,
+      x: 700,
+      y: 0,
+      imageCount: 1,
+      textCount: 22
+    },
+    {
+      id: '3',
+      name: '03 Project',
+      width: 595,
+      height: 842,
+      x: 0,
+      y: 900,
+      imageCount: 8,
+      textCount: 86
+    }
   ],
   fonts: [
-    { family: 'Pretendard Variable', style: 'Regular', weight: 400, italic: false, nodeCount: 128, charCount: 18901 },
-    { family: 'Pretendard Variable', style: 'SemiBold', weight: 600, italic: false, nodeCount: 21, charCount: 718 },
-    { family: 'Pretendard Variable', style: 'ExtraBold', weight: 800, italic: false, nodeCount: 30, charCount: 695 },
-    { family: 'Pretendard Variable', style: 'Bold', weight: 700, italic: false, nodeCount: 16, charCount: 261 }
+    {
+      family: 'Pretendard Variable',
+      style: 'Regular',
+      weight: 400,
+      italic: false,
+      nodeCount: 128,
+      charCount: 18901
+    },
+    {
+      family: 'Pretendard Variable',
+      style: 'SemiBold',
+      weight: 600,
+      italic: false,
+      nodeCount: 21,
+      charCount: 718
+    },
+    {
+      family: 'Pretendard Variable',
+      style: 'ExtraBold',
+      weight: 800,
+      italic: false,
+      nodeCount: 30,
+      charCount: 695
+    },
+    {
+      family: 'Pretendard Variable',
+      style: 'Bold',
+      weight: 700,
+      italic: false,
+      nodeCount: 16,
+      charCount: 261
+    }
   ],
   storedFonts: [
-    { family: 'Pretendard Variable', style: 'Regular', weight: 400, italic: false, byteLength: 611200, numGlyphs: 3607, codePoints: 2966, fileName: 'Pretendard-Regular.ttf' },
-    { family: 'Pretendard Variable', style: 'Bold', weight: 700, italic: false, byteLength: 614704, numGlyphs: 3607, codePoints: 2966, fileName: 'Pretendard-Bold.ttf' }
+    {
+      family: 'Pretendard Variable',
+      style: 'Regular',
+      weight: 400,
+      italic: false,
+      byteLength: 611200,
+      numGlyphs: 3607,
+      codePoints: 2966,
+      fileName: 'Pretendard-Regular.ttf'
+    },
+    {
+      family: 'Pretendard Variable',
+      style: 'Bold',
+      weight: 700,
+      italic: false,
+      byteLength: 614704,
+      numGlyphs: 3607,
+      codePoints: 2966,
+      fileName: 'Pretendard-Bold.ttf'
+    }
   ]
 }
 
-function page(uiScript) {
+function page(uiScript, query) {
+  // ?bare=1&tab=images&w=380&h=620 — 스크린샷 자동화용: 컨트롤 바 없이 UI 만 꽉 채운다
+  const bare = query.get('bare') === '1'
+  const tab = query.get('tab') ?? ''
+  const lang = query.get('lang') ?? ''
+  const width = Number(query.get('w') ?? 380)
+  const height = Number(query.get('h') ?? 560)
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>Featherweight UI preview</title>
 <style>
   body { margin: 0; font: 12px -apple-system, sans-serif; background: #e5e5e5; }
   .bar { padding: 8px 12px; background: #fff; border-bottom: 1px solid #ddd; display: flex; gap: 12px; align-items: center; }
   .frame { display: block; margin: 16px auto; border: 1px solid #bbb; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+  ${bare ? '.bar { display: none; } .frame { margin: 0; border: none; box-shadow: none; }' : ''}
 </style></head>
 <body>
   <div class="bar">
@@ -81,7 +161,7 @@ function page(uiScript) {
     <button id="apply">적용</button>
     <span id="note"></span>
   </div>
-  <iframe class="frame" id="ui" width="380" height="560"></iframe>
+  <iframe class="frame" id="ui" width="${width}" height="${height}"></iframe>
 <script>
 const FIXTURE = ${JSON.stringify(FIXTURE)}
 const UI_SCRIPT = ${JSON.stringify(uiScript)}
@@ -90,7 +170,10 @@ const VARS = ${JSON.stringify(FIGMA_VARS)}
 const iframe = document.getElementById('ui')
 iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VARS +
   '</style></head><body class="figma-light"><div id="create-figma-plugin"></div>' +
-  '<script>const __FIGMA_COMMAND__="";const __SHOW_UI_DATA__={};' + UI_SCRIPT + '<\\/script></body></html>'
+  '<script>const __FIGMA_COMMAND__="";const __SHOW_UI_DATA__={};' +
+  'window.__PREVIEW_TAB__="${tab}";' +
+  ('${lang}' ? 'Object.defineProperty(navigator,"language",{get:()=>"${lang}"});' : '') +
+  UI_SCRIPT + '<\\/script></body></html>'
 
 // UI 가 보낸 메시지에 메인 스레드처럼 답한다
 window.addEventListener('message', (event) => {
@@ -121,9 +204,10 @@ document.getElementById('apply').onclick = () => {
 
 const server = createServer(async (request, response) => {
   try {
+    const url = new URL(request.url ?? '/', `http://localhost:${PORT}`)
     const uiScript = await readFile(join(ROOT, 'build/ui.js'), 'utf8')
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-    response.end(page(uiScript))
+    response.end(page(uiScript, url.searchParams))
   } catch {
     response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
     response.end('build/ui.js 가 없다. `npm run build` 를 먼저 돌려라.')
