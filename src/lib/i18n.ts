@@ -39,9 +39,13 @@ const MESSAGES = {
     en: '{names} — no font file, will stay as outlines. Add it in the Fonts tab',
     ko: '{names} — 파일이 없어 아웃라인으로 나갑니다 · 폰트 탭에서 넣기'
   },
-  'fonts.pathHint': {
-    en: 'Font files usually live here (click to copy): ',
-    ko: '폰트 파일은 보통 여기 있습니다 (클릭해 복사): '
+  'fonts.pathHelpMac': {
+    en: 'Installed fonts are in the folders below. Click a path to copy it, then press ⌘⇧G in the file dialog and paste.',
+    ko: '설치된 폰트는 아래 폴더에 있습니다. 경로를 클릭해 복사한 뒤, 파일 선택 창에서 ⌘⇧G 를 누르고 붙여넣으세요.'
+  },
+  'fonts.pathHelpWin': {
+    en: 'Installed fonts are in the folder below. Click the path to copy it, then paste it into the file name field.',
+    ko: '설치된 폰트는 아래 폴더에 있습니다. 경로를 클릭해 복사한 뒤, 파일 이름 칸에 붙여넣으세요.'
   },
   'fonts.pathCopiedMac': {
     en: 'Path copied — press ⌘⇧G in the file dialog and paste',
@@ -97,12 +101,20 @@ const MESSAGES = {
   // ── 폰트 패널 ───────────────────────────────────────────
   'fonts.title': { en: 'Fonts', ko: '폰트' },
   'fonts.summaryReady': {
-    en: (p) => `${n(Number(p.count), 'family', 'families')} · all ready`,
-    ko: '{count}종 · 전부 준비됨'
+    en: (p) => `${n(Number(p.count), 'font', 'fonts')} ready`,
+    ko: '폰트 {count}종 준비됨'
   },
   'fonts.summaryMissing': {
-    en: (p) => `${n(Number(p.count), 'family', 'families')} · ${p.missing} missing`,
-    ko: '{count}종 · {missing}종 없음'
+    en: (p) => `${n(Number(p.missing), 'font', 'fonts')} missing`,
+    ko: '폰트 {missing}종 없음'
+  },
+  'summary.imagesTip': {
+    en: 'Image quality preset — click to open the Images tab',
+    ko: '이미지 품질 프리셋 — 클릭하면 이미지 탭이 열립니다'
+  },
+  'summary.fontsTip': {
+    en: 'Font readiness for this document — click to open the Fonts tab',
+    ko: '문서 폰트 준비 상태 — 클릭하면 폰트 탭이 열립니다'
   },
   'fonts.help': {
     en: 'Open-license fonts are downloaded automatically at export. Add a file only for fonts that cannot be fetched; anything missing stays as outlines — same look, just less savings.',

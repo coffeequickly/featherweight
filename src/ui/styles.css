@@ -272,3 +272,23 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* 상단 요약 — 픽토그램 + 문구 칩, 클릭하면 해당 탭 */
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summaryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  margin-left: -6px;
+  border-radius: 4px;
+}
+
+.summaryChip + .summaryChip {
+  margin-left: 0;
+}
