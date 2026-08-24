@@ -12,7 +12,11 @@ import { join } from 'node:path'
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 
 const TASKS = [
-  { label: 'build', command: join(ROOT, 'node_modules/.bin/build-figma-plugin'), args: ['--typecheck', '--watch'] },
+  {
+    label: 'build',
+    command: join(ROOT, 'node_modules/.bin/build-figma-plugin'),
+    args: ['--typecheck', '--watch']
+  },
   { label: 'fonts', command: process.execPath, args: [join(ROOT, 'tools/serve-fonts.mjs')] }
 ]
 

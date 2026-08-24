@@ -22,7 +22,7 @@ import { presetOf } from '../lib/presets'
 import { FrameFocusHandler, FrameItem, ResizeWindowHandler, SortMode } from '../lib/types'
 import { PLUGIN_VERSION } from './buildInfo'
 import { ExportFooter } from './ExportFooter'
-import { FontPanel, fontsSummaryText } from './FontPanel'
+import { FontPanel, fontsSummaryText, missingFonts } from './FontPanel'
 import { FrameList } from './FrameList'
 import { ImageSettings } from './ImageSettings'
 import { useExport } from './useExport'
@@ -120,6 +120,7 @@ function AppBody(): JSX.Element {
   }, [items, sortMode, manualOrder])
 
   const visible = ordered.filter((item) => !excluded.includes(item.id))
+  const missing = missingFonts(fonts, storedFonts)
 
   function handleMove(id: string, direction: -1 | 1): void {
     const ids = visible.map((item) => item.id)
@@ -209,6 +210,18 @@ function AppBody(): JSX.Element {
                     value={sortMode}
                   />
                 </div>
+                {missing.length === 0 ? null : (
+                  <Fragment>
+                    <VerticalSpace space="extraSmall" />
+                    <div class="clickable missingLine ellipsis" onClick={() => setTab('fonts')}>
+                      <Text>
+                        {t('app.missingWarn', {
+                          names: missing.map((font) => `${font.family} ${font.style}`).join(', ')
+                        })}
+                      </Text>
+                    </div>
+                  </Fragment>
+                )}
                 <VerticalSpace space="small" />
               </Fragment>
             )}

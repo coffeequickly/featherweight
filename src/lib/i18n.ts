@@ -35,6 +35,22 @@ const MESSAGES = {
   'tab.images': { en: 'Images', ko: '이미지' },
   'tab.fonts': { en: 'Fonts', ko: '폰트' },
   'fonts.none': { en: 'No text in this document', ko: '문서에 쓰인 폰트가 없습니다' },
+  'app.missingWarn': {
+    en: '{names} — no font file, will stay as outlines. Add it in the Fonts tab',
+    ko: '{names} — 파일이 없어 아웃라인으로 나갑니다 · 폰트 탭에서 넣기'
+  },
+  'fonts.pathHint': {
+    en: 'Font files usually live here (click to copy): ',
+    ko: '폰트 파일은 보통 여기 있습니다 (클릭해 복사): '
+  },
+  'fonts.pathCopiedMac': {
+    en: 'Path copied — press ⌘⇧G in the file dialog and paste',
+    ko: '경로 복사됨 — 파일 선택창에서 ⌘⇧G 누르고 붙여넣으세요'
+  },
+  'fonts.pathCopiedWin': {
+    en: 'Path copied — paste it into the file name field',
+    ko: '경로 복사됨 — 파일 이름 칸에 붙여넣으세요'
+  },
   'app.errorGuide': {
     en: 'If it keeps failing, try exporting fewer frames at once.',
     ko: '계속 실패하면 프레임을 나눠서 내보내 보세요.'

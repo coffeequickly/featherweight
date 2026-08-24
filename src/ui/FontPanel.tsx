@@ -19,7 +19,8 @@ import {
   FontSaveHandler,
   FontUsage,
   NoticeHandler,
-  StoredFont
+  StoredFont,
+  ToastHandler
 } from '../lib/types'
 import { createProbe } from './fontkitAdapter'
 
@@ -47,6 +48,11 @@ function availabilityOf(font: FontUsage, stored: StoredFont[]): Availability {
  * 파일에서 family/style 을 자동으로 읽지 않는 이유: variable 에서 뽑은 static 인스턴스의
  * 이름표가 Figma 가 부르는 이름과 어긋난다("Pretendard Variable SemiBold / Regular").
  */
+/** 파일이 없어 아웃라인으로 나갈 폰트들 — 내보내기 탭 경고에 쓴다 */
+export function missingFonts(fonts: FontUsage[], stored: StoredFont[]): FontUsage[] {
+  return fonts.filter((font) => availabilityOf(font, stored).kind === 'missing')
+}
+
 /** 내보내기 탭의 한 줄 요약 — "4종 · 전부 준비됨" */
 export function fontsSummaryText(fonts: FontUsage[], stored: StoredFont[]): string {
   if (fonts.length === 0) return ''
@@ -104,10 +110,40 @@ export function FontPanel({
           <Text>
             <Muted>{t('fonts.missingNote', { missing })}</Muted>
           </Text>
+          <VerticalSpace space="extraSmall" />
+          {/* 파일 선택창은 보안상 시작 폴더를 지정할 수 없다 —
+              대신 경로를 복사해 주고 이동(⌘⇧G)으로 안내한다 */}
+          <Text>
+            <Muted>
+              {t('fonts.pathHint')}
+              {FONT_DIRS.map((dir, index) => (
+                <Fragment key={dir}>
+                  {index > 0 ? ' · ' : ''}
+                  <span class="clickable pathChip" onClick={() => copyPath(dir)}>
+                    {dir}
+                  </span>
+                </Fragment>
+              ))}
+            </Muted>
+          </Text>
         </Fragment>
       )}
     </Fragment>
   )
+}
+
+const IS_MAC = navigator.platform.toUpperCase().includes('MAC')
+const FONT_DIRS = IS_MAC ? ['~/Library/Fonts', '/Library/Fonts'] : ['C:\\Windows\\Fonts']
+
+function copyPath(path: string): void {
+  // 플러그인 iframe 에서는 clipboard API 권한이 불안정하다 — execCommand 가 확실하다
+  const area = document.createElement('textarea')
+  area.value = path
+  document.body.appendChild(area)
+  area.select()
+  document.execCommand('copy')
+  area.remove()
+  emit<ToastHandler>('toast', t(IS_MAC ? 'fonts.pathCopiedMac' : 'fonts.pathCopiedWin'))
 }
 
 function FontRow({
