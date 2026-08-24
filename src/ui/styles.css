@@ -252,10 +252,16 @@
   margin: 0 -16px;
 }
 
-/* 파일 없는 폰트 경고 — 클릭하면 폰트 탭으로 */
+/* 파일 없는 폰트 경고 — 배경 있는 배너로 클릭 영역을 분명하게. 클릭하면 폰트 탭으로 */
 .missingLine {
   color: var(--figma-color-text-warning, #b45309);
-  padding: 2px 4px 2px 0;
+  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.missingLine:hover {
+  filter: brightness(1.05);
 }
 
 .missingLine * {
