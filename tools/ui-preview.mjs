@@ -34,6 +34,7 @@ const FIGMA_VARS = `
   --figma-color-icon: #333333;
   --figma-color-icon-secondary: #808080;
   --figma-color-bg-warning-tertiary: #fff1c2;
+  --figma-color-text-warning: #a15c07;
 }
 body { margin: 0; background: var(--figma-color-bg); }
 `
@@ -56,6 +57,7 @@ const FIGMA_VARS_DARK = `
   --figma-color-icon: #cccccc;
   --figma-color-icon-secondary: #8c8c8c;
   --figma-color-bg-warning-tertiary: #4a3a12;
+  --figma-color-text-warning: #f3c11b;
 }
 body { margin: 0; background: var(--figma-color-bg); }
 `

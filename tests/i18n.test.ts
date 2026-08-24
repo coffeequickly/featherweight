@@ -83,7 +83,8 @@ describe('사전 무결성', () => {
     sample: '가',
     type: 'SLICE',
     why: 'w',
-    message: 'm'
+    message: 'm',
+    names: 'Nexa Heavy'
   }
 
   it('모든 키가 양 언어에서 비지 않은 문장을 준다', () => {
