@@ -223,6 +223,10 @@ window.addEventListener('message', (event) => {
     send('fonts', FIXTURE.fonts)
     send('fonts:stored', FIXTURE.storedFonts)
   }
+
+  if (name === 'toast') {
+    document.getElementById('note').textContent = 'TOAST: ' + message[1]
+  }
 })
 
 function send(name, ...args) {
