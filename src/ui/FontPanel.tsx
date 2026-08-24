@@ -114,11 +114,14 @@ export function FontPanel({
           {/* 파일 선택창은 보안상 시작 폴더를 지정할 수 없다 —
               대신 경로를 복사해 주고 이동(⌘⇧G)으로 안내한다 */}
           <Text>
+            <Muted>{t(IS_MAC ? 'fonts.pathHelpMac' : 'fonts.pathHelpWin')}</Muted>
+          </Text>
+          <VerticalSpace space="extraSmall" />
+          <Text>
             <Muted>
-              {t('fonts.pathHint')}
               {FONT_DIRS.map((dir, index) => (
                 <Fragment key={dir}>
-                  {index > 0 ? ' · ' : ''}
+                  {index > 0 ? '  ·  ' : ''}
                   <span class="clickable pathChip" onClick={() => copyPath(dir)}>
                     {dir}
                   </span>

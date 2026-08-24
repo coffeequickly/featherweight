@@ -59,6 +59,45 @@ class ErrorBoundary extends Component<{ children: ComponentChildren }, { crashed
   }
 }
 
+/** 요약용 픽토그램 — 12px 스트로크, 텍스트 보조색 */
+function ImageGlyph(): JSX.Element {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--figma-color-text-secondary)"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  )
+}
+
+/** 폰트 픽토그램 — 대문자 A 형태 */
+function TypeGlyph(): JSX.Element {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--figma-color-text-secondary)"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M4 20L12 4l8 16" />
+      <path d="M7 14h10" />
+    </svg>
+  )
+}
+
 function AppBody(): JSX.Element {
   // 화면이 들고 있는 것: 탭·정렬·순서·제외. 메인에서 오는 것: useMainState.
   // 초기 탭 — ui-preview 캡처 자동화용 훅. Figma 안에서는 전역이 없어 항상 'export'.
@@ -192,13 +231,31 @@ function AppBody(): JSX.Element {
             {items.length === 0 ? null : (
               <Fragment>
                 <div class="rowBetween">
-                  <div class="ellipsis">
-                    <Text>
-                      <Muted>
-                        {t(`presets.${presetOf(settings)}` as const)}
-                        {fonts.length > 0 ? ` · ${fontsSummaryText(fonts, storedFonts)}` : ''}
-                      </Muted>
-                    </Text>
+                  <div class="ellipsis summaryRow">
+                    <span
+                      class="clickable summaryChip"
+                      title={t('summary.imagesTip')}
+                      onClick={() => setTab('images')}
+                    >
+                      <ImageGlyph />
+                      <Text>
+                        <Muted>
+                          {t('tab.images')} {t(`presets.${presetOf(settings)}` as const)}
+                        </Muted>
+                      </Text>
+                    </span>
+                    {fonts.length === 0 ? null : (
+                      <span
+                        class="clickable summaryChip"
+                        title={t('summary.fontsTip')}
+                        onClick={() => setTab('fonts')}
+                      >
+                        <TypeGlyph />
+                        <Text>
+                          <Muted>{fontsSummaryText(fonts, storedFonts)}</Muted>
+                        </Text>
+                      </span>
+                    )}
                   </div>
                   <SegmentedControl
                     disabled={exporter.busy}
