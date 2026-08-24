@@ -122,7 +122,7 @@ export function FontPanel({
               {FONT_DIRS.map((dir, index) => (
                 <Fragment key={dir}>
                   {index > 0 ? '  ·  ' : ''}
-                  <span class="clickable pathChip" onClick={() => copyPath(dir)}>
+                  <span class="clickable pathChip" onClick={() => void copyPath(dir)}>
                     {dir}
                   </span>
                 </Fragment>
@@ -138,15 +138,47 @@ export function FontPanel({
 const IS_MAC = navigator.platform.toUpperCase().includes('MAC')
 const FONT_DIRS = IS_MAC ? ['~/Library/Fonts', '/Library/Fonts'] : ['C:\\Windows\\Fonts']
 
-function copyPath(path: string): void {
-  // 플러그인 iframe 에서는 clipboard API 권한이 불안정하다 — execCommand 가 확실하다
-  const area = document.createElement('textarea')
-  area.value = path
-  document.body.appendChild(area)
-  area.select()
-  document.execCommand('copy')
-  area.remove()
-  emit<ToastHandler>('toast', t(IS_MAC ? 'fonts.pathCopiedMac' : 'fonts.pathCopiedWin'))
+async function copyPath(path: string): Promise<void> {
+  // execCommand 를 먼저 쓴다 — 동기라 절대 멈추지 않는다. 실측 결과 Clipboard API
+  // (navigator.clipboard.writeText) 는 이 플러그인 iframe 에서 권한 프롬프트가
+  // 렌더링되지 못해 응답 없이 영원히 대기했다 — await 가 안 끝나 클릭이 "반응 없음"
+  // 으로 보였다. 그래서 비동기 경로는 타임아웃을 씌워 반드시 끝나게 한다.
+  const copied = trySyncCopy(path) || (await tryAsyncCopy(path))
+  emit<ToastHandler>(
+    'toast',
+    t(copied ? (IS_MAC ? 'fonts.pathCopiedMac' : 'fonts.pathCopiedWin') : 'fonts.pathCopyFailed')
+  )
+}
+
+function trySyncCopy(text: string): boolean {
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.focus()
+    area.select()
+    const ok = document.execCommand('copy')
+    area.remove()
+    return ok
+  } catch {
+    return false
+  }
+}
+
+const CLIPBOARD_TIMEOUT_MS = 400
+
+function tryAsyncCopy(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText === undefined) return Promise.resolve(false)
+  const attempt = navigator.clipboard
+    .writeText(text)
+    .then(() => true)
+    .catch(() => false)
+  const timeout = new Promise<boolean>((resolve) =>
+    setTimeout(() => resolve(false), CLIPBOARD_TIMEOUT_MS)
+  )
+  return Promise.race([attempt, timeout])
 }
 
 function FontRow({

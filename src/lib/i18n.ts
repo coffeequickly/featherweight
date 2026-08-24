@@ -47,6 +47,10 @@ const MESSAGES = {
     en: 'Installed fonts are in the folder below. Click the path to copy it, then paste it into the file name field.',
     ko: '설치된 폰트는 아래 폴더에 있습니다. 경로를 클릭해 복사한 뒤, 파일 이름 칸에 붙여넣으세요.'
   },
+  'fonts.pathCopyFailed': {
+    en: "Couldn't copy automatically — select the path text below and copy it manually",
+    ko: '자동으로 복사하지 못했습니다 — 아래 경로를 직접 드래그해 복사해 주세요'
+  },
   'fonts.pathCopiedMac': {
     en: 'Path copied — press ⌘⇧G in the file dialog and paste',
     ko: '경로 복사됨 — 파일 선택창에서 ⌘⇧G 누르고 붙여넣으세요'

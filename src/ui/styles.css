@@ -269,8 +269,13 @@
 }
 
 .pathChip {
+  /* create-figma-plugin 의 Text 컴포넌트는 자체적으로 pointer-events: none 이다 —
+     Text 안에 중첩된 클릭 요소는 이 속성이 상속돼 클릭이 그대로 통과해버린다.
+     명시적으로 되돌린다. (실측: 이 한 줄이 없으면 클릭이 조용히 아무 반응도 없다) */
+  pointer-events: auto;
   text-decoration: underline;
   text-underline-offset: 2px;
+  user-select: text;
 }
 
 /* 상단 요약 — 픽토그램 + 문구 칩, 클릭하면 해당 탭 */
