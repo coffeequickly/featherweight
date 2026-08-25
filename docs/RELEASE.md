@@ -1,78 +1,91 @@
-# 릴리즈 플레이북 — Figma Community 공개
+# Release playbook
 
-> **상태 (2026-08-21): 심사 제출 완료** — https://www.figma.com/community/plugin/1672509720278498323
-> 지원 이메일: featherweight@jangwonseok.com · 승인되면 README 설치 절을 Community 링크로 교체.
-> 후속: 태그 보강(resume·portfolio·fonts·ats 등), 한국어 설명 추가 여부 확인.
+**Status: live on the Figma Community** —
+[Featherweight – Compressed PDF Export with Real Fonts](https://www.figma.com/community/plugin/1672509720278498323/featherweight-compressed-pdf-export-with-real-fonts)
+· approved 2026-08-26 · support: featherweight@jangwonseok.com
 
-> 목표: Community 무료 공개.
-> 이름 확정: **Featherweight** (2026-08-21). Community 에 정확히 일치하는 플러그인 없음을 직접 확인.
-> 참고: "Featherlight — Compress, WebP & Batch Export"(Rational Mystic LLC, 유료, 사용 2명)라는
-> 한 글자 차이 플러그인이 같은 카테고리에 존재 — 인지하고 진행하기로 결정.
-> 내부 식별자(레포 이름 figma-sheaf, manifest id "sheaf", clientStorage 키)는 저장 데이터 호환을 위해 유지한다.
-> 방침: 폰트 라이선스·결과물 검증 책임은 면책조건으로 사용자에게 명시한다.
-> 플러그인은 임베드 권한(fsType) 검사를 하지 않는다 — 기능은 기능이다.
+Repo: [coffeequickly/featherweight](https://github.com/coffeequickly/featherweight) ·
+MIT · plugin id `1672509720278498323`
 
-## 1. 출시 전 남은 일
+## Cutting a release
 
-코드 (완료된 것은 ✅)
+```bash
+npm run lint && npm test && npm run verify:catalog   # verify:catalog hits the network
+npm run install:local                                # load the build into Figma for manual QA
+# work through docs/CHECKLIST.md → "Release QA"
 
-- ✅ 혼합 스타일 노드를 run 별 폰트로 드로잉 (2026-08-21)
-- ✅ 밑줄·취소선 텍스트는 아웃라인 fallback (2026-08-21)
-- ✅ 폰트 카탈로그 15종 확장 + `verify:catalog` 실검증 (2026-08-21)
-- ✅ UI 한/영 병행 — 앱 언어 자동 감지, 문장은 `src/lib/i18n.ts` 사전 (2026-08-21)
-- ✅ 파이프라인 실검증 (2026-08-21, `npm run verify:catalog` 에 포함) — 실제 Figma SVG 픽스처
-      + CDN 실폰트 3굵기(Regular/Bold/ExtraBold)로 PDF 생성: 전부 CID TrueType 임베드,
-      `pdftotext` 한글 추출 100%, 서브셋으로 7.5KB (원본 폰트 7.7MB)
-- ✅ UI 전면 개편 — 탭 구조·프리셋·드래그 정렬·캔버스 점프·파일명 자동·한/영 (2026-08-21)
-- [ ] `docs/CHECKLIST.md` "릴리즈 QA" 섹션 — **사람이 Figma 데스크톱에서 육안 확인만 남음**
-      (좌표 정합·굵기 시각 확인·플러그인 UI·clientStorage. 임베드·추출·다운로드는 위에서 기계 검증됨)
-- [ ] 타인 문서 최소 2종으로 내보내기 검증 (영문 문서 1종 포함)
-- [ ] Figma 웹(브라우저) 버전에서 다운로드 동작 확인
+npm version patch                                    # or minor / major
+git push --follow-tags                               # CI builds the GitHub Release + zip
+```
 
-퍼블리싱 형식
+Then publish to the Community (manual, two clicks):
 
-- ✅ 이름 확정 Featherweight → manifest name·PDF Producer·패키지 zip·문서 일괄 교체 (2026-08-21)
-- ✅ 아이콘 128×128, 커버 1920×960 — `docs/brand/` 에 PNG 저장 (2026-08-21).
-      디자인 수정은 캔버스에서: https://claude.ai/code/artifact/c4b4d306-ad6f-4bc1-9297-844c7db6368d (수정 시 PNG 재생성 필요)
-- [ ] 지원 연락처(이메일 또는 GitHub Issues), 태그 선정
-- ✅ 코드 라이선스 MIT (2026-08-21). 공개 시 새 레포 + 히스토리 리셋 권장 (docs/RELEASE.md 참고)
+1. Figma desktop → Plugins → Manage plugins → Featherweight → **Publish**
+2. **Publish new version**, add a one-line release note, submit
 
-## 2. 심사 대비 메모
+Version updates skip the full review that the first submission went through.
+Before clicking, run the plugin once and confirm the version in the bottom-right
+corner matches what you intend to ship.
 
-- `networkAccess.allowedDomains: ["https://cdn.jsdelivr.net"]` + reasoning 이 이미
-  manifest 에 있다. 리스팅 설명의 프라이버시 문구와 **정확히 일치**시킬 것.
-- 문서 데이터는 어떤 서버로도 나가지 않는다. "폰트 다운로드만" 이 심사관에게 명확해야 한다.
-- 플러그인 ID 는 퍼블리시 과정에서 Figma 가 발급한다 (`figma-plugin.id: "sheaf"` 는 로컬용).
+### Two distribution tracks
 
-## 3. 리스팅 문안 (2026-08-21 — 인기작 패턴 분석 반영)
+| Trigger | Result |
+|---|---|
+| Push to `main` | Tests + build, and the rolling `latest` prerelease is refreshed with a fresh zip |
+| Push a `v*` tag | A versioned GitHub Release with `featherweight-X.Y.Z.zip` attached |
 
-> 참조: Compressed PDF and Image Exporter(143k 사용자)·Hypermatic 리스팅 분석.
-> 발견한 패턴 — ① 이름에 검색 키워드를 붙인다 ② 태그라인은 기능+키워드 압축 한 줄
-> ③ 설명은 문제 후킹 → 기능 불릿 → 사용 3단계 → 차별점 → 지원 순서.
-> 결정적 근거: CPIE 개발자가 댓글에서 "폰트 임베드는 못 한다. Figma 가 전부 아웃라인으로
-> 뽑는 게 근본 문제"라고 인정 — 이력서 사용자들이 "전부 텍스트라 용량이 안 준다"고 호소.
-> **우리 카피는 그 지점(진짜 폰트 임베드)을 정면에 세운다.**
+The zip is for people who want a development build (unzip → Import plugin from
+manifest). Regular users install from the Community.
 
-### 이름 (퍼블리시 폼 Name)
+## Why Community publishing isn't automated
 
-> **Featherweight – Light PDF Export (Real Fonts)**
+Figma provides no public API for publishing plugins — submissions go through the
+desktop app. The unofficial path is to call the internal endpoints the desktop
+app uses, authenticating with the `__Host-figma.authn` cookie.
 
-Community 검색은 이름 가중치가 커서 키워드를 이름에 붙이는 게 업계 관행
-(CPIE 도 "(PDF, PNG, JPG, WebP)" 를 이름에 달았다). 메뉴에 조금 길게 보이는 대신
-"pdf export" 검색에 잡힌다. 짧은 이름을 원하면 "Featherweight" 단독도 가능.
+We deliberately don't wire that into CI:
 
-### 태그라인 (검색 카드 한 줄)
+- The cookie **expires**, and there's no way to refresh or rotate it
+  programmatically. Automating it produces a release path that works fine until
+  one day it silently doesn't.
+- It is account-credential-grade. Parking it in CI secrets is a standing risk for
+  what is otherwise a two-click manual step.
 
-> EN: Tiny PDFs with real embedded fonts — selectable, searchable, ATS-ready. Résumés & portfolios from 10MB to <1MB.
->
-> KR: 프레임을 가벼운 PDF 로 — 텍스트는 아웃라인이 아니라 진짜 폰트. 검색·복사되는 이력서·포트폴리오.
+`tools/figma-publish.mjs` is kept for the cases where clicking isn't an option,
+and as a starting point if Figma ever ships an official API:
 
-### 설명 (Description)
+```bash
+# token: figma.com → DevTools → Application → Cookies → __Host-figma.authn
+FIGMA_WEB_AUTHN_TOKEN=... node tools/figma-publish.mjs --dry-run   # inspect only
+FIGMA_WEB_AUTHN_TOKEN=... npm run publish:figma "Fix: ..."         # actually upload
+```
+
+It reuses the listing values (name, description, tags, images) already on the
+store, so this path can't change your listing copy. Copy and image edits happen
+in the desktop app.
+
+## Listing copy
+
+Kept in sync with what's live. Edit here first, then paste into the publish form.
+
+### Name
+
+> Featherweight – Compressed PDF Export with Real Fonts
+
+Community search weighs the plugin name heavily, hence the keywords after the
+brand name (the leading competitor does the same with "(PDF, PNG, JPG, WebP)").
+
+### Tagline
+
+> Tiny PDFs with real embedded fonts — selectable, searchable, ATS-ready.
+> Résumés & portfolios from 10MB to <1MB.
+
+### Description
 
 Figma's built-in PDF export turns every letter into vector outlines. Your text
 can't be selected, searched, or read by résumé scanners (ATS) — and text-heavy
-documents balloon to 10–20MB that no compressor can shrink, because there are
-no images to compress.
+documents balloon to 10–20MB that no compressor can shrink, because there are no
+images to compress.
 
 Featherweight fixes the text problem itself:
 
@@ -114,66 +127,29 @@ GOOD TO KNOW
 • Text is embedded in an extractable form, but no specific ATS parsing
   result is guaranteed. Not affiliated with Figma, Inc.
 
----
+### Categories & tags
 
-한국어
+Categories (max 2): **Import & export** (primary) + **Design tools**
 
-Figma 기본 PDF 내보내기는 모든 글자를 벡터 아웃라인으로 바꿉니다. 텍스트가
-선택·검색되지 않고 채용 시스템(ATS)이 읽지 못하며, 텍스트 위주 문서는
-10~20MB 가 됩니다 — 압축할 이미지가 없어서 어떤 압축 도구로도 줄지 않습니다.
+Tags: `pdf` `export` `fonts` `compress` `resume` `portfolio` `korean` `ats`
 
-Featherweight 는 텍스트 문제 자체를 고칩니다:
+### Media
 
-🪶 아웃라인이 아니라 진짜 폰트 — 텍스트를 서브셋 폰트로 다시 임베드합니다.
-선택·검색·복사가 되고 ATS 가 읽습니다. 텍스트 위주 이력서가 10MB 에서 1MB
-아래로 줄어듭니다.
+Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 
-🪶 이미지 다운스케일 — 화면 표시 크기에 맞춰 줄입니다. 프리셋(선명하게/균형/
-최소 용량) 또는 세부 조절.
+| File | Use |
+|---|---|
+| `icon-128.png` | Plugin icon (128×128) |
+| `cover-1920x960.png` | Cover image |
+| `media-1.png` … `media-4.png` | Carousel: hero, export tab, presets, fonts |
 
-사용법: 프레임 선택 → 실행 → 드래그로 순서 조정 → 내보내기.
+The tab screenshots come from `npm run ui:preview` with `?bare=1&lang=en-US`, so
+they can be re-captured whenever the UI changes.
 
-• 한글 오픈 폰트 15종 자동 임베드 (Pretendard, 나눔, Gothic A1, Spoqa 등),
-  그 외 서체는 TTF/OTF 를 한 번만 등록
-• 절대 다른 폰트로 대체하지 않음 — 임베드 못 하는 텍스트는 원본 아웃라인
-  유지, 사유를 클릭하면 해당 레이어로 이동
-• 100% 로컬 — 문서는 어디에도 전송되지 않습니다 (네트워크는 오픈 폰트
-  다운로드 전용). 텔레메트리 없음. 무료 오픈소스(MIT).
+## Release-note style
 
-유의사항: 제출 전 결과 PDF 를 반드시 확인하세요. 결과물 사용과 직접 등록한
-폰트의 라이선스 준수는 사용자 책임입니다.
+Match the existing version history — one line, leading with the change type:
 
-### 카테고리 (폼에서 최대 2개)
-
-> Import & export (주) + Design tools (보조) — CPIE 와 같은 조합
-
-### 태그
-
-pdf · export · fonts · compress · resume · portfolio · korean · ats
-
-## 4. 출시 절차
-
-1. `npm run lint && npm test && npm run verify:catalog && npm run build`
-2. `docs/CHECKLIST.md` 릴리즈 QA 통과 확인
-3. zip 배포는 두 트랙이다:
-   - **latest** — main 에 푸시하면 CI 가 latest 프리릴리즈를 자동 갱신 (항상 최신)
-   - **정식 버전** — `npm version minor` → `git push --follow-tags` (v* Release 자동)
-   - **Figma 새 버전 올리기 — 수동** (데스크톱 앱, 클릭 두 번)
-     Plugins → Manage plugins → Featherweight → Publish → Publish new version.
-     릴리즈 노트 한 줄만 적으면 끝. 로컬 빌드가 올라가므로 `npm run install:local`
-     로 최신 빌드를 넣어 둔 상태여야 한다 (플러그인 우하단 버전으로 확인).
-
-     자동화하지 않는 이유: 퍼블리싱 공개 API 가 없고, 대안인 내부 API 는 만료되는
-     쿠키를 쓰는데 자동 갱신·로테이션 수단이 없다. 자동화하면 어느 날 조용히
-     실패하는 릴리즈 경로가 되고, 계정 자격증명급 시크릿을 CI 에 상주시켜야 한다.
-
-     그래도 원격에서 올려야 할 때를 위해 `tools/figma-publish.mjs` 를 남겨 뒀다:
-
-     ```
-     # 토큰: figma.com → 개발자도구 → Application → Cookies → __Host-figma.authn
-     FIGMA_WEB_AUTHN_TOKEN=... node tools/figma-publish.mjs --dry-run   # 확인만
-     FIGMA_WEB_AUTHN_TOKEN=... npm run publish:figma "Fix: ..."         # 실제 업로드
-     ```
-
-     리스팅 문구·이미지는 스토어의 기존 값을 그대로 재사용하므로 이 경로로 바뀌지
-     않는다. 문구·이미지 변경은 데스크톱 앱에서 한다.
+- "Fix: the font path 'copy' button didn't respond to clicks at all."
+- "Fix: logos and small images now pass through untouched. UI polish across all tabs."
+- "Windows: correct font folder paths and shortcuts. Locale-aware number formatting."

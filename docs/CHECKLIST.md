@@ -1,223 +1,87 @@
-# 수동 체크리스트 (Figma 안에서 사람이 확인)
-
-Claude Code가 Phase마다 갱신한다. PO 가 실행 결과를 붙여넣으면 판정한다. (PRD §11)
-
----
-
-## Phase 0 — 진단 + 스캐폴드
-
-준비
-
-- [ ] `npm install` 성공
-- [ ] `npm run build` 성공 → 레포 루트에 `manifest.json`, `build/main.js`, `build/ui.js` 생성
-
-Figma
-
-- [ ] Figma 데스크톱 → Plugins → Development → Import plugin from manifest… → `figma-sheaf/manifest.json` 선택
-- [ ] 플러그인 실행 → 창이 뜬다 (제목 "Sheaf")
-- [ ] 프레임을 선택하지 않은 상태: "내보낼 프레임을 캔버스에서 선택하세요" 안내가 보인다
-- [ ] 프레임 3개 선택: 이름·크기가 목록에 뜬다
-- [ ] 캔버스에서 선택을 바꾸면 1초 안에 목록이 따라 바뀐다
-- [ ] 플러그인을 닫았다 열어도 정상 동작한다
-
-폰트 점검 (Phase 2 진입 조건 — 오픈 질문 1)
-
-- [ ] 목록 아래 "폰트 N종"에 실제로 쓰는 폰트가 전부 뜬다 (family + style + weight + 글자 수)
-- [ ] 빠진 폰트가 없다 (한 TextNode 안에서 폰트를 섞어 쓴 곳도 잡히는지)
-- [ ] "fonts.json 초안"을 열어 내용을 복사해 둔다
-- [ ] 각 폰트의 TTF 파일을 구할 수 있는지 확인한다
-      - 로컬 설치 폰트 → `~/Library/Fonts` 또는 `/Library/Fonts` 에서 복사
-      - Figma 제공(Google Fonts) → 다운로드
-      - 파일을 못 구하는 폰트 → 그 텍스트는 Phase 2 에서도 아웃라인으로 남는다 (모양은 그대로)
-- [ ] Variable 폰트를 쓰고 있다면(예: "Pretendard Variable") static TTF 로 대체 가능한지 확인
-
-진단 (PO → `docs/SPIKES.md` Baseline에 붙여넣기)
-
-- [ ] `brew install poppler qpdf`
-- [ ] 이력서 PDF: `ls -l`, `pdfimages -list`, `pdffonts`, `pdftotext ... | head -40`
-- [ ] 포트폴리오 PDF: 같은 4개
-
-폰트 보관 (S8 — clientStorage)
-
-- [ ] `npm run fonts` 실행 → `fonts/*.ttf` 4개가 각 600KB 내외로 생성된다
-- [ ] 플러그인 "폰트 파일" 영역에 문서가 쓰는 폰트 4자리가 뜬다 (전부 "파일 없음")
-- [ ] `npm run fonts:serve` 를 켜고 플러그인을 연다 → 4종이 자동으로 채워진다 ← **자동 경로**
-- [ ] 서버를 끄고 플러그인을 열어도 4종이 그대로 있다 (clientStorage 에 남아 있으므로)
-- [ ] 서버가 꺼진 상태에서 새 폰트 자리가 생기면 "로컬 폰트 서버가 없다" 안내가 뜬다
-- [ ] 자리마다 [파일 선택] 으로 직접 넣는 것도 된다 (수동 경로)
-- [ ] 넣을 때마다 파일명·용량·글리프 수가 뜨고, 상단 용량이 늘어난다 (최종 약 2.3MB / 5.0MB)
-- [ ] 플러그인을 닫았다 다시 열어도 4개가 그대로 있다 ← **S8 의 핵심**
-- [ ] 휴지통 버튼으로 하나 지우면 목록과 용량이 같이 줄어든다
-- [ ] (선택) 서브셋 안 한 3.1MB 원본을 넣어보면 "용량 초과" 경고가 뜨고 저장되지 않는다
-
-판정
-
-- [ ] Phase 0 DoD 통과 → Phase 1 착수 승인
-- [ ] S8 통과 → Phase 2 는 clientStorage 방식으로 간다 (실패 시 번들로 되돌림)
-
----
-
-## Phase 1 — 순서 + 머지
-
-준비
-
-- [ ] `npm run dev` 를 켜둔다 (자동 빌드 + 폰트 서버)
-- [ ] Figma 에서 플러그인 실행
-
-목록 조작 (FR-1, FR-2)
-
-- [ ] 프레임 5개 선택 → 목록에 1~5 번호가 붙는다
-- [ ] ↑↓ 로 순서를 바꾼다. 맨 위의 ↑, 맨 아래의 ↓ 는 비활성이다
-- [ ] ✕ 로 1개 제외 → "제외됨 1개 · 복원" 이 뜨고 목록에서 사라진다
-- [ ] "복원" 을 누르면 되돌아온다
-- [ ] [위치순]/[이름순] 을 누르면 손으로 잡은 순서가 초기화된다
-- [ ] 캔버스에서 선택을 바꾸면 순서·제외가 초기화된다
-
-내보내기 (FR-4)
-
-- [ ] [PDF 내보내기] → 진행률 "페이지 n/5" 가 오른다
-- [ ] 저장 다이얼로그가 뜬다. 파일명이 `{문서이름}.pdf` 다
-- [ ] 결과 줄에 `5쪽 · N.NMB · N.N초` 가 뜬다
-
-결과 PDF 확인 (터미널)
-
-- [ ] `pdfinfo 결과.pdf` → Pages 가 목록 개수와 같다, Producer 가 `Sheaf`, Title 이 문서 이름
-- [ ] `pdftoppm -png -r 40 결과.pdf /tmp/p` 로 훑어보면 **페이지 순서가 목록 순서와 같다**
-- [ ] 제외한 프레임이 결과에 없다
-- [ ] `pdfimages -list 결과.pdf` 가 Figma 기본 export 와 같다 (아직 무압축이라 같아야 정상)
-
-원본 무손상 (G4) — **가장 중요**
-
-- [ ] 내보내기 후 Figma 문서에 변경 표시가 없다 (레이어·위치·오토레이아웃 그대로)
-- [ ] 레이어 패널에 `__sheaf_tmp__` 가 남아 있지 않다
-- [ ] 오토레이아웃 **안에 있는** 프레임을 선택해 내보내도 형제가 밀리지 않는다 (S6)
-- [ ] 내보내는 도중 [취소] → 중단되고 `__sheaf_tmp__` 가 남지 않는다
-- [ ] 취소 후 다시 내보내면 정상 동작한다
-- [ ] 실행 중 플러그인 창을 닫아도 `__sheaf_tmp__` 가 남지 않는다 (남아 있으면 다음 실행 시 자동 정리 알림)
-
-판정
-
-- [ ] Phase 1 DoD 통과 → Phase 1.5(이미지 압축) 착수 승인
-
-## Phase 1.5 — 이미지 압축
-
-목적: 문서보다 큰 원본이 그대로 들어가는 걸 막는다. 표시 크기의 배율(기본 1.5x)이 상한.
-
-- [ ] 이미지 설정이 보인다: 품질 슬라이더 0.80, 배율 [1x][1.5x][2x], 긴 변 상한, 체크박스
-- [ ] 설정을 바꾸고 플러그인을 닫았다 열면 **그대로 복원된다** (FR-6)
-- [ ] 내보내는 동안 설정이 잠긴다
-- [ ] 진행률에 "이미지 n/m" 이 뜬다
-
-이미지 많은 프레임으로 (포트폴리오)
-
-- [ ] 기본값(1.5x / 2048 / q0.80)으로 내보낸다
-- [ ] `pdfimages -list 결과.pdf` → **모든 이미지의 긴 변이 target 이하** (표시 크기 × 1.5, 최대 2048)
-- [ ] 불투명 이미지는 `enc=jpeg`
-- [ ] 투명 있는 PNG 는 `enc` 가 jpeg 가 아니고 알파가 살아 있다 (배경이 검게 안 탄다)
-- [ ] 200% 줌에서 육안 비교 OK
-- [ ] 리포트에 이미지 절감(before → after)이 뜬다
-
-경계
-
-- [ ] 원본이 이미 작은 이미지는 커지지 않는다 (`pdfimages -list` 크기가 그대로)
-- [ ] 배율 1x 로 하면 눈에 띄게 흐려진다 (레버가 실제로 동작하는지 확인)
-- [ ] 이미지가 없는 프레임도 정상 동작한다
-
-잔여 클론 0 (G4)
-
-- [ ] 성공 / 실패 / 취소 세 경로 모두 `__sheaf_tmp__` 가 안 남는다
-- [ ] 이미지 처리 도중 취소해도 남지 않는다
-
-## Phase 1.5 — 이미지 압축 (원래 계획 메모)
-
-## Phase 2 — 실 폰트 임베드
-
-### 먼저 S1 (이게 안 되면 나머지가 의미 없다)
-
-Baseline 에서 확인된 것: Figma 는 텍스트를 **Type 3 폰트**로 내보내고 그게 파일의 84% 다.
-검증할 것은 "TextNode `fills = []` 로 만들면 Figma 가 그 Type 3 폰트를 아예 안 넣는가" 다.
-
-- [ ] "텍스트를 실제 폰트로 임베드" **끄고** 이력서 5쪽 내보내기 → `before.pdf`
-- [ ] 켜고 같은 5쪽 내보내기 → `after.pdf`
-- [ ] `ls -l before.pdf after.pdf` → after 가 극적으로 작다 (기대: 9.6MB → 0.5MB 내외)
-- [ ] `pdffonts after.pdf` → **Type 3 가 사라지고** `CID TrueType` Pretendard 만 남는다
-- [ ] Type 3 가 그대로 남아 있으면 → S1 실패. 아래는 볼 것 없이 플랜 B 로 간다
-
-### 결과 확인
-
-- [ ] `pdffonts after.pdf` → Pretendard 4종, `emb=yes`, `uni=yes`
-- [ ] `pdftotext after.pdf -` 가 원문과 일치한다 (한글 포함)
-- [ ] 리포트에 "텍스트 n개" 와 fallback 개수·사유가 뜬다
-
-### 시각 비교 — 겹침·어긋남
-
-- [ ] `npm run compare -- before.pdf after.pdf` → 페이지마다 다른 픽셀 비율이 나온다
-      - 0.5% 미만: 안티에일리어싱 수준 = 사실상 동일
-      - 2% 이상: 위치가 밀린 것 → diff 이미지(빨강=기준에만, 파랑=결과에만)로 어디인지 본다
-- [ ] 200% 줌에서 before/after 를 나란히 본다
-- [ ] **글자가 두 번 겹쳐 보이지 않는다** (겹치면 fills=[] 가 안 먹은 것)
-- [ ] 글자 위치가 어긋나지 않는다 (줄 위치·왼쪽 정렬 기준)
-- [ ] 가운데·오른쪽 정렬 텍스트가 제자리에 있다
-- [ ] 자간이 있는 텍스트가 벌어지거나 좁아지지 않았다
-- [ ] 굵기가 바뀌지 않았다 (SemiBold 가 Bold 로 보이면 매칭이 틀린 것)
-
-### fallback 이 안전한지
-
-- [ ] 폰트 파일을 하나 지우고 내보내면 → 그 굵기 텍스트가 **아웃라인으로 남고 보인다** (사라지지 않는다)
-- [ ] 이모지·특수문자가 든 텍스트는 fallback 으로 빠지고 그대로 보인다
-- [ ] 그라데이션 fill·그림자 있는 텍스트가 fallback 으로 빠진다
-- [ ] fallback 사유가 리포트에 뜬다
-
-### 원본 무손상 (G4)
-
-- [ ] 내보낸 뒤 Figma 문서의 텍스트가 그대로다 (fill 이 비지 않았다)
-- [ ] `__sheaf_tmp__` 가 남지 않는다
-
----
-
-## 릴리즈 QA (출시 게이트 — 2026-08-21 UI 개편 반영)
-
-위 Phase 체크리스트와 별개로, 현재 UI(탭 구조) 기준으로 실물 확인한다.
-전부 통과해야 Community 퍼블리시로 간다. (docs/RELEASE.md §1)
-
-### 화면 (탭 UI)
-
-- [ ] 탭 3개(내보내기/이미지/폰트)가 뜨고, 어느 탭에서든 하단 버튼·진행·결과가 보인다
-- [ ] 내보내기 탭: 목록 아래 설정 요약("균형 · N종 · 전부 준비됨")이 실제 상태와 일치한다
-- [ ] 프레임 행 클릭 → 캔버스가 그 프레임으로 이동한다 (선택은 유지)
-- [ ] 프레임 행 드래그 → 순서가 바뀐다 (↑↓ 버튼도 동작)
-- [ ] 이미지 탭: 프리셋 3개 전환, 숫자를 만지면 "직접"이 나타난다
-- [ ] 폰트 탭: 임베드 체크가 **기본 켜짐**, 폰트 목록·넣기 동작
-- [ ] 레이어 1~2개일 때 창이 컴팩트하고, 창 크기를 직접 바꾸면 자동 조절이 멈춘다
-- [ ] Figma 앱 언어가 한국어면 한국어(존댓말), 영어면 영어로 나온다
-- [ ] 글자 위아래·꼬리(g·j·y)가 잘리지 않는다
-
-### 내보내기 동작
-
-- [ ] 버튼에 쪽수가 맞다. 진행 문구가 "3/8쪽 · 이미지 최적화 1/4" 형식으로 나온다
-- [ ] 저장 다이얼로그에 "이름_20260821133911.pdf" 형식이 미리 채워진다
-      (프레임 1개면 프레임 이름, 여러 개면 문서 이름)
-- [ ] 완료 시 캔버스 토스트("… 저장 완료")가 뜬다
-- [ ] 리포트 첫 줄에 파일명·쪽수·용량·시간이 나온다
-
-### 혼합 스타일 드로잉 (run 별 폰트)
-
-- [ ] 한 TextNode 안에 Regular + Bold 섞은 줄 → 결과 PDF 에서 굵은 부분만 굵다
-- [ ] `pdffonts` 에 두 굵기가 둘 다 서브셋 임베드로 뜬다
-
-### 밑줄·취소선 fallback
-
-- [ ] 밑줄 텍스트 → 결과에서 밑줄이 보인다 (아웃라인 유지), 리포트에 사유가 뜬다
-
-### 확장 카탈로그·fallback
-
-- [ ] 나눔고딕(Google Fonts) 텍스트가 업로드 없이 자동 임베드된다
-- [ ] 카탈로그 밖 서체는 "파일 없음"으로 뜨고 아웃라인으로 남는다
-- [ ] 리포트 사유 클릭 → 해당 텍스트 레이어가 캔버스에서 선택·줌 된다
-- [ ] 오프라인(와이파이 끔) → 카탈로그 폰트가 fallback 으로 빠지고 PDF 는 정상
-- [ ] 원본 무손상: 내보낸 뒤 문서 텍스트 그대로, `__sheaf_tmp__` 잔존 0
-
-### 환경
-
-- [ ] 타인 문서 2종(영문 1종 포함)으로 위 항목을 반복한다
-- [ ] Figma 웹(브라우저)에서 다운로드가 동작한다 (dev 플러그인은 데스크톱 import 후 웹 확인 불가 시 항목 보류 표기)
+# Manual QA
+
+What a person has to check inside Figma, because no automated test can.
+Everything else — coordinate math, the SVG parser, font matching, the catalog,
+i18n, presets, file names — is covered by `npm test` (and `npm run
+verify:catalog` for the real CDN plus a full text-pipeline run against real
+fonts).
+
+Work through this before publishing a new version to the Community.
+Run `npm run install:local` first, then reopen the plugin and confirm the version
+in the bottom-right corner is the build you mean to ship.
+
+## Layout & states
+
+- [ ] Three tabs (Export / Images / Fonts); the export button, progress and
+      result stay visible from every tab
+- [ ] Export tab: the summary line ("Balanced · 4 fonts ready") matches reality,
+      and clicking each chip opens the matching tab
+- [ ] Clicking a frame row reveals that frame on the canvas (selection unchanged)
+- [ ] Dragging a row reorders it; ↑↓ buttons still work; ✕ excludes and the
+      excluded list restores individually
+- [ ] Images tab: the three presets switch; touching a number shows "Custom"
+- [ ] Fonts tab: "Embed text as real fonts" is **on** by default; the font list
+      and Add button work; clicking a path copies it (toast confirms)
+- [ ] With one or two frames the window is compact; resizing it by hand stops the
+      automatic sizing from taking over again
+- [ ] Empty state: no sort control, no "(0 pages)" in the button
+- [ ] Nothing is clipped — Hangul ascenders/descenders and Latin g/j/y tails
+
+## Language & platform
+
+- [ ] Figma app language Korean → Korean UI; English → English UI
+- [ ] On Windows: font paths show `C:\Windows\Fonts` and `%LOCALAPPDATA%\...`,
+      and the guidance mentions the file name field (**no ⌘⇧G**)
+- [ ] On macOS: `~/Library/Fonts` and `/Library/Fonts`, guidance mentions ⌘⇧G
+- [ ] Figma in the browser: export and download still work
+
+`npm run ui:preview` renders most of these without Figma:
+`?tab=fonts&theme=dark&lang=en-US&platform=win&frames=12&bare=1`.
+
+## Export behaviour
+
+- [ ] Button shows the right page count; progress reads like
+      "Page 3/8 · optimizing images 1/4"
+- [ ] The save dialog is pre-filled with `name_20260826134512.pdf`
+      (single frame → frame name, multiple → document name)
+- [ ] A canvas toast confirms the save; the report's first line has file name,
+      pages, size and elapsed time
+
+## Text embedding
+
+- [ ] A single text node mixing Regular and Bold → only the bold part is bold in
+      the PDF, and `pdffonts` lists both weights as embedded subsets
+- [ ] `pdftotext` output matches the Figma text, Hangul included
+- [ ] Underlined text keeps its underline (stays as outlines), and the report
+      says why
+- [ ] Clicking a reason in the report selects those layers on the canvas
+
+## Fonts & fallback
+
+- [ ] A catalog font (e.g. Nanum Gothic) is embedded with no upload needed
+- [ ] A font outside the catalog shows "no file" and stays as outlines — the
+      export tab warns with the font's name and jumps to the Fonts tab
+- [ ] Offline (Wi-Fi off): catalog fonts fall back to outlines and the PDF still
+      exports cleanly
+
+## Images
+
+- [ ] A logo well within the frame's budget comes out untouched —
+      `pdfimages -list` shows the original dimensions and encoding
+- [ ] An oversized screenshot is downscaled; no image exceeds its target
+- [ ] Transparent PNGs stay PNG (no black boxes)
+
+## Document safety
+
+- [ ] After exporting, the Figma document is unchanged (text fills intact)
+- [ ] No `__sheaf_tmp__` layers left behind, including after a cancel or an error
+- [ ] Cancelling mid-export leaves the document clean
+
+## Inspecting the result
+
+```bash
+pdfinfo out.pdf                 # size, pages, producer
+pdffonts out.pdf                # embedded subsets (emb=yes, uni=yes)
+pdftotext out.pdf - | head -40  # extracted text
+pdfimages -list out.pdf         # per-image dimensions and encoding
+```

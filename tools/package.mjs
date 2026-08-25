@@ -50,50 +50,58 @@ await writeFile(
   join(stage, 'INSTALL.md'),
   `# Featherweight ${pkg.version}
 
-Figma 프레임을 가벼운 PDF 로 내보냅니다. 텍스트가 아웃라인이 아니라 진짜 폰트로
-들어가서 검색·복사가 되고 파일이 작아집니다.
+Export Figma frames as light PDFs with real embedded fonts — text stays
+selectable, searchable and ATS-readable, and the file gets much smaller.
 
-## 설치 (한 번만)
+Most people should install from the Figma Community instead:
+https://www.figma.com/community/plugin/1672509720278498323
 
-1. 이 폴더를 옮기지 않을 자리에 두세요. 예: \`~/figma-plugins/featherweight\`
-   (Figma 는 import 할 때의 경로를 기억합니다. 폴더를 옮기면 다시 import 해야 합니다.)
-2. Figma 데스크톱 앱 → 메뉴 → Plugins → Development → **Import plugin from manifest…**
-3. 이 폴더의 \`manifest.json\` 선택
+This zip is a development build, for trying an unreleased version.
 
-이제 모든 Figma 파일에서 Plugins → Development → Featherweight 로 실행할 수 있습니다.
-\`Cmd + /\` 로 "Featherweight" 를 검색해도 됩니다.
+## Install (once)
 
-## 사용법
+1. Put this folder somewhere permanent, e.g. \`~/figma-plugins/featherweight\`
+   (Figma remembers the path you import from — moving the folder breaks it.)
+2. Figma desktop app → menu → Plugins → Development → **Import plugin from manifest…**
+3. Pick \`manifest.json\` in this folder
 
-1. 캔버스에서 내보낼 프레임을 여러 개 선택합니다
-2. 플러그인 실행 → ↑↓ 로 순서 조정, ✕ 로 제외
-3. [PDF 내보내기]
+Run it from Plugins → Development → Featherweight, or hit \`Cmd + /\` and search
+for "Featherweight".
 
-## 폰트
+## Using it
 
-문서가 쓰는 폰트를 "폰트" 패널에서 보여줍니다.
+1. Select frames on the canvas
+2. Run the plugin → drag rows to reorder, ✕ to exclude
+3. **Export PDF**
 
-- **공개 폰트**는 내보낼 때 자동으로 받아 옵니다.
-  (Pretendard, 나눔고딕·명조, Gothic A1, 고운돋움·바탕, IBM Plex Sans KR,
-  Spoqa Han Sans Neo, 도현, 주아 등 — 전부 SIL OFL 오픈 폰트)
-- **그 외 서체**는 [넣기] 로 TTF/OTF 파일을 한 번 넣으면 저장됩니다.
-- 파일이 없는 폰트의 텍스트는 **아웃라인으로 남습니다** — 모양은 원본과 똑같고,
-  다른 폰트로 대체되는 일은 없습니다. 다만 그만큼 파일이 줄지 않습니다.
+## Fonts
 
-## 이미지
+The Fonts tab shows every font your document uses.
 
-화면에 보이는 크기의 1.5배를 넘는 픽셀은 버립니다(설정에서 조절).
-문서보다 큰 원본이 그대로 들어가는 것을 막습니다. 원본이 더 작으면 건드리지 않습니다.
+- **Open-license fonts** are downloaded automatically at export time — nothing
+  to do. (Pretendard, Nanum Gothic/Myeongjo, Gothic A1, Gowun, IBM Plex Sans KR,
+  Spoqa Han Sans Neo, Do Hyeon, Jua and more — all SIL OFL.)
+- **Anything else**: add a TTF/OTF once and it is stored for next time.
+- Text whose font can't be obtained **stays as outlines** — identical to the
+  original, never substituted with a different font. You just don't get the size
+  and search benefits for those parts.
 
-## 면책조건
+## Images
 
-- **결과 PDF 는 제출 전에 반드시 눈으로 확인해 주세요.** 텍스트를 폰트로 다시
-  그리는 방식이라 원본과 미세하게 다를 수 있습니다. 결과물 사용의 책임은
-  사용자에게 있습니다.
-- **직접 넣은 폰트를 PDF 에 임베드하는 것이 그 폰트의 라이선스에서 허용되는지는
-  사용자가 확인할 책임입니다.** 상용 폰트 상당수는 문서 임베드를 제한합니다.
-- 네트워크는 폰트 다운로드(cdn.jsdelivr.net)에만 사용합니다. 문서 내용은 어디에도
-  전송되지 않습니다.
+Images larger than the frame's budget are downscaled to their displayed size.
+Smaller images — logos, icons — pass through untouched, with no re-encoding.
+
+## Good to know
+
+- **Always proofread the exported PDF before submitting it anywhere.** Text is
+  redrawn with real fonts and may differ subtly from Figma's rendering. You are
+  responsible for the files you produce with this plugin.
+- **Fonts you add yourself are embedded as-is.** Confirming that your font's
+  license permits document embedding is your responsibility.
+- Network access is used only to download open-license fonts
+  (cdn.jsdelivr.net). Your document's content never leaves your machine.
+
+MIT licensed · github.com/coffeequickly/featherweight
 `,
   'utf8'
 )

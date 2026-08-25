@@ -1,5 +1,15 @@
 # SPIKES — 구현 전에 검증할 가정
 
+> **Historical document.** Runtime assumptions that had to be verified against
+> the real Figma API before the code could rely on them, with the measurements
+> that settled each one (Korean). Useful when you wonder "why does it do it this
+> odd way" — the answer is usually "because the obvious way was measured and it
+> didn't work".
+>
+> The baseline numbers at the top are from the very first export, before any
+> optimisation existed.
+
+
 각 항목: 가설 / 검증 절차 / 결과(검증 후 채움) / 결정.
 결과가 없는 스파이크에 의존하는 코드는 플래그 뒤에 둔다. (PRD §10, §12)
 
