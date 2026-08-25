@@ -7,7 +7,8 @@ import {
   ImageUsage,
   KEEP_BYTES_FLOOR,
   planImageTargets,
-  processFloor
+  processFloor,
+  transformScale
 } from '../lib/imageTarget'
 import { Reason } from '../lib/types'
 import { Settings } from '../lib/types'
@@ -57,11 +58,13 @@ export function collectImageUsages(root: SceneNode): ImageUsage[] {
       for (const paint of node.fills) {
         if (paint.type !== 'IMAGE' || paint.visible === false) continue
         if (paint.imageHash === null) continue
+        // 부모가 확대·축소돼 있으면 node.width 는 화면 크기가 아니다 — 배율을 곱한다
+        const scale = transformScale(node.absoluteTransform)
         usages.push({
           nodeId: node.id,
           imageHash: paint.imageHash,
-          width: node.width,
-          height: node.height,
+          width: node.width * scale.x,
+          height: node.height * scale.y,
           scaleMode: paint.scaleMode
         })
       }
@@ -92,8 +95,13 @@ export async function shrinkImages(
   const plans = planImageTargets(usages, settings)
   if (plans.length === 0) return stats
 
-  // 프레임 예산 안에 드는 이미지는 손대지 않는다 — 작은 로고까지 열화시킬 이유가 없다
-  const floor = processFloor(settings, Math.max(root.width, root.height))
+  // 프레임 예산 안에 드는 이미지는 손대지 않는다 — 작은 로고까지 열화시킬 이유가 없다.
+  // 프레임 자체가 스케일돼 있을 수 있으므로 여기서도 렌더 크기로 잰다.
+  const rootScale = transformScale(root.absoluteTransform)
+  const floor = processFloor(
+    settings,
+    Math.max(root.width * rootScale.x, root.height * rootScale.y)
+  )
 
   const replacement = new Map<string, string>()
 

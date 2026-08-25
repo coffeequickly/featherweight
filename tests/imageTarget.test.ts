@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   MIN_TARGET_LONG_EDGE,
+  transformScale,
   processFloor,
   ImageUsage,
   isProcessable,
@@ -153,5 +154,53 @@ describe('processFloor', () => {
 
   it('maxEdge 를 넘지 않는다', () => {
     expect(processFloor({ multiplier: 2, maxEdge: 2048 }, 4000)).toBe(2048)
+  })
+})
+
+describe('transformScale', () => {
+  it('변환이 없으면 배율 1', () => {
+    expect(
+      transformScale([
+        [1, 0, 0],
+        [0, 1, 0]
+      ])
+    ).toEqual({ x: 1, y: 1 })
+  })
+
+  it('부모가 확대돼 있으면 그 배율이 잡힌다 — 실측 버그의 재현', () => {
+    // 3.6배로 깔린 그룹 안의 이미지: node.width 370 → 실제 1332
+    const scale = transformScale([
+      [3.6, 0, 100],
+      [0, 3.6, 200]
+    ])
+    expect(scale.x).toBeCloseTo(3.6, 6)
+    expect(370 * scale.x).toBeCloseTo(1332, 6)
+  })
+
+  it('축소도 잡는다', () => {
+    expect(
+      transformScale([
+        [0.5, 0, 0],
+        [0, 0.25, 0]
+      ])
+    ).toEqual({ x: 0.5, y: 0.25 })
+  })
+
+  it('회전이 섞여 있어도 배율만 뽑는다', () => {
+    // 90도 회전 + 2배
+    const scale = transformScale([
+      [0, -2, 0],
+      [2, 0, 0]
+    ])
+    expect(scale.x).toBeCloseTo(2, 6)
+    expect(scale.y).toBeCloseTo(2, 6)
+  })
+
+  it('x·y 배율이 다르면 각각 잡는다', () => {
+    const scale = transformScale([
+      [2, 0, 0],
+      [0, 3, 0]
+    ])
+    expect(scale).toEqual({ x: 2, y: 3 })
   })
 })
