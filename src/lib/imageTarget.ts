@@ -21,6 +21,19 @@ export type ImagePlan = {
   nodeIds: string[]
 }
 
+/**
+ * 교체한 이미지가 렌더러에 준비될 때까지 기다릴 시간.
+ *
+ * createImage 로 만든 이미지는 fill 에 꽂아도 렌더러가 곧바로 쓰지 못한다. 그 상태로
+ * exportAsync 를 부르면 그 그림만 쏙 빠진 PDF 가 나온다 — 실측: 처리한 7장이 전부
+ * 사라지고 처리를 건너뛴 4장만 남았다. Figma 에는 "이제 준비됐다" 를 알려주는 API 가
+ * 없어서 기다리는 수밖에 없다. 장수에 비례하되 상한을 둔다.
+ */
+export function settleDelayMs(replacedCount: number): number {
+  if (replacedCount === 0) return 0
+  return Math.min(4000, 400 + replacedCount * 300)
+}
+
 /** Figma 의 absoluteTransform — [[a, b, tx], [c, d, ty]] */
 export type Transform = readonly [
   readonly [number, number, number],

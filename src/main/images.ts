@@ -8,9 +8,11 @@ import {
   KEEP_BYTES_FLOOR,
   planImageTargets,
   processFloor,
+  settleDelayMs,
   transformScale
 } from '../lib/imageTarget'
 import { Reason } from '../lib/types'
+import { withTimeout } from '../lib/withTimeout'
 import { Settings } from '../lib/types'
 import { awaitResponse, nextRequestId } from './bridge'
 
@@ -46,6 +48,9 @@ type FillsNode = SceneNode & { fills: readonly Paint[] | typeof figma.mixed }
 function hasFills(node: SceneNode): node is FillsNode {
   return 'fills' in node
 }
+
+/** 새로 만든 이미지가 그릴 수 있는 상태가 되기를 기다리는 한도 */
+const READY_TIMEOUT_MS = 20_000
 
 /** 클론 전체에서 이미지 fill 을 쓰는 자리를 모은다. */
 export function collectImageUsages(root: SceneNode): ImageUsage[] {
@@ -124,7 +129,11 @@ export async function shrinkImages(
     }
   }
 
-  if (replacement.size > 0) applyReplacements(root, replacement)
+  if (replacement.size > 0) {
+    applyReplacements(root, replacement)
+    // 여기서 안 기다리면 방금 꽂은 이미지가 export 에서 통째로 빠진다 (settleDelayMs 참고)
+    await new Promise((resolve) => setTimeout(resolve, settleDelayMs(replacement.size)))
+  }
   return stats
 }
 
@@ -180,13 +189,16 @@ async function shrinkOne(
   try {
     const created = figma.createImage(result.bytes)
 
-    // createImage 는 바이트를 받아들이고도 렌더링 불가능한 이미지를 만들 수 있다.
-    // 그대로 fill 에 꽂으면 export 때 그림이 통째로 빠진다(빈 자리만 남는다) —
-    // 크기를 물어봐서 실제로 읽히는지 확인하고, 아니면 원본을 지킨다.
-    const size = await created.getSizeAsync()
-    if (size.width === 0 || size.height === 0) {
-      throw new Error('created image has no size')
-    }
+    // ⚠ 여기서 기다리지 않으면 큰 이미지가 통째로 사라진다.
+    //
+    // createImage 는 즉시 해시를 주지만 이미지 데이터는 뒤늦게 준비된다. 준비되기 전에
+    // exportAsync 를 부르면 Figma 가 그 fill 을 그리지 못하고 빈 자리로 남긴다 —
+    // 실측: 100KB 넘는 이미지(2500~4032px)만 골라서 사라졌고, 처리를 건너뛴 작은
+    // 이미지는 멀쩡했다. 커질수록 준비가 늦으니 정확히 큰 것만 빠진 것이다.
+    //
+    // getSizeAsync 는 메타데이터라 준비 전에도 답해서 이 상황을 못 거른다.
+    // 실제 바이트를 되읽어야 "그릴 수 있는 상태" 임이 보장된다.
+    await withTimeout(created.getBytesAsync(), READY_TIMEOUT_MS, plan.imageHash.slice(0, 8))
 
     stats.bytesAfter += result.bytes.length
     stats.processed += 1

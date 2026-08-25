@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   MIN_TARGET_LONG_EDGE,
+  settleDelayMs,
   transformScale,
   processFloor,
   ImageUsage,
@@ -202,5 +203,20 @@ describe('transformScale', () => {
       [0, 3, 0]
     ])
     expect(scale).toEqual({ x: 2, y: 3 })
+  })
+})
+
+describe('settleDelayMs', () => {
+  it('교체가 없으면 기다리지 않는다', () => {
+    expect(settleDelayMs(0)).toBe(0)
+  })
+
+  it('장수에 비례해 늘어난다', () => {
+    expect(settleDelayMs(1)).toBe(700)
+    expect(settleDelayMs(7)).toBe(2500)
+  })
+
+  it('상한이 있다 — 이미지가 많아도 무한정 기다리지 않는다', () => {
+    expect(settleDelayMs(100)).toBe(4000)
   })
 })

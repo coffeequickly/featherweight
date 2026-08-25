@@ -35,9 +35,7 @@ export function ExportFooter({ exporter, notice, pageCount, onExport }: Props): 
           <div class="rowBetween">
             <Text>
               <Muted>
-                {exporter.progress === null
-                  ? t('app.preparing')
-                  : `${exporter.progress.label} ${exporter.progress.current}/${exporter.progress.total}`}
+                {exporter.progress === null ? t('app.preparing') : exporter.progress.label}
               </Muted>
             </Text>
             <Button danger onClick={exporter.cancel} secondary>
