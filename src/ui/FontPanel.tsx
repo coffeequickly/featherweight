@@ -10,7 +10,7 @@ import {
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
 
-import { t } from '../lib/i18n'
+import { formatNumber, t } from '../lib/i18n'
 import { catalogEntry } from '../lib/fontCatalog'
 import { fontKey } from '../lib/fontInventory'
 import { findStored, fitsWithin, formatBytes } from '../lib/fontStore'
@@ -135,8 +135,28 @@ export function FontPanel({
   )
 }
 
-const IS_MAC = navigator.platform.toUpperCase().includes('MAC')
-const FONT_DIRS = IS_MAC ? ['~/Library/Fonts', '/Library/Fonts'] : ['C:\\Windows\\Fonts']
+/**
+ * navigator.platform 은 deprecated 라 브라우저가 값을 얼리거나 비울 수 있다.
+ * userAgentData(신규) → userAgent(범용) → platform(구형) 순으로 본다.
+ * 판정 실패 시 mac 이 아닌 쪽으로 두는 게 안전하다 — 윈도우 안내에는 mac 전용
+ * 단축키(⌘⇧G)가 없으므로 틀려도 잘못된 키를 알려주지 않는다.
+ */
+const IS_MAC = detectMac()
+
+function detectMac(): boolean {
+  const data = (navigator as { userAgentData?: { platform?: string } }).userAgentData
+  if (typeof data?.platform === 'string' && data.platform !== '') {
+    return data.platform.toUpperCase().includes('MAC')
+  }
+  const agent = navigator.userAgent ?? ''
+  if (agent !== '') return /Mac|iPhone|iPad|iPod/i.test(agent)
+  return (navigator.platform ?? '').toUpperCase().includes('MAC')
+}
+// 윈도우는 "모든 사용자"(C:\Windows\Fonts)와 "나만"(%LOCALAPPDATA%) 두 곳에 설치된다 —
+// 관리자 권한 없이 설치한 폰트는 후자에만 있어서 둘 다 안내해야 한다.
+const FONT_DIRS = IS_MAC
+  ? ['~/Library/Fonts', '/Library/Fonts']
+  : ['C:\\Windows\\Fonts', '%LOCALAPPDATA%\\Microsoft\\Windows\\Fonts']
 
 async function copyPath(path: string): Promise<void> {
   // execCommand 를 먼저 쓴다 — 동기라 절대 멈추지 않는다. 실측 결과 Clipboard API
@@ -243,7 +263,7 @@ function FontRow({
           })
         : t('fonts.detailMissing', {
             count: font.nodeCount,
-            chars: font.charCount.toLocaleString()
+            chars: formatNumber(font.charCount)
           })
 
   return (

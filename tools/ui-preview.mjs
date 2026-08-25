@@ -169,6 +169,7 @@ function page(uiScript, query) {
   const tab = query.get('tab') ?? ''
   const lang = query.get('lang') ?? ''
   const dark = query.get('theme') === 'dark'
+  const platform = query.get('platform') ?? ''
   const frames = query.get('frames')
   const width = Number(query.get('w') ?? 380)
   const height = Number(query.get('h') ?? 560)
@@ -199,6 +200,11 @@ iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VAR
   '</style></head><body class="figma-light"><div id="create-figma-plugin"></div>' +
   '<script>const __FIGMA_COMMAND__="";const __SHOW_UI_DATA__={};' +
   'window.__PREVIEW_TAB__="${tab}";' +
+  ('${platform}' === 'win'
+    ? 'Object.defineProperty(navigator,"userAgent",{get:()=>"Mozilla/5.0 (Windows NT 10.0; Win64; x64)"});' +
+      'Object.defineProperty(navigator,"platform",{get:()=>"Win32"});' +
+      'Object.defineProperty(navigator,"userAgentData",{get:()=>({platform:"Windows"})});'
+    : '') +
   ('${lang}' ? 'Object.defineProperty(navigator,"language",{get:()=>"${lang}"});' : '') +
   UI_SCRIPT + '<\\/script></body></html>'
 
