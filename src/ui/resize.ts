@@ -66,25 +66,11 @@ export async function resizeImage(request: ResizeRequest): Promise<ResizeResult>
     // 투명이 있는 PNG 를 JPEG 로 바꾸면 배경이 검게 탄다. 알파가 있으면 PNG 를 유지한다.
     const keepPng = sourcePng && (!reencodeOpaquePng || hasAlpha(context, size.width, size.height))
 
-    let mime: 'image/png' | 'image/jpeg'
-    let out: Uint8Array
-    if (keepPng) {
-      mime = 'image/png'
-      out = new Uint8Array(await (await canvas.convertToBlob({ type: mime })).arrayBuffer())
-    } else {
-      // 로고 같은 플랫 그래픽은 PNG 가 더 작으면서 무손실이다 — 둘 다 만들어 작은 쪽을 쓴다
-      const [jpeg, png] = await Promise.all([
-        canvas.convertToBlob({ type: 'image/jpeg', quality }),
-        canvas.convertToBlob({ type: 'image/png' })
-      ])
-      if (png.size < jpeg.size) {
-        mime = 'image/png'
-        out = new Uint8Array(await png.arrayBuffer())
-      } else {
-        mime = 'image/jpeg'
-        out = new Uint8Array(await jpeg.arrayBuffer())
-      }
-    }
+    // 인코딩은 한 형식만 만든다. 예전에 "PNG 가 더 작으면 PNG" 를 넣었다가
+    // 이미지가 통째로 사라지는 사고가 났다 — 절감 이득보다 위험이 크다. (v1.0.1)
+    const mime: 'image/png' | 'image/jpeg' = keepPng ? 'image/png' : 'image/jpeg'
+    const blob = await canvas.convertToBlob(keepPng ? { type: mime } : { type: mime, quality })
+    const out = new Uint8Array(await blob.arrayBuffer())
 
     // 줄였는데 오히려 커지는 경우가 있다 (이미 잘 압축된 JPEG 등)
     if (keepsOriginal(bytes.length, out.length)) {

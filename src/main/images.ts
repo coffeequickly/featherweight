@@ -179,6 +179,15 @@ async function shrinkOne(
 
   try {
     const created = figma.createImage(result.bytes)
+
+    // createImage 는 바이트를 받아들이고도 렌더링 불가능한 이미지를 만들 수 있다.
+    // 그대로 fill 에 꽂으면 export 때 그림이 통째로 빠진다(빈 자리만 남는다) —
+    // 크기를 물어봐서 실제로 읽히는지 확인하고, 아니면 원본을 지킨다.
+    const size = await created.getSizeAsync()
+    if (size.width === 0 || size.height === 0) {
+      throw new Error('created image has no size')
+    }
+
     stats.bytesAfter += result.bytes.length
     stats.processed += 1
     return created.hash
