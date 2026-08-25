@@ -21,6 +21,26 @@ export type ImagePlan = {
   nodeIds: string[]
 }
 
+/** Figma 의 absoluteTransform — [[a, b, tx], [c, d, ty]] */
+export type Transform = readonly [
+  readonly [number, number, number],
+  readonly [number, number, number]
+]
+
+/**
+ * 변환 행렬에서 실제 배율을 뽑는다.
+ *
+ * `node.width` 는 **로컬 좌표계** 크기다 — 부모 그룹·프레임이 확대·축소돼 있으면
+ * 화면에 보이는 크기와 다르다. 이걸 놓치면 크게 보이는 이미지를 작은 크기로 오해해
+ * 과하게 줄여버린다 (실측: 1334pt 로 깔리는 이미지를 556px 로 축소해 30ppi 가 됐다).
+ *
+ * 회전이 섞여 있어도 열 벡터의 길이가 곧 배율이므로 정확하다.
+ */
+export function transformScale(transform: Transform): { x: number; y: number } {
+  const [[a, b], [c, d]] = transform
+  return { x: Math.hypot(a, c), y: Math.hypot(b, d) }
+}
+
 export function displayedLongEdge(usage: ImageUsage): number {
   return Math.max(usage.width, usage.height)
 }
