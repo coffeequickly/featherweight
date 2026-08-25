@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { currentLocale, detectLocale, MESSAGE_KEYS, setLocale, t } from '../src/lib/i18n'
+import {
+  currentLocale,
+  detectLocale,
+  formatNumber,
+  MESSAGE_KEYS,
+  setLocale,
+  t
+} from '../src/lib/i18n'
 
 afterEach(() => setLocale('en'))
 
@@ -46,6 +53,15 @@ describe('t', () => {
     expect(t('font.loadFailed', { family: 'A', style: 'Bold', why: 'HTTP 404' })).toBe(
       'could not load A Bold (HTTP 404)'
     )
+  })
+})
+
+describe('formatNumber', () => {
+  it('OS 로캘이 아니라 현재 사전 언어를 따른다', () => {
+    setLocale('en')
+    expect(formatNumber(18901)).toBe('18,901')
+    setLocale('ko')
+    expect(formatNumber(18901)).toBe('18,901')
   })
 })
 
@@ -95,6 +111,15 @@ describe('사전 무결성', () => {
         expect(message.length, `${locale}:${key}`).toBeGreaterThan(0)
         expect(message, `${locale}:${key} 에 안 채워진 자리가 있다`).not.toMatch(/\{\w+\}/)
       }
+    }
+  })
+
+  it('윈도우 안내에 mac 전용 단축키가 섞이지 않는다', () => {
+    for (const locale of ['en', 'ko'] as const) {
+      setLocale(locale)
+      expect(t('fonts.pathHelpWin')).not.toContain('⌘')
+      expect(t('fonts.pathCopiedWin')).not.toContain('⌘')
+      expect(t('fonts.pathHelpMac')).toContain('⌘')
     }
   })
 

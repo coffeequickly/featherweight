@@ -330,3 +330,12 @@ export const MESSAGE_KEYS = Object.keys(MESSAGES) as MessageKey[]
 export function formatReason(reason: { code: MessageKey; params?: Params }): string {
   return t(reason.code, reason.params ?? {})
 }
+
+/**
+ * 숫자 구분자를 현재 사전 언어에 맞춘다.
+ * toLocaleString() 을 인자 없이 부르면 OS 로캘을 따라가서, 영어 UI 인데
+ * 숫자만 다른 로캘 서식으로 나오는 어긋남이 생긴다.
+ */
+export function formatNumber(value: number): string {
+  return value.toLocaleString(current === 'ko' ? 'ko-KR' : 'en-US')
+}
