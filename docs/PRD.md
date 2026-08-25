@@ -1,5 +1,18 @@
 # Sheaf PRD — v0.1 (Figma → 가벼운 PDF, 진짜 폰트)
 
+> **Historical document.** This is the original product spec written before the
+> plugin was built (Korean). It records *why* the architecture looks the way it
+> does — the hard constraints of the Figma plugin runtime (§5) and the design
+> decisions that follow from them — and it is still the best explanation of the
+> `src/main` / `src/ui` / `src/lib` split.
+>
+> It is **not** a description of the current UI or feature set: the plugin has
+> evolved considerably since (tabs, image presets, drag reordering, canvas jump,
+> i18n, timestamped file names). For what the plugin does today, see the
+> [README](../README.md); for what to verify before shipping, see
+> [CHECKLIST.md](CHECKLIST.md).
+
+
 > repo: `github.com/coffeequickly/featherweight` (구 figma-sheaf 비공개 레포에서 이전)
 > status: Draft v0.1 / 2026-08-20
 > 독자: Claude Code(구현 에이전트) + PO(QA 겸)
