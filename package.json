@@ -16,13 +16,14 @@
     "build": "build-figma-plugin --typecheck --minify",
     "watch": "build-figma-plugin --typecheck --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src tests && prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.{mjs,json}\"",
+    "lint": "eslint src tests tools *.mjs && prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"tools/**/*.mjs\" \"*.{mjs,json}\"",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.{mjs,json}\"",
     "test": "vitest run",
     "verify:catalog": "CATALOG_NET=1 vitest run tests/fontCatalog.net.test.ts tests/textPipeline.net.test.ts",
     "compare": ".venv/bin/python tools/compare-pdf.py",
     "install:local": "npm run build && node tools/install-local.mjs",
     "package": "npm run build && node tools/package.mjs",
+    "publish:figma": "npm run build && node tools/figma-publish.mjs",
     "ui:preview": "node tools/ui-preview.mjs"
   },
   "dependencies": {
