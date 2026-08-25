@@ -158,28 +158,22 @@ pdf · export · fonts · compress · resume · portfolio · korean · ats
 3. zip 배포는 두 트랙이다:
    - **latest** — main 에 푸시하면 CI 가 latest 프리릴리즈를 자동 갱신 (항상 최신)
    - **정식 버전** — `npm version minor` → `git push --follow-tags` (v* Release 자동)
-   - **Figma 퍼블리시 자동화(선택)** — `tools/figma-publish.mjs` (자체 구현)
+   - **Figma 새 버전 올리기 — 수동** (데스크톱 앱, 클릭 두 번)
+     Plugins → Manage plugins → Featherweight → Publish → Publish new version.
+     릴리즈 노트 한 줄만 적으면 끝. 로컬 빌드가 올라가므로 `npm run install:local`
+     로 최신 빌드를 넣어 둔 상태여야 한다 (플러그인 우하단 버전으로 확인).
+
+     자동화하지 않는 이유: 퍼블리싱 공개 API 가 없고, 대안인 내부 API 는 만료되는
+     쿠키를 쓰는데 자동 갱신·로테이션 수단이 없다. 자동화하면 어느 날 조용히
+     실패하는 릴리즈 경로가 되고, 계정 자격증명급 시크릿을 CI 에 상주시켜야 한다.
+
+     그래도 원격에서 올려야 할 때를 위해 `tools/figma-publish.mjs` 를 남겨 뒀다:
 
      ```
-     # 1) 토큰: figma.com 로그인 → 개발자도구 → Application → Cookies →
-     #    `__Host-figma.authn` 값 복사
-     gh secret set FIGMA_WEB_AUTHN_TOKEN -R coffeequickly/featherweight
-
-     # 2) 로컬에서 먼저 확인 (아무것도 올리지 않는다)
-     FIGMA_WEB_AUTHN_TOKEN=... node tools/figma-publish.mjs --dry-run
-
-     # 3) 수동 퍼블리시
-     FIGMA_WEB_AUTHN_TOKEN=... npm run publish:figma "Fix: ..."
+     # 토큰: figma.com → 개발자도구 → Application → Cookies → __Host-figma.authn
+     FIGMA_WEB_AUTHN_TOKEN=... node tools/figma-publish.mjs --dry-run   # 확인만
+     FIGMA_WEB_AUTHN_TOKEN=... npm run publish:figma "Fix: ..."         # 실제 업로드
      ```
 
-     시크릿을 등록해 두면 `v*` 태그 푸시가 GitHub Release + Figma 새 버전까지
-     한 번에 처리한다. 시크릿이 없으면 그 스텝은 건너뛴다.
-
-     **주의** — Figma 는 퍼블리싱 공개 API 가 없어서 데스크톱 앱이 쓰는 내부
-     엔드포인트를 호출한다. 언제든 바뀔 수 있으므로 GitHub Release 를 먼저 만든 뒤
-     마지막에 실행하고, 실패하면 큰 소리로 멈춘다(조용한 부분 성공 없음).
-     그때는 데스크톱 앱에서 Publish new version 을 누르면 된다.
-     이름·설명·이미지·태그는 스토어의 기존 값을 그대로 재사용하므로 이 경로로
-     리스팅 문구가 바뀌지 않는다 — 문구·이미지 변경은 데스크톱 앱에서 한다.
-4. Figma 데스크톱 → Plugins → Development → Publish → 리스팅 문안·면책조건 붙여넣기
-5. 심사 통과 후: README 의 설치 절을 Community 링크로 교체
+     리스팅 문구·이미지는 스토어의 기존 값을 그대로 재사용하므로 이 경로로 바뀌지
+     않는다. 문구·이미지 변경은 데스크톱 앱에서 한다.
