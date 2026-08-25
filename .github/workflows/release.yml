@@ -48,23 +48,3 @@ jobs:
 
             공개 폰트(Pretendard 등)는 플러그인이 내보낼 때 알아서 받아 온다.
             그 외 서체만 UI 에서 파일을 한 번 넣으면 된다.
-
-      # ── Figma Community 자동 퍼블리시 (자체 스크립트) ──
-      # FIGMA_WEB_AUTHN_TOKEN 시크릿이 있으면 태그 푸시만으로 스토어 버전까지 올라간다.
-      # 없으면 건너뛴다 — 그때는 데스크톱 앱에서 클릭 두 번으로 올리면 된다.
-      #
-      # Figma 는 퍼블리싱 공개 API 가 없어서 데스크톱 앱이 쓰는 내부 엔드포인트를 호출한다.
-      # 깨질 수 있는 경로이므로 GitHub Release 를 먼저 만든 뒤 마지막에 실행한다 —
-      # 이 스텝이 실패해도 zip 배포는 이미 끝나 있다.
-      - name: Figma Community 에 새 버전 퍼블리시
-        env:
-          FIGMA_WEB_AUTHN_TOKEN: ${{ secrets.FIGMA_WEB_AUTHN_TOKEN }}
-          # 커밋 메시지를 릴리즈 노트로 쓴다 — 셸 인젝션을 피해 env 로 넘긴다
-          NOTES: ${{ github.event.head_commit.message }}
-        run: |
-          if [ -z "$FIGMA_WEB_AUTHN_TOKEN" ]; then
-            echo "FIGMA_WEB_AUTHN_TOKEN 시크릿이 없어 Figma 퍼블리시는 건너뜁니다."
-            echo "데스크톱 앱에서 올리려면: Plugins → Manage plugins → Publish new version"
-            exit 0
-          fi
-          node tools/figma-publish.mjs "$NOTES"
