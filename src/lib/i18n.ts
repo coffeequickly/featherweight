@@ -153,11 +153,18 @@ const MESSAGES = {
   },
 
   // ── 진행·결과 ───────────────────────────────────────────
-  'progress.prepare': { en: 'Preparing', ko: '준비 중' },
-  'progress.page': { en: 'Exporting page', ko: '페이지 내보내는 중' },
+  'progress.prepare': { en: 'Preparing…', ko: '준비 중…' },
+  'progress.page': {
+    en: 'Exporting page {page}/{pages}',
+    ko: '{page}/{pages}쪽 내보내는 중'
+  },
   'progress.pageImages': {
-    en: 'Page {page}/{pages} · optimizing images',
-    ko: '{page}/{pages}쪽 · 이미지 최적화'
+    en: 'Page {page}/{pages} · optimizing images {current}/{total}',
+    ko: '{page}/{pages}쪽 · 이미지 최적화 {current}/{total}'
+  },
+  'progress.pageSettle': {
+    en: 'Page {page}/{pages} · finishing images',
+    ko: '{page}/{pages}쪽 · 이미지 마무리'
   },
   'export.cancelled': { en: 'Cancelled.', ko: '취소했습니다.' },
   'export.nothing': {

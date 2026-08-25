@@ -180,7 +180,7 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
     setBusy(true)
     setError(null)
     setReport(null)
-    setProgress({ label: t('progress.prepare'), current: 0, total: order.length })
+    setProgress({ label: t('progress.prepare'), current: 0, total: Math.max(order.length, 1) })
     emit<ExportHandler>('export', { order, settings, fileName })
   }, [])
 

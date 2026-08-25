@@ -133,6 +133,9 @@ let exporting = false
  * 프레임을 하나씩 순차로 내보낸다. 동시성 1 — 빠르게 만들려다 메모리로 죽는 쪽이 더 비싸다.
  * 실패한 프레임이 있어도 나머지로 PDF 를 만든다. (PRD §7.4, FR-4)
  */
+/** 진행률 해상도 — 페이지 하나를 이만큼으로 쪼개 이미지 진행까지 담는다 */
+const PROGRESS_STEPS = 100
+
 async function runExport({ order, settings, fileName }: ExportRequest): Promise<void> {
   if (exporting) return
   exporting = true
@@ -146,24 +149,34 @@ async function runExport({ order, settings, fileName }: ExportRequest): Promise<
     for (let index = 0; index < order.length; index += 1) {
       if (cancelled) break
 
-      emit<ProgressHandler>('progress', {
-        label: t('progress.page'),
-        current: index + 1,
-        total: order.length
-      })
+      // 진행률은 "전체 작업" 하나의 축이어야 한다. 페이지 안의 이미지 진행까지
+      // 여기에 녹여서, 프레임마다 0→100 을 반복하지 않고 한 방향으로만 찬다.
+      const reportProgress = (label: string, within = 0): void => {
+        emit<ProgressHandler>('progress', {
+          label,
+          current: Math.round((index + within) * PROGRESS_STEPS),
+          total: order.length * PROGRESS_STEPS
+        })
+      }
+
+      reportProgress(t('progress.page', { page: index + 1, pages: order.length }))
 
       const result = await exportFrame(order[index], index, {
         settings,
         sendResizeRequest: (payload: ResizeRequestPayload) => {
           emit<ImageResizeHandler>('image:resize', payload)
         },
-        // "이미지 1/1" 만 보이면 무엇의 1/1 인지 알 수 없다 — 몇 쪽의 이미지인지 같이 보여준다
+        // 이미지 진행은 그 페이지 몫(1/총쪽수) 안에서만 움직인다
         onImageProgress: (current, total) => {
-          emit<ProgressHandler>('progress', {
-            label: t('progress.pageImages', { page: index + 1, pages: order.length }),
-            current,
-            total
-          })
+          reportProgress(
+            t('progress.pageImages', {
+              page: index + 1,
+              pages: order.length,
+              current,
+              total
+            }),
+            total === 0 ? 0 : current / total
+          )
         },
         validateText: (sources: TextRunSource[]) => requestTextValidation(sources),
         isCancelled: () => cancelled
