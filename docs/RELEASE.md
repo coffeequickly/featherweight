@@ -77,8 +77,8 @@ brand name (the leading competitor does the same with "(PDF, PNG, JPG, WebP)").
 
 ### Tagline
 
-> Tiny PDFs with real embedded fonts — selectable, searchable, ATS-ready.
-> Résumés & portfolios from 10MB to <1MB.
+> Compress images and embed real fonts in one export. Selectable, searchable,
+> ATS-ready PDFs — a 12-page portfolio goes from 22.7MB to 4.0MB.
 
 ### Description
 
@@ -94,9 +94,14 @@ Text is re-embedded as real subset fonts. It stays selectable, searchable,
 copy-pasteable, and ATS-parseable. A text-heavy résumé drops from ~10MB to
 under 1MB.
 
-🪶 SMART IMAGE DOWNSCALING
-Images are resized to their displayed size before export. Pick a preset —
-Sharp / Balanced / Smallest — or fine-tune quality, scale and resolution caps.
+🪶 SMART IMAGE COMPRESSION
+Images are downscaled to the size they are actually displayed at, then
+re-encoded. Pick a preset — Sharp / Balanced / Smallest — or fine-tune quality,
+scale and resolution caps. Logos and already-small images pass through
+untouched, so nothing that was sharp gets muddy.
+
+Together the two make a real difference: a 12-page portfolio went from 22.7MB
+to 4.0MB with the same pages and the same look.
 
 HOW IT WORKS
 1. Select frames and run Featherweight
@@ -139,11 +144,11 @@ Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 
 | File | Use |
 |---|---|
-| `icon-128.png` | Plugin icon — document + feather, reads as "PDF export" at thumbnail size |
-| `cover-1920x960.png` | Cover — 22.7MB → 4.0MB, the numbers do the selling |
+| `icon-128.png` | Plugin icon — minimal two-tone feather (split barbs read as a feather, not a leaf) |
+| `cover-1920x960.png` | Cover — 22.7MB → 4.0MB, with image compression and real fonts given equal billing |
 | `media-1.png` | Editorial: "Real fonts. Smaller PDFs. Better documents." |
 | `media-2.png` | Dark brand: "Keep text real. Keep files light." |
-| `media-3/4/5.png` | UI: export tab, image presets, fonts tab |
+| `media-3/4/5.png` | UI: export tab, image compression presets, fonts tab |
 
 Everything is rendered from source in `docs/brand/src/` (plain HTML + `tokens.css`),
 so any of it can be regenerated or restyled:
