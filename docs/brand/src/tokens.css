@@ -1,0 +1,8 @@
+:root{
+  --orange:#F2622A; --orange-soft:#FF8A4C;
+  --ink:#141414; --ink-2:#3D3D3D; --mute:#767676;
+  --cream:#FAF8F5; --line:#E6E2DC;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,'Apple SD Gothic Neo',sans-serif;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-0.04em}

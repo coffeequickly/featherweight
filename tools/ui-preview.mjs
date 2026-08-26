@@ -171,6 +171,7 @@ function page(uiScript, query) {
   const dark = query.get('theme') === 'dark'
   const platform = query.get('platform') ?? ''
   const frames = query.get('frames')
+  const allFontsReady = query.get('fonts') === 'ready'
   const width = Number(query.get('w') ?? 380)
   const height = Number(query.get('h') ?? 560)
   return `<!doctype html>
@@ -194,6 +195,7 @@ function page(uiScript, query) {
 const FIXTURE = ${JSON.stringify(FIXTURE)}
 const UI_SCRIPT = ${JSON.stringify(uiScript)}
 const VARS = ${JSON.stringify(dark ? FIGMA_VARS_DARK : FIGMA_VARS)}\nconst FRAME_COUNT = ${frames === null ? 'null' : Number(frames)}
+const ALL_FONTS_READY = ${allFontsReady}
 
 const iframe = document.getElementById('ui')
 iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VARS +
@@ -226,7 +228,8 @@ window.addEventListener('message', (event) => {
           name: (i + 1).toString().padStart(2, '0') + ' ' + FIXTURE.selection[i % FIXTURE.selection.length].name.slice(3)
         }))
     send('selection', selection)
-    send('fonts', FIXTURE.fonts)
+    // ?fonts=ready — 카탈로그 밖 서체를 빼고 전부 준비된 상태로 (마케팅 캡처용)
+    send('fonts', ALL_FONTS_READY ? FIXTURE.fonts.filter((f) => f.family !== 'Nexa') : FIXTURE.fonts)
     send('fonts:stored', FIXTURE.storedFonts)
   }
 
