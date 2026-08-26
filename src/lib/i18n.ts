@@ -158,9 +158,16 @@ const MESSAGES = {
     en: 'Exporting page {page}/{pages}',
     ko: '{page}/{pages}쪽 내보내는 중'
   },
+  // 한 장뿐이면 "1/1" 은 아무것도 알려주지 않는다 — 여럿일 때만 숫자를 붙인다
   'progress.pageImages': {
-    en: 'Page {page}/{pages} · optimizing images {current}/{total}',
-    ko: '{page}/{pages}쪽 · 이미지 최적화 {current}/{total}'
+    en: (p) =>
+      Number(p.total) > 1
+        ? `Page ${p.page}/${p.pages} · optimizing images ${p.current}/${p.total}`
+        : `Page ${p.page}/${p.pages} · optimizing image`,
+    ko: (p) =>
+      Number(p.total) > 1
+        ? `${p.page}/${p.pages}쪽 · 이미지 최적화 ${p.current}/${p.total}`
+        : `${p.page}/${p.pages}쪽 · 이미지 최적화`
   },
   'progress.pageSettle': {
     en: 'Page {page}/{pages} · finishing images',
