@@ -139,12 +139,25 @@ Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 
 | File | Use |
 |---|---|
-| `icon-128.png` | Plugin icon (128×128) |
-| `cover-1920x960.png` | Cover image |
-| `media-1.png` … `media-4.png` | Carousel: hero, export tab, presets, fonts |
+| `icon-128.png` | Plugin icon — document + feather, reads as "PDF export" at thumbnail size |
+| `cover-1920x960.png` | Cover — 22.7MB → 4.0MB, the numbers do the selling |
+| `media-1.png` | Editorial: "Real fonts. Smaller PDFs. Better documents." |
+| `media-2.png` | Dark brand: "Keep text real. Keep files light." |
+| `media-3/4/5.png` | UI: export tab, image presets, fonts tab |
 
-The tab screenshots come from `npm run ui:preview` with `?bare=1&lang=en-US`, so
-they can be re-captured whenever the UI changes.
+Everything is rendered from source in `docs/brand/src/` (plain HTML + `tokens.css`),
+so any of it can be regenerated or restyled:
+
+```bash
+# UI screenshots — all-ready state, English, no error banners
+npm run ui:preview   # then capture ?bare=1&lang=en-US&fonts=ready&tab=export
+
+# then render any src/*.html at 1920×960 with headless Chrome
+```
+
+Palette: orange `#F2622A` · ink `#141414` · cream `#FAF8F5`.
+"Free forever · open source" is called out on the cover and the dark board — it is
+a real differentiator against the paid/subscription plugins in this category.
 
 ## Release-note style
 
