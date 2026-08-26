@@ -1,6 +1,6 @@
 {
   "name": "featherweight",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "Figma plugin: export selected frames to a light PDF with real embedded fonts",
   "repository": {

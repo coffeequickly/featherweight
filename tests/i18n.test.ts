@@ -56,6 +56,26 @@ describe('t', () => {
   })
 })
 
+describe('progress.pageImages', () => {
+  it('여러 장이면 몇 번째인지 보여준다', () => {
+    setLocale('ko')
+    expect(t('progress.pageImages', { page: 3, pages: 11, current: 2, total: 5 })).toBe(
+      '3/11쪽 · 이미지 최적화 2/5'
+    )
+  })
+
+  it('한 장뿐이면 "1/1" 을 붙이지 않는다', () => {
+    setLocale('ko')
+    expect(t('progress.pageImages', { page: 3, pages: 11, current: 1, total: 1 })).toBe(
+      '3/11쪽 · 이미지 최적화'
+    )
+    setLocale('en')
+    expect(t('progress.pageImages', { page: 3, pages: 11, current: 1, total: 1 })).toBe(
+      'Page 3/11 · optimizing image'
+    )
+  })
+})
+
 describe('formatNumber', () => {
   it('OS 로캘이 아니라 현재 사전 언어를 따른다', () => {
     setLocale('en')
