@@ -70,7 +70,9 @@ const FIXTURE = {
     multiplier: 1.5,
     maxEdge: 2048,
     reencodeOpaquePng: true,
-    embedText: true
+    embedText: true,
+    fitToSize: false,
+    fitTargetMb: 5
   },
   selection: [
     {
@@ -172,6 +174,7 @@ function page(uiScript, query) {
   const platform = query.get('platform') ?? ''
   const frames = query.get('frames')
   const allFontsReady = query.get('fonts') === 'ready'
+  const fitToSize = query.get('fit') === '1'
   const width = Number(query.get('w') ?? 380)
   const height = Number(query.get('h') ?? 560)
   return `<!doctype html>
@@ -196,6 +199,7 @@ const FIXTURE = ${JSON.stringify(FIXTURE)}
 const UI_SCRIPT = ${JSON.stringify(uiScript)}
 const VARS = ${JSON.stringify(dark ? FIGMA_VARS_DARK : FIGMA_VARS)}\nconst FRAME_COUNT = ${frames === null ? 'null' : Number(frames)}
 const ALL_FONTS_READY = ${allFontsReady}
+const FIT_TO_SIZE = ${fitToSize}
 
 const iframe = document.getElementById('ui')
 iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VARS +
@@ -218,7 +222,8 @@ window.addEventListener('message', (event) => {
   document.getElementById('note').textContent = 'UI → main: ' + name
 
   if (name === 'ui:ready') {
-    send('settings', FIXTURE.settings)
+    // ?fit=1 — 목표 용량 모드로 열어 본다
+    send('settings', { ...FIXTURE.settings, fitToSize: FIT_TO_SIZE })
     // ?frames=N 으로 목록 크기를 바꾼다 (0 = 빈 상태)
     const selection = FRAME_COUNT === null
       ? FIXTURE.selection

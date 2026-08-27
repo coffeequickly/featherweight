@@ -13,3 +13,6 @@ src/**/*.css.d.ts
 .venv/
 figma-plugins/
 dist/
+
+# 미디어 렌더링용 중간 산출물 — 릴리즈마다 다시 찍는다 (docs/RELEASE.md)
+docs/brand/src/ui-*.png

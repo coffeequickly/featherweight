@@ -93,6 +93,17 @@ const MESSAGES = {
   'presets.balanced': { en: 'Balanced', ko: '균형' },
   'presets.small': { en: 'Smallest', ko: '최소 용량' },
   'presets.custom': { en: 'Custom', ko: '직접' },
+  // 4칸짜리 세그먼트라 가로가 빠듯하다 — 영문은 짧게. 뜻은 아래 설명이 받는다.
+  'presets.fit': { en: 'Target', ko: '목표 용량' },
+  'images.fitTarget': { en: 'Target', ko: '목표' },
+  'images.fitHelp': {
+    en: 'Picks the best image quality that still fits the target. Quality never drops below a floor — if the target is out of reach, you get the smallest possible file and a note saying so.',
+    ko: '목표를 지키는 가장 좋은 화질을 골라 줍니다. 화질에는 하한이 있어서, 목표가 무리면 가능한 가장 작은 파일과 함께 그 사실을 알려 드립니다.'
+  },
+  'images.fitSlower': {
+    en: 'Takes about twice as long as a normal export.',
+    ko: '보통 내보내기보다 두 배쯤 걸립니다.'
+  },
   'images.help': {
     en: 'Only images larger than the frame budget are downscaled. Small images like logos pass through untouched.',
     ko: '프레임 기준을 넘는 큰 이미지만 줄입니다. 로고처럼 작은 이미지는 재인코딩 없이 그대로 둡니다.'
@@ -173,6 +184,19 @@ const MESSAGES = {
     en: 'Page {page}/{pages} · finishing images',
     ko: '{page}/{pages}쪽 · 이미지 마무리'
   },
+  // ── 목표 용량 맞추기 ──────────────────────────────────
+  'progress.measure': {
+    en: 'Measuring the baseline file…',
+    ko: '기준 파일 크기 재는 중…'
+  },
+  'progress.probe': {
+    en: 'Looking for the best quality that fits ({current}/{total})',
+    ko: '목표에 맞는 최선의 화질 찾는 중 ({current}/{total})'
+  },
+  'progress.refine': {
+    en: 'Re-exporting at the chosen quality',
+    ko: '고른 화질로 다시 내보내는 중'
+  },
   'export.cancelled': { en: 'Cancelled.', ko: '취소했습니다.' },
   'export.nothing': {
     en: 'No pages could be exported. See the reasons below.',
@@ -202,6 +226,18 @@ const MESSAGES = {
     ko: '아웃라인으로 남은 텍스트 {total}개 · 사유 {kinds}가지'
   },
   'report.skipped': { en: 'Skipped — {name}: {reason}', ko: '건너뜀 — {name}: {reason}' },
+  'report.fitOk': {
+    en: 'Fit to {target} — best quality that stays under the target',
+    ko: '{target} 목표 달성 — 목표를 지키는 가장 좋은 화질입니다'
+  },
+  'report.fitAlready': {
+    en: 'Already under {target} — quality left untouched',
+    ko: '이미 {target} 이하 — 화질을 그대로 두었습니다'
+  },
+  'report.fitUnreachable': {
+    en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",
+    ko: '{target}까지는 줄이지 못했습니다. 이 문서는 화질 하한을 지키는 한 약 {floor} 아래로 내려가지 않습니다.'
+  },
 
   // ── 메인 스레드 알림 ────────────────────────────────────
   'main.cancelled': { en: 'Cancelled', ko: '취소했습니다' },
