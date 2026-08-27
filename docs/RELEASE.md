@@ -228,6 +228,13 @@ Two derivatives:
 - **`icon-128.png`** — cropped straight from the *source*, background and all.
   The alpha version loses those dark facets and goes thin at 128px.
 
+**Gradient text.** `.warm` paints type through `background-clip: text`, which
+only fills what sits inside the element's background box. `.num` carries a
+negative `letter-spacing`, which trims the box short of the last glyph and
+shears its right edge off — it ate the B in "4.0MB" once. `.warm` keeps a small
+`padding-right` to cover that; don't remove it, and re-check the last character
+whenever you change letter-spacing.
+
 Palette (`src/tokens.css`): background `#0B0A0C` · warm gradient
 gold `#FFB347` → orange `#F2622A` → magenta `#C2478A` · text `#F6F3EF`.
 The gradient is sampled from the feather, and `.warm` applies it to type.
