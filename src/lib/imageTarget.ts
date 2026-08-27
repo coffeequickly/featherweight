@@ -69,7 +69,7 @@ export function isProcessable(usage: ImageUsage): boolean {
  * 다시 인코딩해 봐야 몇 KB 아끼자고 화질만 상한다. 열화는 큰 원본에서만 값어치가 있다.
  */
 export function processFloor(
-  settings: Pick<Settings, 'multiplier' | 'maxEdge'>,
+  settings: { multiplier: number; maxEdge: number },
   frameLongEdge: number
 ): number {
   return Math.min(settings.maxEdge, Math.ceil(frameLongEdge * settings.multiplier))

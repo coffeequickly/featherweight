@@ -2,7 +2,7 @@
 
 import { PdfPart, Reason, Settings, TextRunSource, TMP_NODE_NAME } from '../lib/types'
 import { withTimeout } from '../lib/withTimeout'
-import { ImageRequestSender, shrinkImages } from './images'
+import { ImageRequestSender, OriginalSink, shrinkImages } from './images'
 import { ExportableNode, isExportable } from './selection'
 import { clearTextFills, collectTextNodes, extractText, screenTextNode } from './text'
 
@@ -22,6 +22,8 @@ export type FrameResult =
 export type FrameContext = {
   settings: Settings
   sendResizeRequest: ImageRequestSender
+  /** 목표 용량 탐색 중일 때만 준다 — 손대지 않은 이미지의 원본을 UI 캐시로 보낸다 */
+  keepOriginal?: OriginalSink
   onImageProgress: (current: number, total: number) => void
   /** fill 을 지워도 되는 노드를 UI 에 물어본다 (글리프 커버리지는 UI 에서만 볼 수 있다) */
   validateText: (sources: TextRunSource[]) => Promise<{
@@ -62,7 +64,8 @@ export async function exportFrame(
       context.settings,
       context.sendResizeRequest,
       context.onImageProgress,
-      context.isCancelled
+      context.isCancelled,
+      context.keepOriginal
     )
 
     const text = context.settings.embedText
@@ -89,6 +92,7 @@ export async function exportFrame(
           imagesProcessed: images.processed,
           bytesBefore: images.bytesBefore,
           bytesAfter: images.bytesAfter,
+          bytesUntouched: images.bytesUntouched,
           fallbacks: [
             ...images.warnings.map((reason) => ({ nodeId: id, reason })),
             ...text.fallbacks

@@ -37,5 +37,17 @@ export function presetOf(settings: Settings): PresetId | 'custom' {
 
 /** 프리셋 값을 얹는다. 프리셋에 없는 항목(reencodeOpaquePng 등)은 그대로 둔다. */
 export function applyPreset(settings: Settings, id: PresetId): Settings {
-  return { ...settings, ...PRESETS[id] }
+  return { ...settings, ...PRESETS[id], fitToSize: false }
+}
+
+/**
+ * 화면에 보여줄 이미지 모드. 목표 용량은 프리셋과 나란히 고르는 네 번째 선택지다 —
+ * 화질을 직접 정하는 대신 크기를 정하면 화질은 플러그인이 고른다.
+ */
+export type ImageModeId = PresetId | 'fit' | 'custom'
+
+export const IMAGE_MODE_IDS: Array<PresetId | 'fit'> = [...PRESET_IDS, 'fit']
+
+export function imageModeOf(settings: Settings): ImageModeId {
+  return settings.fitToSize ? 'fit' : presetOf(settings)
 }

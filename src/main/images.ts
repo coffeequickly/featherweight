@@ -32,7 +32,29 @@ export type ImageStats = {
   processed: number
   bytesBefore: number
   bytesAfter: number
+  /** 손대지 않고 통과시킨 이미지의 바이트 합 — 목표 용량 예측용 */
+  bytesUntouched: number
   warnings: Reason[]
+}
+
+/** 원본 바이트를 UI 캐시로 흘려보내는 통로. Fit to Size 일 때만 준다. */
+export type OriginalSink = (imageHash: string, bytes: Uint8Array) => void
+
+/**
+ * 이번 export 에서 실제로 본 이미지의 픽셀·바이트.
+ *
+ * 후보 프로필을 재보려면 "이 프로필의 기준선을 넘는가"(픽셀)와 "손대지 않으면 몇
+ * 바이트인가"를 알아야 하는데, 둘 다 Figma 왕복이라 후보마다 다시 묻기엔 비싸다.
+ * 기준 패스에서 한 번 본 값을 여기 남겨 두고 재사용한다. runExport 가 비운다.
+ */
+const seenImages = new Map<string, { longEdge: number; bytes: number }>()
+
+export function seenImageInfo(): ReadonlyMap<string, { longEdge: number; bytes: number }> {
+  return seenImages
+}
+
+export function forgetSeenImages(): void {
+  seenImages.clear()
 }
 
 export type ImageRequestSender = (payload: {
@@ -41,6 +63,8 @@ export type ImageRequestSender = (payload: {
   targetLongEdge: number
   quality: number
   reencodeOpaquePng: boolean
+  /** UI 가 목표 용량 탐색용으로 원본을 캐시하는 키 */
+  imageHash?: string
 }) => void
 
 type FillsNode = SceneNode & { fills: readonly Paint[] | typeof figma.mixed }
@@ -53,6 +77,21 @@ function hasFills(node: SceneNode): node is FillsNode {
 const READY_TIMEOUT_MS = 20_000
 
 /** 클론 전체에서 이미지 fill 을 쓰는 자리를 모은다. */
+/**
+ * 탐색용: 이 프로필로 처리한다면 각 이미지의 목표 크기가 얼마인지.
+ * 실제 처리는 하지 않는다 — UI 가 바이트만 재보게 넘길 목록이다.
+ */
+export function planFor(
+  root: SceneNode,
+  profile: { multiplier: number; maxEdge: number }
+): ImagePlan[] {
+  const usages = collectImageUsages(root)
+  return planImageTargets(usages, {
+    multiplier: profile.multiplier as Settings['multiplier'],
+    maxEdge: profile.maxEdge as Settings['maxEdge']
+  })
+}
+
 export function collectImageUsages(root: SceneNode): ImageUsage[] {
   const usages: ImageUsage[] = []
 
@@ -93,9 +132,16 @@ export async function shrinkImages(
   settings: Settings,
   send: ImageRequestSender,
   onProgress: (current: number, total: number) => void,
-  isCancelled: () => boolean
+  isCancelled: () => boolean,
+  keepOriginal?: OriginalSink
 ): Promise<ImageStats> {
-  const stats: ImageStats = { processed: 0, bytesBefore: 0, bytesAfter: 0, warnings: [] }
+  const stats: ImageStats = {
+    processed: 0,
+    bytesBefore: 0,
+    bytesAfter: 0,
+    bytesUntouched: 0,
+    warnings: []
+  }
   const usages = collectImageUsages(root)
   const plans = planImageTargets(usages, settings)
   if (plans.length === 0) return stats
@@ -116,7 +162,7 @@ export async function shrinkImages(
 
     const plan = plans[index]
     try {
-      const newHash = await shrinkOne(plan, floor, settings, send, stats)
+      const newHash = await shrinkOne(plan, floor, settings, send, stats, keepOriginal)
       if (newHash !== null) replacement.set(plan.imageHash, newHash)
     } catch (error) {
       stats.warnings.push({
@@ -142,7 +188,8 @@ async function shrinkOne(
   floor: number,
   settings: Settings,
   send: ImageRequestSender,
-  stats: ImageStats
+  stats: ImageStats,
+  keepOriginal?: OriginalSink
 ): Promise<string | null> {
   const image = figma.getImageByHash(plan.imageHash)
   if (image === null) {
@@ -150,14 +197,26 @@ async function shrinkOne(
     return null
   }
 
-  // 픽셀 수만 먼저 본다 — 기준선 이하면 바이트를 UI 로 보낼 필요조차 없다
+  // 픽셀 수만 먼저 본다 — 기준선 이하면 바이트를 UI 로 보낼 필요조차 없다.
+  // 단 목표 용량 탐색 중이면 통과시킨 이미지의 바이트도 알아야 예측이 맞는다.
   const size = await image.getSizeAsync()
-  if (Math.max(size.width, size.height) <= floor) return null
+  const belowFloor = Math.max(size.width, size.height) <= floor
+  if (belowFloor && keepOriginal === undefined) return null
 
   const original = await image.getBytesAsync()
+  seenImages.set(plan.imageHash, {
+    longEdge: Math.max(size.width, size.height),
+    bytes: original.length
+  })
 
   // 이미 가벼운 파일은 픽셀이 커도 그대로 둔다 — 절감의 본질은 바이트다
-  if (original.length <= KEEP_BYTES_FLOOR) return null
+  if (belowFloor || original.length <= KEEP_BYTES_FLOOR) {
+    stats.bytesUntouched += original.length
+    // 더 센 프로필에서는 이 이미지도 처리 대상이 될 수 있다 — 그때 재보게 넘겨둔다.
+    // (처리하는 이미지는 리사이즈 요청이 원본을 같이 실어 보내므로 여기서는 뺀다)
+    keepOriginal?.(plan.imageHash, original)
+    return null
+  }
 
   stats.bytesBefore += original.length
 
@@ -168,7 +227,8 @@ async function shrinkOne(
     bytes: original,
     targetLongEdge: plan.targetLongEdge,
     quality: settings.quality,
-    reencodeOpaquePng: settings.reencodeOpaquePng
+    reencodeOpaquePng: settings.reencodeOpaquePng,
+    imageHash: plan.imageHash // UI 가 탐색용으로 원본을 들고 있는다
   })
   const result = await promise
 
