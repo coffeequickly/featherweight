@@ -93,12 +93,13 @@ can't be selected, searched, or read by résumé scanners (ATS) — and text-hea
 documents balloon to 10–20MB that no compressor can shrink, because there are no
 images to compress.
 
-Featherweight fixes the text problem itself:
+Featherweight fixes the text itself — then gets the file down to the size you need:
 
 🪶 REAL FONTS, NOT OUTLINES
-Text is re-embedded as real subset fonts. It stays selectable, searchable,
-copy-pasteable, and ATS-parseable. A text-heavy résumé drops from ~10MB to
-under 1MB.
+Text is re-embedded as real subset fonts — italics included. It stays
+selectable, searchable, copy-pasteable, and ATS-parseable. Inter (Figma's own
+default), Roboto, Pretendard and 57 more are fetched and embedded for you.
+A text-heavy résumé drops from ~10MB to under 1MB.
 
 🪶 SMART IMAGE COMPRESSION
 Images are downscaled to the size they are actually displayed at, then
@@ -106,7 +107,7 @@ re-encoded. Pick a preset — Sharp / Balanced / Smallest — or fine-tune quali
 scale and resolution caps. Logos and already-small images pass through
 untouched, so nothing that was sharp gets muddy.
 
-🪶 FIT TO A TARGET SIZE (new in 1.1)
+🪶 FIT TO A TARGET SIZE
 Have a 5MB upload limit? Type the number. Featherweight exports once to measure,
 then finds the best image quality that still fits and re-exports at that
 setting. Quality never drops below a floor — if your target is out of reach it
@@ -123,10 +124,11 @@ HOW IT WORKS
 4. Export — the save dialog is pre-filled with a timestamped file name
 
 WHAT MAKES IT DIFFERENT
-• 60 open-license font families are downloaded and embedded automatically —
-  Inter, Roboto, Open Sans, Montserrat, Lato, Poppins and 37 more Latin faces,
-  plus 17 Korean ones (Pretendard, Noto Sans KR, Nanum, Gothic A1, Spoqa…).
-  Italics included. Add your own TTF/OTF once for anything else.
+• 60 open-license font families embed automatically, starting with Inter —
+  Figma's own default — then Roboto, Open Sans, Montserrat, Lato, Poppins and
+  37 more Latin faces, plus 17 Korean ones (Pretendard, Noto Sans KR, Nanum,
+  Gothic A1, Spoqa…). Every weight, roman and italic. Add your own TTF/OTF
+  once for anything else.
 • Never substitutes fonts. Anything it can't embed keeps its original
   outlines — identical look, honestly reported with a reason you can click
   to locate the exact layer on canvas.
