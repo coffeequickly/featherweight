@@ -117,6 +117,7 @@ describe('사전 무결성', () => {
     hash: 'h',
     detail: 'd',
     target: '5.0MB',
+    lines: 42,
     floor: '7.2MB',
     sample: '가',
     type: 'SLICE',
