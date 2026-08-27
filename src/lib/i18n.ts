@@ -226,6 +226,24 @@ const MESSAGES = {
     ko: '아웃라인으로 남은 텍스트 {total}개 · 사유 {kinds}가지'
   },
   'report.skipped': { en: 'Skipped — {name}: {reason}', ko: '건너뜀 — {name}: {reason}' },
+  // ── 아웃라인 무게 · 추출 미리보기 ─────────────────────
+  'report.outlineCost': {
+    en: (p) => ` · ${p.size} of vector outlines`,
+    ko: ' · 아웃라인 벡터 {size}'
+  },
+  'report.leak': {
+    en: 'Some glyphs were left behind as invisible outlines. The text may be extracted twice — please report this.',
+    ko: '지워지지 않은 글리프가 남았습니다. 텍스트가 두 번 추출될 수 있습니다 — 제보해 주시면 고치겠습니다.'
+  },
+  'report.preview': { en: 'Check what a parser reads', ko: '파서가 읽을 내용 확인' },
+  previewTitle: { en: 'Text a parser will read', ko: '파서가 읽어 갈 텍스트' },
+  previewHelp: {
+    en: (p) =>
+      `${p.lines} lines embedded as real fonts. Outlined text is not listed — parsers drop or garble it.`,
+    ko: '진짜 폰트로 임베드된 {lines}줄입니다. 아웃라인으로 남은 텍스트는 빠져 있습니다 — 파서가 흘리거나 깨뜨리는 쪽입니다.'
+  },
+  previewCopy: { en: 'Copy all', ko: '전체 복사' },
+  previewClose: { en: 'Close', ko: '닫기' },
   'report.fitOk': {
     en: 'Fit to {target} — best quality that stays under the target',
     ko: '{target} 목표 달성 — 목표를 지키는 가장 좋은 화질입니다'

@@ -3,6 +3,7 @@
 import { Banner, Button, IconWarning16, Muted, Text, VerticalSpace } from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
+import { useState } from 'preact/hooks'
 
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
@@ -82,6 +83,55 @@ function progressPercent(progress: { current: number; total: number } | null): n
 }
 
 /**
+ * 제출 전에 "채용 시스템이 뭘 읽어 갈지" 를 보여준다.
+ *
+ * 아웃라인으로 남은 텍스트는 여기 없다 — 파서가 흘리거나 깨뜨리는 쪽이라 없는 셈
+ * 치고 보여 주는 편이 정직하다. 사용자가 이름이나 연락처가 빠졌는지 눈으로 잡을 수 있다.
+ */
+function ParserPreview({ lines }: { lines: string[] }): JSX.Element {
+  const [open, setOpen] = useState(false)
+
+  if (!open) {
+    return (
+      <div class="reportLine">
+        <span class="clickable pathChip" onClick={() => setOpen(true)}>
+          <Text>
+            <Muted>{t('report.preview')}</Muted>
+          </Text>
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div class="previewCard">
+      <div class="rowBetween">
+        <Text>{t('previewTitle')}</Text>
+        <span class="clickable pathChip" onClick={() => setOpen(false)}>
+          <Text>
+            <Muted>{t('previewClose')}</Muted>
+          </Text>
+        </span>
+      </div>
+      <VerticalSpace space="extraSmall" />
+      <Text>
+        <Muted>{t('previewHelp', { lines: lines.length })}</Muted>
+      </Text>
+      <VerticalSpace space="extraSmall" />
+      <div class="previewBody">
+        {lines.map((line, index) => (
+          <div key={index} class="previewLine">
+            <Text>
+              <Muted>{line}</Muted>
+            </Text>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
  * 목표 용량 결과 한 줄. 못 맞췄을 때는 "왜 안 됐는지"보다 "그럼 얼마가 최선인지"가
  * 쓸모 있다 — 목표를 다시 잡을 근거가 되는 건 그 숫자다.
  */
@@ -139,9 +189,31 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
                     after: formatBytes(report.imageBytesAfter)
                   })
                 : ''}
+              {report.outlines.vectorBytes > 0
+                ? t('report.outlineCost', { size: formatBytes(report.outlines.vectorBytes) })
+                : ''}
             </Muted>
           </Text>
         </div>
+
+        {report.extractable.length === 0 ? null : (
+          <Fragment>
+            <VerticalSpace space="extraSmall" />
+            <ParserPreview lines={report.extractable} />
+          </Fragment>
+        )}
+
+        {/* 전부 임베드했는데 Type 3 가 남았다면 글리프를 못 지운 것이다 (유령 텍스트) */}
+        {report.fallbacks.length === 0 && report.outlines.fonts > 0 ? (
+          <Fragment>
+            <VerticalSpace space="extraSmall" />
+            <div class="reportLine reportWarn">
+              <Text>
+                <Muted>{t('report.leak')}</Muted>
+              </Text>
+            </div>
+          </Fragment>
+        ) : null}
 
         {report.fit === null ? null : (
           <Fragment>

@@ -312,6 +312,26 @@
   white-space: nowrap;
 }
 
+/* 파서 미리보기 — 결과 카드 안에서 접었다 편다 */
+.previewCard {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+}
+
+.previewBody {
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--figma-color-bg-secondary);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.previewLine + .previewLine {
+  margin-top: 4px;
+}
+
 /* 목표 용량 입력칸. 두세 자리 숫자에 한 줄을 다 내주면 무엇을 넣으라는 건지 흐려진다 */
 .targetInput {
   flex: 0 0 92px;

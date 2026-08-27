@@ -4,7 +4,7 @@ import { PdfPart, Reason, Settings, TextRunSource, TMP_NODE_NAME } from '../lib/
 import { withTimeout } from '../lib/withTimeout'
 import { ImageRequestSender, OriginalSink, shrinkImages } from './images'
 import { ExportableNode, isExportable } from './selection'
-import { clearTextFills, collectTextNodes, extractText, screenTextNode } from './text'
+import { collectTextNodes, extractText, hideTextGlyphs, screenTextNode } from './text'
 
 const EXPORT_TIMEOUT_MS = 30_000
 
@@ -163,7 +163,7 @@ async function prepareText(
   const sources: TextRunSource[] = []
   for (const candidate of candidates) {
     if (!approved.has(candidate.source.nodeId)) continue
-    clearTextFills(candidate.node)
+    hideTextGlyphs(candidate.node)
     sources.push(candidate.source)
   }
 

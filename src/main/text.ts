@@ -152,9 +152,39 @@ export function collectTextNodes(root: SceneNode): TextNode[] {
 }
 
 /**
- * 글리프를 지운다. `visible = false` 는 오토레이아웃 형제를 재배치하므로 쓰면 안 된다 (C6).
- * fill 을 비우면 자리는 그대로 두고 그림만 사라진다.
+ * 오토레이아웃을 꺼서 자식들을 지금 자리에 굳힌다.
+ *
+ * HUG 로 잡힌 프레임은 레이아웃을 끄는 순간 크기가 변하므로 먼저 FIXED 로 바꾼다.
+ * 클론에서만 부르므로 원본 문서는 그대로다.
  */
-export function clearTextFills(node: TextNode): void {
-  node.fills = []
+function freezeLayout(parent: BaseNode | null): void {
+  if (parent === null || !('layoutMode' in parent)) return
+
+  const frame = parent as FrameNode
+  if (frame.layoutMode === 'NONE') return
+
+  try {
+    if (frame.layoutSizingHorizontal === 'HUG') frame.layoutSizingHorizontal = 'FIXED'
+    if (frame.layoutSizingVertical === 'HUG') frame.layoutSizingVertical = 'FIXED'
+  } catch {
+    // 오토레이아웃 자식이 아니면 이 속성을 못 쓴다 — 크기는 어차피 안 변한다
+  }
+
+  frame.layoutMode = 'NONE'
+}
+
+/**
+ * 글리프를 export 에서 완전히 빼낸다.
+ *
+ * ⚠ fill 만 비우면 안 된다. 눈에는 안 보이지만 텍스트 그리기 연산과 Type 3 폰트·
+ * ToUnicode 가 PDF 에 그대로 남는다. 화면은 멀쩡한데 추출기만 유령 텍스트를 읽어서,
+ * 우리가 다시 그린 문장과 겹쳐 나온다 — 실측한 이력서에서 추출 텍스트의 5% 가 유령이었고
+ * 이름이 "장장원석A AI" 로 깨졌다. ATS 가 가장 먼저 읽는 자리다.
+ *
+ * visible = false 면 export 에서 아예 빠지지만 오토레이아웃 형제가 재배치된다 (C6).
+ * 그래서 부모의 레이아웃을 먼저 굳힌 뒤 숨긴다.
+ */
+export function hideTextGlyphs(node: TextNode): void {
+  freezeLayout(node.parent)
+  node.visible = false
 }

@@ -23,7 +23,7 @@ import {
 import { formatBytes } from '../lib/fontStore'
 import { t } from '../lib/i18n'
 import { forgetOriginals } from './imageCache'
-import { downloadPdf, MergeOutput, mergePdfs } from './pdf'
+import { downloadPdf, MergeOutput, mergePdfs, OutlineCost } from './pdf'
 import { drawTextLayer, FontCache } from './textLayer'
 import { loadFontBytes } from './fontSource'
 
@@ -41,6 +41,10 @@ export type ExportReport = {
   fallbacks: Array<{ nodeId: string; reason: Reason }>
   /** 목표 용량 맞추기를 켰을 때만 있다 */
   fit: FitReport | null
+  /** 아웃라인으로 남은 것의 무게 — Type 3 폰트 수와 벡터 바이트 */
+  outlines: OutlineCost
+  /** 추출될 텍스트 — "제출 전 확인" 이 보여준다 (문서 순서) */
+  extractable: string[]
 }
 
 export type ExportState = {
@@ -52,6 +56,21 @@ export type ExportState = {
   /** 마지막 요청 그대로 재시도. 실패 배너의 [다시 시도] 가 쓴다. */
   retry: () => void
   cancel: () => void
+}
+
+/**
+ * 진짜 폰트로 임베드한 텍스트를 문서 순서로 모은다.
+ *
+ * 채용 시스템(ATS)이 읽어 갈 내용이 바로 이것이다. 아웃라인으로 남은 텍스트는
+ * 여기 없다 — 파서가 못 읽거나 글자를 흘리는 쪽이라, 없는 셈 치고 보여 주는 편이
+ * 정직하다. 실측한 경쟁 제품은 아웃라인 텍스트에서 "Amazon" 이 "Ama on" 으로
+ * 추출됐다.
+ */
+function extractableText(parts: readonly PdfPart[]): string[] {
+  return [...parts]
+    .sort((a, b) => a.index - b.index)
+    .flatMap((part) => part.text.map((run) => run.characters))
+    .filter((line) => line.trim().length > 0)
 }
 
 /** 이 부분들이 PDF 안에서 차지하는 이미지 바이트 — 손대지 않고 통과시킨 것까지 센다 */
@@ -165,7 +184,9 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
             imageBytesAfter: 0,
             textDrawn: 0,
             fallbacks: [],
-            fit: done.fit ?? null
+            fit: done.fit ?? null,
+            outlines: { fonts: 0, vectorBytes: 0 },
+            extractable: []
           })
           return
         }
@@ -206,7 +227,9 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
           imageBytesAfter: stats.imageBytesAfter,
           textDrawn: merged.textDrawn,
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
-          fit: done.fit ?? null
+          fit: done.fit ?? null,
+          outlines: merged.outlines,
+          extractable: extractableText(collected)
         })
         setError(null)
       } catch (mergeError) {

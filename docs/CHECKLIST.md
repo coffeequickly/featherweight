@@ -102,3 +102,20 @@ pdffonts out.pdf                # embedded subsets (emb=yes, uni=yes)
 pdftotext out.pdf - | head -40  # extracted text
 pdfimages -list out.pdf         # per-image dimensions and encoding
 ```
+
+## Extracted text (ATS)
+
+The whole point of embedding real fonts is that a parser reads them. Check the
+text, not just the picture — a leftover outline is invisible on screen and only
+shows up in extraction.
+
+```bash
+pdftotext out.pdf - | head -40    # is every paragraph there exactly once?
+pdffonts out.pdf                  # Type 3 count should match the outline count
+```
+
+- [ ] No paragraph appears twice — once garbled, once whole. That means glyphs
+      were hidden but not removed, and a parser reads both
+- [ ] The name/heading line is intact (not "장장원석A AI")
+- [ ] "Check what a parser reads" in the report matches what `pdftotext` prints
+- [ ] With every font embedded, `pdffonts` shows no Type 3 at all
