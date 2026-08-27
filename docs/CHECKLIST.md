@@ -71,6 +71,23 @@ in the bottom-right corner is the build you mean to ship.
 - [ ] An oversized screenshot is downscaled; no image exceeds its target
 - [ ] Transparent PNGs stay PNG (no black boxes)
 
+## Fit to Size
+
+Exports twice, so budget time. Watch the progress bar — it must fill in one
+direction only, never restart at the second pass.
+
+- [ ] A target well above the document's size finishes in one pass and reports
+      "already under" — the file is byte-identical to the same export with the
+      Balanced preset
+- [ ] A reachable target lands **under** it — check `pdfinfo` against the number
+      you typed, not just the report line
+- [ ] An impossible target (say 0.5MB on an image-heavy deck) reports the floor
+      in the warning colour, and the file it produced matches that floor
+- [ ] A text-only document with a target below its size reports unreachable
+      without burning a second pass
+- [ ] Cancelling mid-search still leaves a usable PDF and no `__sheaf_tmp__`
+      layers
+
 ## Document safety
 
 - [ ] After exporting, the Figma document is unchanged (text fills intact)

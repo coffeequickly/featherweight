@@ -77,8 +77,8 @@ brand name (the leading competitor does the same with "(PDF, PNG, JPG, WebP)").
 
 ### Tagline
 
-> Compress images and embed real fonts in one export. Selectable, searchable,
-> ATS-ready PDFs — a 12-page portfolio goes from 22.7MB to 4.0MB.
+> Name a target file size and hit it, with real embedded fonts. Selectable,
+> searchable, ATS-ready PDFs — a 12-page portfolio goes from 22.7MB to 4.0MB.
 
 ### Description
 
@@ -100,13 +100,21 @@ re-encoded. Pick a preset — Sharp / Balanced / Smallest — or fine-tune quali
 scale and resolution caps. Logos and already-small images pass through
 untouched, so nothing that was sharp gets muddy.
 
-Together the two make a real difference: a 12-page portfolio went from 22.7MB
+🪶 FIT TO A TARGET SIZE (new in 1.1)
+Have a 5MB upload limit? Type the number. Featherweight exports once to measure,
+then finds the best image quality that still fits and re-exports at that
+setting. Quality never drops below a floor — if your target is out of reach it
+gives you the smallest possible file and tells you what that floor is, instead
+of quietly wrecking your images.
+
+Together these make a real difference: a 12-page portfolio went from 22.7MB
 to 4.0MB with the same pages and the same look.
 
 HOW IT WORKS
 1. Select frames and run Featherweight
 2. Drag to reorder pages, exclude what you don't need
-3. Export — the save dialog is pre-filled with a timestamped file name
+3. Pick an image preset — or Target, and type the size you need
+4. Export — the save dialog is pre-filled with a timestamped file name
 
 WHAT MAKES IT DIFFERENT
 • 15 open-license Korean & Latin font families are downloaded and embedded
@@ -145,20 +153,28 @@ Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 | File | Use |
 |---|---|
 | `icon-128.png` | Plugin icon — minimal two-tone feather (split barbs read as a feather, not a leaf) |
-| `cover-1920x960.png` | Cover — 22.7MB → 4.0MB, with image compression and real fonts given equal billing |
+| `cover-1920x960.png` | Cover — 22.7MB → 4.0MB, three feature lines incl. the Fit to Size badge |
 | `media-1.png` | Editorial: "Real fonts. Smaller PDFs. Better documents." |
 | `media-2.png` | Dark brand: "Keep text real. Keep files light." |
-| `media-3/4/5.png` | UI: export tab, image compression presets, fonts tab |
+| `media-3.png` | UI: export tab — "Reorder." |
+| `media-4.png` | UI: image presets — "Name a size. It hits it." |
+| `media-5.png` | UI: fonts tab |
 
 Everything is rendered from source in `docs/brand/src/` (plain HTML + `tokens.css`),
 so any of it can be regenerated or restyled:
 
 ```bash
-# UI screenshots — all-ready state, English, no error banners
-npm run ui:preview   # then capture ?bare=1&lang=en-US&fonts=ready&tab=export
+# 1. UI screenshots → docs/brand/src/ui-{export,images,fonts}.png
+npm run ui:preview
+#    capture ?bare=1&w=400&h=480&lang=en-US&fonts=ready&tab=export  (etc.)
+#    w=400 matters — the preview defaults to 380 and hides overflow
 
-# then render any src/*.html at 1920×960 with headless Chrome
+# 2. render each src/*.html at 1920×960 with headless Chrome
+#    cover.html → cover-1920x960.png, m2…m6.html → media-1…5.png
 ```
+
+`m3.html` carries the version number, so it needs a bump every release. The UI
+captures also carry the version in the corner — re-shoot them, don't reuse.
 
 Palette: orange `#F2622A` · ink `#141414` · cream `#FAF8F5`.
 "Free forever · open source" is called out on the cover and the dark board — it is
@@ -171,3 +187,4 @@ Match the existing version history — one line, leading with the change type:
 - "Fix: the font path 'copy' button didn't respond to clicks at all."
 - "Fix: logos and small images now pass through untouched. UI polish across all tabs."
 - "Windows: correct font folder paths and shortcuts. Locale-aware number formatting."
+- "Feature: Fit to Size — name a target file size and Featherweight finds the best image quality that fits."
