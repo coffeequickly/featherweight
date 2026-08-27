@@ -77,8 +77,14 @@ brand name (the leading competitor does the same with "(PDF, PNG, JPG, WebP)").
 
 ### Tagline
 
-> Name a target file size and hit it, with real embedded fonts. Selectable,
-> searchable, ATS-ready PDFs — a 12-page portfolio goes from 22.7MB to 4.0MB.
+**Hard limit: 100 characters.** The form counts and truncates silently — check
+the counter before saving.
+
+> Name a size — say 5MB — and it hits it. Text stays selectable, searchable, ATS-ready.
+
+85 characters. It deliberately does not repeat "compressed PDF export with real
+fonts" — the plugin *name* already says that, so the tagline spends its budget
+on what the name can't carry: the new target-size feature and a concrete number.
 
 ### Description
 
@@ -117,9 +123,10 @@ HOW IT WORKS
 4. Export — the save dialog is pre-filled with a timestamped file name
 
 WHAT MAKES IT DIFFERENT
-• 15 open-license Korean & Latin font families are downloaded and embedded
-  automatically (Pretendard, Nanum, Gothic A1, IBM Plex Sans KR, Spoqa…).
-  Add your own TTF/OTF once for anything else.
+• 60 open-license font families are downloaded and embedded automatically —
+  Inter, Roboto, Open Sans, Montserrat, Lato, Poppins and 37 more Latin faces,
+  plus 17 Korean ones (Pretendard, Noto Sans KR, Nanum, Gothic A1, Spoqa…).
+  Italics included. Add your own TTF/OTF once for anything else.
 • Never substitutes fonts. Anything it can't embed keeps its original
   outlines — identical look, honestly reported with a reason you can click
   to locate the exact layer on canvas.
@@ -140,6 +147,22 @@ GOOD TO KNOW
 • Text is embedded in an extractable form, but no specific ATS parsing
   result is guaranteed. Not affiliated with Figma, Inc.
 
+FONT SOURCES & CREDITS
+Every auto-downloaded font is licensed under the SIL Open Font License 1.1,
+which permits embedding in documents. The files are the upstream originals —
+Featherweight does not modify, host or redistribute them; your machine fetches
+them at export time over the jsDelivr CDN (cdn.jsdelivr.net).
+
+• Google Fonts — github.com/google/fonts
+• Expo Google Fonts — github.com/expo/google-fonts (static builds of families
+  Google now ships variable-only, such as Inter and Noto Sans KR)
+• Pretendard — github.com/orioncactus/pretendard
+• Spoqa Han Sans Neo — github.com/spoqa/spoqa-han-sans
+
+Every URL is pinned to a commit or a package version, and verified weekly
+against the real files. Featherweight is not affiliated with, or endorsed by,
+any of these projects. Font names are trademarks of their respective owners.
+
 ### Categories & tags
 
 Categories (max 2): **Import & export** (primary) + **Design tools**
@@ -147,6 +170,14 @@ Categories (max 2): **Import & export** (primary) + **Design tools**
 Tags: `pdf` `export` `fonts` `compress` `resume` `portfolio` `korean` `ats`
 
 ### Media
+
+**Safe area.** The Community carousel crops the sides on mobile — a 1920×960
+board loses roughly 8% off each edge. Keep every word inside the middle **80%
+horizontally and 86% vertically** (that means ~200px side padding on the cover,
+176px on the boards). Check by overlaying a dashed box at `left:10%;right:10%;
+top:7%;bottom:7%` before shipping. This bit us once: the first dark cover had
+96px padding and the logo, "22.7", and the footer URL were all clipped on phones.
+
 
 Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 

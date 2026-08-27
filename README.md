@@ -1,6 +1,6 @@
 # Featherweight – Compressed PDF Export with Real Fonts
 
-![Featherweight — compressed PDF export with real fonts](docs/brand/cover-1920x960.png?v=2)
+![Featherweight — compressed PDF export with real fonts](docs/brand/cover-1920x960.png?v=3)
 
 A Figma plugin that exports frames as **light PDFs with real embedded fonts**.
 
@@ -35,6 +35,10 @@ The plugin UI follows your Figma app language (English / Korean).
    In the report, click a reason to select the affected layers on canvas
 
 ## Fonts
+
+60 families are downloaded and embedded automatically — 43 Latin (Inter, Roboto,
+Open Sans, Montserrat, Lato, Poppins, IBM Plex, JetBrains Mono…) and 17 Korean
+(Pretendard, Noto Sans KR, Nanum, Gothic A1, Spoqa…), italics included.
 
 The Fonts tab lists every font your document uses, in one of three states:
 
@@ -130,6 +134,26 @@ Publishing a new version to the Figma Community is **deliberately manual**
 (Plugins → Manage plugins → Publish new version) — see `docs/RELEASE.md` for why.
 
 ## Credits
+
+### Fonts
+
+Every auto-downloaded font is licensed under the **SIL Open Font License 1.1**,
+which permits embedding in documents. Featherweight does not modify, host or
+redistribute any font file — your machine fetches the upstream original at
+export time over the jsDelivr CDN. Every URL is pinned to a commit or a package
+version and verified weekly (`.github/workflows/catalog.yml`).
+
+| Source | Families | |
+|---|---|---|
+| [Google Fonts](https://github.com/google/fonts) | 20 | first-party |
+| [Expo Google Fonts](https://github.com/expo/google-fonts) | 37 | static builds of families Google now ships variable-only |
+| [Pretendard](https://github.com/orioncactus/pretendard) | 2 | first-party |
+| [Spoqa Han Sans Neo](https://github.com/spoqa/spoqa-han-sans) | 1 | first-party |
+
+Not affiliated with, or endorsed by, any of these projects. Font names are
+trademarks of their respective owners.
+
+### Everything else
 
 - Not affiliated with Figma, Inc.
 - Built with [pdf-lib](https://github.com/Hopding/pdf-lib) (MIT) ·

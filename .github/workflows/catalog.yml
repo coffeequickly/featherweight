@@ -1,0 +1,32 @@
+# 폰트 카탈로그의 주소가 아직 살아 있는지 감시한다.
+#
+# 카탈로그는 남의 저장소를 가리키는 URL 600여 개다. 커밋 SHA·npm 버전으로 고정해 뒀지만
+# 절대적이지는 않다 — npm 은 게시 취소가 가능하고, GitHub 저장소는 이름이 바뀌거나 사라진다.
+# 링크가 썩어도 플러그인은 조용히 아웃라인으로 폴백하므로 아무도 모른 채 지나간다.
+#
+# CI 본체(ci.yml)에 넣지 않는 이유: 600개를 받으니 느리고, 네트워크·CDN 사정으로 실패하면
+# 코드와 무관하게 PR 이 막힌다. 주 1회 따로 돌려 사람이 보게 한다.
+
+name: Catalog
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # 매주 월요일 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # 실제로 전부 내려받아 TTF(glyf)인지, static 인지, 굵기·이탤릭·글자 커버리지가
+      # 맞는지 확인한다. 어느 배포처가 죽었는지는 실패한 항목 이름으로 드러난다.
+      - run: npm run verify:catalog
