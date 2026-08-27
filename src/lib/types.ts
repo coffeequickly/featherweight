@@ -25,6 +25,9 @@ export type Settings = {
   maxEdge: 1024 | 1600 | 2048 | 4096
   reencodeOpaquePng: boolean
   embedText: boolean // Phase 2
+  /** 목표 용량에 맞춰 압축을 자동으로 고른다 (docs/FIT-TO-SIZE.md) */
+  fitToSize: boolean
+  fitTargetMb: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,7 +38,9 @@ export const DEFAULT_SETTINGS: Settings = {
   multiplier: 1.5,
   maxEdge: 2048,
   reencodeOpaquePng: true,
-  embedText: true
+  embedText: true,
+  fitToSize: false,
+  fitTargetMb: 5
 }
 
 export type SortMode = 'position' | 'name'
@@ -102,6 +107,8 @@ export type PartStats = {
   imagesProcessed: number
   bytesBefore: number
   bytesAfter: number
+  /** 손대지 않고 통과시킨 이미지의 바이트 합. 목표 용량 예측에만 쓴다. */
+  bytesUntouched: number
   fallbacks: Array<{ nodeId: string; reason: Reason }>
 }
 
@@ -223,7 +230,26 @@ export interface PdfPartHandler extends EventHandler {
   handler: (part: PdfPart) => void
 }
 
+/** 측정 패스 결과 — UI 가 머지한 실제 PDF 크기를 메인에 돌려준다 */
+export interface FitMeasuredHandler extends EventHandler {
+  name: 'fit:measured'
+  handler: (payload: { reqId: string; pdfBytes: number; imageBytes: number }) => void
+}
+
+/** Fit to Size 결과 — 리포트에 그대로 보여준다 */
+export type FitReport = {
+  targetBytes: number
+  outcome: 'fits' | 'already-small' | 'unreachable'
+  /** 예측 크기 — unreachable 이면 이 문서에서 가능한 가장 작은 크기(하한) */
+  predictedBytes: number
+}
+
 export type DoneReport = {
+  /** 측정 요청의 짝 — measureOnly 일 때만 있다 */
+  reqId?: string
+  /** true 면 UI 는 머지해서 크기만 재고 저장하지 않는다 (목표 용량 탐색 1회차) */
+  measureOnly?: boolean
+  fit?: FitReport
   fileName: string
   cancelled: boolean
   skipped: Array<{ id: string; name: string; reason: Reason }>
@@ -260,6 +286,8 @@ export type ResizeRequestPayload = {
   targetLongEdge: number
   quality: number
   reencodeOpaquePng: boolean
+  /** 탐색용 캐시 키 — UI 가 원본을 들고 있으려고 쓴다 (docs/FIT-TO-SIZE.md) */
+  imageHash?: string
 }
 
 export interface ImageResizeHandler extends EventHandler {
@@ -310,6 +338,44 @@ export type TextValidateResult = {
 export interface TextValidateResultHandler extends EventHandler {
   name: 'text:validate:result'
   handler: (payload: TextValidateResult) => void
+}
+
+/**
+ * 목표 용량 탐색용. 캐시된 원본을 주어진 설정으로 재인코딩해 바이트 합계만 돌려준다.
+ * 실제 fill 교체도, Figma 왕복도 없다 — 그래서 후보를 여러 개 재도 싸다.
+ */
+export type ImageProbeItem = {
+  imageHash: string
+  targetLongEdge: number
+  /** 메인이 이 프로필에서 손대지 않을 이미지 — 인코딩 없이 원본 바이트로 센다 */
+  skip: boolean
+  /** 원본 바이트 수. skip 이거나 캐시에 없을 때 이 값으로 센다. */
+  originalBytes: number
+}
+
+/**
+ * 리사이즈 없이 원본 바이트만 UI 캐시에 넣는다.
+ * 이번 프로필에서는 건너뛰지만 더 센 프로필에서는 처리될 이미지가 있어서,
+ * 그때 재보려면 원본이 UI 에 있어야 한다. Fit to Size 일 때만 보낸다.
+ */
+export interface ImageCacheHandler extends EventHandler {
+  name: 'image:cache'
+  handler: (payload: { imageHash: string; bytes: Uint8Array }) => void
+}
+
+export interface ImageProbeHandler extends EventHandler {
+  name: 'image:probe'
+  handler: (payload: {
+    reqId: string
+    items: ImageProbeItem[]
+    quality: number
+    reencodeOpaquePng: boolean
+  }) => void
+}
+
+export interface ImageProbeResultHandler extends EventHandler {
+  name: 'image:probe:result'
+  handler: (payload: { reqId: string; totalBytes: number; failed: number }) => void
 }
 
 /** 문서 이름 — UI 가 파일명 기본값을 제안할 때 쓴다. */

@@ -9,6 +9,8 @@ import {
   DoneReport,
   ErrorHandler,
   ExportHandler,
+  FitMeasuredHandler,
+  FitReport,
   PdfPart,
   PdfPartHandler,
   Progress,
@@ -20,7 +22,8 @@ import {
 } from '../lib/types'
 import { formatBytes } from '../lib/fontStore'
 import { t } from '../lib/i18n'
-import { downloadPdf, mergePdfs } from './pdf'
+import { forgetOriginals } from './imageCache'
+import { downloadPdf, MergeOutput, mergePdfs } from './pdf'
 import { drawTextLayer, FontCache } from './textLayer'
 import { loadFontBytes } from './fontSource'
 
@@ -36,6 +39,8 @@ export type ExportReport = {
   imageBytesAfter: number
   textDrawn: number
   fallbacks: Array<{ nodeId: string; reason: Reason }>
+  /** 목표 용량 맞추기를 켰을 때만 있다 */
+  fit: FitReport | null
 }
 
 export type ExportState = {
@@ -49,6 +54,11 @@ export type ExportState = {
   cancel: () => void
 }
 
+/** 이 부분들이 PDF 안에서 차지하는 이미지 바이트 — 손대지 않고 통과시킨 것까지 센다 */
+function imageBytesOf(parts: readonly PdfPart[]): number {
+  return parts.reduce((sum, part) => sum + part.stats.bytesAfter + part.stats.bytesUntouched, 0)
+}
+
 export function useExport(storedFonts: StoredFont[], embedText: boolean): ExportState {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
@@ -56,6 +66,8 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
   const [error, setError] = useState<string | null>(null)
 
   const parts = useRef<PdfPart[]>([])
+  // 목표 용량 탐색 1회차 결과. 2회차가 없으면(이미 목표 이하) 이걸 그대로 저장한다.
+  const measured = useRef<{ parts: PdfPart[]; merged: MergeOutput | null } | null>(null)
   const startedAt = useRef(0)
   const fonts = useRef<StoredFont[]>(storedFonts)
   const wantsText = useRef(embedText)
@@ -79,9 +91,64 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
       setProgress(null)
     })
 
+    /** 부분들을 한 PDF 로 합친다. 폰트 캐시는 문서 전체에 하나여야 한다. */
+    async function mergeCollected(collected: PdfPart[], fileName: string): Promise<MergeOutput> {
+      // 페이지마다 캐시를 만들면 같은 폰트가 페이지 수만큼 중복 임베드된다 (5쪽이면 4종 → 20벌)
+      let cache: FontCache | null = null
+
+      return await mergePdfs(collected, {
+        title: fileName.replace(/\.pdf$/i, ''),
+        createdAt: new Date(),
+        drawText: wantsText.current
+          ? async (document, page, index) => {
+              const part = collected.find((candidate) => candidate.index === index)
+              if (part === undefined || part.text.length === 0) return { drawn: 0, fallbacks: [] }
+              cache ??= new FontCache(document, fonts.current, (font) => loadFontBytes(font))
+              return await drawTextLayer(page, part.text, cache)
+            }
+          : undefined
+      })
+    }
+
+    /**
+     * 목표 용량 탐색 1회차: 저장하지 않고 실제 크기만 재서 메인에 돌려준다.
+     * 머지가 실패하면 크기 0 으로 알린다 — 메인이 탐색을 접고 기준 결과로 마무리한다.
+     */
+    async function measure(done: DoneReport, collected: PdfPart[]): Promise<void> {
+      try {
+        const merged = await mergeCollected(collected, done.fileName)
+        measured.current = { parts: collected, merged }
+        emit<FitMeasuredHandler>('fit:measured', {
+          reqId: done.reqId ?? '',
+          pdfBytes: merged.bytes.length,
+          imageBytes: imageBytesOf(collected)
+        })
+      } catch {
+        measured.current = { parts: collected, merged: null }
+        emit<FitMeasuredHandler>('fit:measured', {
+          reqId: done.reqId ?? '',
+          pdfBytes: 0,
+          imageBytes: 0
+        })
+      }
+    }
+
     async function finish(done: DoneReport): Promise<void> {
-      const collected = parts.current
+      const arrived = parts.current
       parts.current = []
+
+      if (done.measureOnly === true) {
+        await measure(done, arrived)
+        return
+      }
+
+      // 2회차가 아무것도 안 보냈으면 1회차 결과를 그대로 쓴다 (이미 목표 이하였던 경우)
+      const stash = measured.current
+      measured.current = null
+      forgetOriginals()
+
+      const collected = arrived.length > 0 ? arrived : (stash?.parts ?? [])
+      const premerged = arrived.length > 0 ? null : (stash?.merged ?? null)
 
       try {
         if (collected.length === 0) {
@@ -97,27 +164,13 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
             imageBytesBefore: 0,
             imageBytesAfter: 0,
             textDrawn: 0,
-            fallbacks: []
+            fallbacks: [],
+            fit: done.fit ?? null
           })
           return
         }
 
-        // 폰트 캐시는 문서 전체에 하나여야 한다. 페이지마다 만들면 같은 폰트가
-        // 페이지 수만큼 중복 임베드된다 (5쪽이면 4종 → 20벌).
-        let cache: FontCache | null = null
-
-        const merged = await mergePdfs(collected, {
-          title: done.fileName.replace(/\.pdf$/i, ''),
-          createdAt: new Date(),
-          drawText: wantsText.current
-            ? async (document, page, index) => {
-                const part = collected.find((candidate) => candidate.index === index)
-                if (part === undefined || part.text.length === 0) return { drawn: 0, fallbacks: [] }
-                cache ??= new FontCache(document, fonts.current, (font) => loadFontBytes(font))
-                return await drawTextLayer(page, part.text, cache)
-              }
-            : undefined
-        })
+        const merged = premerged ?? (await mergeCollected(collected, done.fileName))
         const bytes = merged.bytes
         downloadPdf(bytes, done.fileName)
         // 플러그인 창을 안 보고 있어도 완료를 알 수 있게 캔버스 토스트로도 알린다
@@ -152,7 +205,8 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
           imageBytesBefore: stats.imageBytesBefore,
           imageBytesAfter: stats.imageBytesAfter,
           textDrawn: merged.textDrawn,
-          fallbacks: [...stats.fallbacks, ...merged.textFallbacks]
+          fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
+          fit: done.fit ?? null
         })
         setError(null)
       } catch (mergeError) {
@@ -176,6 +230,7 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
   const start = useCallback((order: string[], settings: Settings, fileName: string) => {
     lastRequest.current = { order, settings, fileName }
     parts.current = []
+    measured.current = null
     startedAt.current = Date.now()
     setBusy(true)
     setError(null)

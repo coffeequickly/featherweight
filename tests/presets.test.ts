@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { applyPreset, PRESET_IDS, PRESETS, presetOf } from '../src/lib/presets'
+import { applyPreset, imageModeOf, PRESET_IDS, PRESETS, presetOf } from '../src/lib/presets'
 import { DEFAULT_SETTINGS } from '../src/lib/types'
 
 describe('presetOf', () => {
@@ -28,5 +28,23 @@ describe('applyPreset', () => {
     expect(applied.quality).toBe(PRESETS.sharp.quality)
     expect(applied.reencodeOpaquePng).toBe(false)
     expect(applied.embedText).toBe(false)
+  })
+})
+
+describe('imageModeOf', () => {
+  it('목표 용량을 켜면 프리셋 숫자와 무관하게 fit 이다', () => {
+    expect(imageModeOf({ ...DEFAULT_SETTINGS, fitToSize: true })).toBe('fit')
+    expect(imageModeOf({ ...DEFAULT_SETTINGS, fitToSize: true, quality: 0.55 })).toBe('fit')
+  })
+
+  it('꺼져 있으면 평소대로 프리셋을 따른다', () => {
+    expect(imageModeOf(DEFAULT_SETTINGS)).toBe('balanced')
+    expect(imageModeOf({ ...DEFAULT_SETTINGS, quality: 0.55 })).toBe('custom')
+  })
+
+  it('프리셋을 고르면 목표 용량 모드에서 빠져나온다 — 둘이 동시에 켜지면 안 된다', () => {
+    const fit = { ...DEFAULT_SETTINGS, fitToSize: true }
+    expect(applyPreset(fit, 'sharp').fitToSize).toBe(false)
+    expect(imageModeOf(applyPreset(fit, 'sharp'))).toBe('sharp')
   })
 })

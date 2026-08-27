@@ -15,6 +15,9 @@ import {
   FontsHandler,
   FontUsage,
   FrameItem,
+  ImageCacheHandler,
+  ImageProbeHandler,
+  ImageProbeResultHandler,
   ImageResizeHandler,
   ImageResizeResultHandler,
   NoticeHandler,
@@ -30,6 +33,7 @@ import {
 } from '../lib/types'
 import { settleResponse } from './bridge'
 import { resetFontCache } from './fontSource'
+import { forgetOriginals, probeImageBytes, rememberOriginal } from './imageCache'
 import { resizeImage } from './resize'
 import { validateSources } from './validateText'
 
@@ -79,9 +83,25 @@ export function useMainState(onSelectionChange: () => void): MainState {
 
     // 메인에는 Canvas 가 없다. 리사이즈 요청이 오면 여기서 처리해 돌려준다. (PRD C3)
     const offResize = on<ImageResizeHandler>('image:resize', (payload) => {
+      // 목표 용량 탐색이 같은 원본을 여러 설정으로 다시 재봐야 해서 들고 있는다
+      if (payload.imageHash !== undefined) rememberOriginal(payload.imageHash, payload.bytes)
       void resizeImage(payload).then((result) => {
         emit<ImageResizeResultHandler>('image:resize:result', { reqId: payload.reqId, ...result })
       })
+    })
+
+    // 리사이즈는 없고 캐시만 — 이번엔 건너뛰지만 더 센 설정에서는 재봐야 할 이미지들
+    const offCache = on<ImageCacheHandler>('image:cache', (payload) => {
+      rememberOriginal(payload.imageHash, payload.bytes)
+    })
+
+    // 목표 용량 탐색: 캐시된 원본을 재인코딩해 바이트 합계만 돌려준다 (Figma 미개입)
+    const offProbe = on<ImageProbeHandler>('image:probe', (payload) => {
+      void probeImageBytes(payload.items, payload.quality, payload.reencodeOpaquePng).then(
+        (result) => {
+          emit<ImageProbeResultHandler>('image:probe:result', { reqId: payload.reqId, ...result })
+        }
+      )
     })
 
     // fill 을 지워도 되는 노드인지 판정한다 — 폰트 파일과 글리프는 여기서만 볼 수 있다
@@ -105,7 +125,10 @@ export function useMainState(onSelectionChange: () => void): MainState {
       offSettings()
       offFontBytes()
       offResize()
+      offCache()
+      offProbe()
       offValidate()
+      forgetOriginals()
     }
   }, [])
 
