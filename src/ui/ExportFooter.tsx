@@ -81,6 +81,22 @@ function progressPercent(progress: { current: number; total: number } | null): n
   return Math.min(100, Math.round((progress.current / progress.total) * 100))
 }
 
+/**
+ * 목표 용량 결과 한 줄. 못 맞췄을 때는 "왜 안 됐는지"보다 "그럼 얼마가 최선인지"가
+ * 쓸모 있다 — 목표를 다시 잡을 근거가 되는 건 그 숫자다.
+ */
+function fitLine(fit: NonNullable<ExportReport['fit']>, actualBytes: number): string {
+  const target = formatBytes(fit.targetBytes)
+  if (fit.outcome === 'unreachable') {
+    return t('report.fitUnreachable', {
+      target,
+      floor: formatBytes(Math.max(fit.predictedBytes, actualBytes))
+    })
+  }
+  if (fit.outcome === 'already-small') return t('report.fitAlready', { target })
+  return t('report.fitOk', { target })
+}
+
 function Report({ report }: { report: ExportReport }): JSX.Element {
   // 같은 사유가 수십 번 반복된다 (폰트 하나가 없으면 그 폰트를 쓰는 노드마다 하나씩).
   // 그대로 늘어놓으면 읽을 수 없어서 묶어서 세고, 클릭하면 해당 노드를 캔버스에서 보여준다.
@@ -126,6 +142,19 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
             </Muted>
           </Text>
         </div>
+
+        {report.fit === null ? null : (
+          <Fragment>
+            <VerticalSpace space="extraSmall" />
+            <div
+              class={report.fit.outcome === 'unreachable' ? 'reportLine reportWarn' : 'reportLine'}
+            >
+              <Text>
+                <Muted>{fitLine(report.fit, report.byteLength)}</Muted>
+              </Text>
+            </div>
+          </Fragment>
+        )}
 
         {reasons.length === 0 ? null : (
           <Fragment>

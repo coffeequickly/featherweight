@@ -18,7 +18,10 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { suggestFileName } from '../lib/fileName'
 import { t } from '../lib/i18n'
 import { sortItems } from '../lib/order'
-import { presetOf } from '../lib/presets'
+import { mbToBytes } from '../lib/fitToSize'
+import { formatBytes } from '../lib/fontStore'
+import { imageModeOf } from '../lib/presets'
+import { ImageGlyph, TypeGlyph } from './glyphs'
 import { FrameFocusHandler, FrameItem, ResizeWindowHandler, SortMode } from '../lib/types'
 import { PLUGIN_VERSION } from './buildInfo'
 import { ExportFooter } from './ExportFooter'
@@ -57,45 +60,6 @@ class ErrorBoundary extends Component<{ children: ComponentChildren }, { crashed
     }
     return this.props.children
   }
-}
-
-/** 요약용 픽토그램 — 12px 스트로크, 텍스트 보조색 */
-function ImageGlyph(): JSX.Element {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="var(--figma-color-text-secondary)"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <path d="M21 15l-5-5L5 21" />
-    </svg>
-  )
-}
-
-/** 폰트 픽토그램 — 대문자 A 형태 */
-function TypeGlyph(): JSX.Element {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="var(--figma-color-text-secondary)"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <path d="M4 20L12 4l8 16" />
-      <path d="M7 14h10" />
-    </svg>
-  )
 }
 
 function AppBody(): JSX.Element {
@@ -240,7 +204,10 @@ function AppBody(): JSX.Element {
                       <ImageGlyph />
                       <Text>
                         <Muted>
-                          {t('tab.images')} {t(`presets.${presetOf(settings)}` as const)}
+                          {t('tab.images')}{' '}
+                          {settings.fitToSize
+                            ? `≤ ${formatBytes(mbToBytes(settings.fitTargetMb))}`
+                            : t(`presets.${imageModeOf(settings)}` as const)}
                         </Muted>
                       </Text>
                     </span>
