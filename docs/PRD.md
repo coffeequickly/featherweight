@@ -510,6 +510,8 @@ out = hasAlpha ? canvas.convertToBlob({ type:'image/png' })
 ## 변경 이력
 
 - v0.1 (2026-08-20) 최초 작성. 요구사항·제약·파이프라인·스파이크·Phase 정의.
+- v1.1 (2026-08-27) 목표 용량 맞추기(Fit to Size)는 이 문서를 고치지 않고
+  `docs/FIT-TO-SIZE.md` 에 따로 적었다 — 이 PRD 는 v0 설계의 기록으로 둔다.
 
 ## 제안
 

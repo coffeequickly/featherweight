@@ -15,6 +15,8 @@ Featherweight fixes the text problem itself:
   selectable, searchable, copy-pasteable and ATS-parseable.
 - **Smart image downscaling** — images are resized to their displayed size before
   export; anything already within the frame's budget passes through untouched.
+- **Fit to a target size** — name a number (say 5 MB) and Featherweight finds the
+  best image quality that still fits, or tells you the smallest it can reach.
 
 A text-heavy résumé drops from ~10MB to under 1MB.
 
@@ -27,7 +29,8 @@ The plugin UI follows your Figma app language (English / Korean).
 1. Select frames on the canvas and run Featherweight
 2. Drag rows (or use ↑↓) to reorder pages, ✕ to exclude — your layers are never
    modified. Click a row to reveal that frame on the canvas
-3. Pick an image preset in the **Images** tab; check font readiness in **Fonts**
+3. Pick an image preset in the **Images** tab — Sharp / Balanced / Smallest, or
+   **Target** to name a file size; check font readiness in **Fonts**
 4. **Export PDF** — the save dialog is pre-filled with a timestamped file name.
    In the report, click a reason to select the affected layers on canvas
 
@@ -99,7 +102,9 @@ pick `~/figma-plugins/sheaf/manifest.json`. After that, re-running
 `install:local` is enough — no re-import needed.
 
 `ui:preview` accepts query flags for reviewing states without Figma:
-`?tab=fonts&theme=dark&lang=en-US&platform=win&frames=12&bare=1`.
+`?tab=fonts&theme=dark&lang=en-US&platform=win&frames=12&fit=1&bare=1`.
+Pass `w=400` to match the real plugin window — the default (380) is narrower and
+hides horizontal overflow.
 
 ### Repo layout
 
@@ -112,8 +117,9 @@ tools/**      build, packaging, local install, UI preview, Figma publish
 
 The split mirrors the plugin runtime's hard constraints. `docs/PRD.md` explains
 the reasoning, `docs/SPIKES.md` records the runtime assumptions verified against
-the real API, `docs/CHECKLIST.md` is the manual QA pass, and `docs/RELEASE.md`
-is the release playbook.
+the real API, `docs/FIT-TO-SIZE.md` covers how the target-size search works,
+`docs/CHECKLIST.md` is the manual QA pass, and `docs/RELEASE.md` is the release
+playbook.
 
 ## Releasing
 
