@@ -1,8 +1,28 @@
+/* 브랜드 토큰. 크리스털 깃털(feather-source.png)에서 뽑은 어두운 팔레트다.
+   깃털은 near-black 배경 위에 그려져 있어서, 얹을 때 mix-blend-mode:screen 으로
+   배경을 날린다 — 어떤 어두운 톤 위에도 글로우만 남는다 (.feather 참고). */
 :root{
-  --orange:#F2622A; --orange-soft:#FF8A4C;
-  --ink:#141414; --ink-2:#3D3D3D; --mute:#767676;
-  --cream:#FAF8F5; --line:#E6E2DC;
+  /* 깃털에서 뽑은 웜 그라디언트 */
+  --orange:#F2622A; --orange-soft:#FF8A4C; --gold:#FFB347; --magenta:#C2478A;
+
+  /* 어두운 바탕 */
+  --bg:#0B0A0C; --bg-2:#141317; --line:#2A2830;
+
+  /* 글자 */
+  --fg:#F6F3EF; --fg-2:#BDB7B2; --mute:#84807E;
+
+  /* 밝은 면(문서 목업 등)에서만 쓴다 */
+  --cream:#FAF8F5; --ink:#141414; --ink-2:#3D3D3D;
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,'Apple SD Gothic Neo',sans-serif;-webkit-font-smoothing:antialiased}
 .num{font-variant-numeric:tabular-nums;letter-spacing:-0.04em}
+
+/* 깃털 이미지 — 배경(near-black)을 screen 으로 날리고 발광만 남긴다 */
+.feather{mix-blend-mode:screen;display:block}
+
+/* 웜 그라디언트 글자 — 깃털의 색을 타이포에 이어 붙인다 */
+.warm{
+  background:linear-gradient(100deg,var(--gold) 0%,var(--orange) 46%,var(--magenta) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}

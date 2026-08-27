@@ -153,9 +153,10 @@ Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 | File | Use |
 |---|---|
 | `icon-128.png` | Plugin icon — minimal two-tone feather (split barbs read as a feather, not a leaf) |
-| `cover-1920x960.png` | Cover — 22.7MB → 4.0MB, three feature lines incl. the Fit to Size badge |
+| `icon-128.png` | Plugin icon — the crystal feather, cropped from `src/feather-source.png` |
+| `cover-1920x960.png` | Cover — 22.7MB → 4.0MB with the feather as hero, three feature lines |
 | `media-1.png` | Editorial: "Real fonts. Smaller PDFs. Better documents." |
-| `media-2.png` | Dark brand: "Keep text real. Keep files light." |
+| `media-2.png` | Brand board: "Keep text real. Keep files light." |
 | `media-3.png` | UI: export tab — "Reorder." |
 | `media-4.png` | UI: image presets — "Name a size. It hits it." |
 | `media-5.png` | UI: fonts tab |
@@ -166,19 +167,37 @@ so any of it can be regenerated or restyled:
 ```bash
 # 1. UI screenshots → docs/brand/src/ui-{export,images,fonts}.png
 npm run ui:preview
-#    capture ?bare=1&w=400&h=480&lang=en-US&fonts=ready&tab=export  (etc.)
+#    capture ?bare=1&w=400&h=480&lang=en-US&fonts=ready&theme=dark&tab=export  (etc.)
 #    w=400 matters — the preview defaults to 380 and hides overflow
+#    theme=dark matters — the boards are dark, a light capture glares
 
 # 2. render each src/*.html at 1920×960 with headless Chrome
 #    cover.html → cover-1920x960.png, m2…m6.html → media-1…5.png
+#    icon.html at 128×128 → icon-128.png
 ```
 
 `m3.html` carries the version number, so it needs a bump every release. The UI
 captures also carry the version in the corner — re-shoot them, don't reuse.
 
-Palette: orange `#F2622A` · ink `#141414` · cream `#FAF8F5`.
-"Free forever · open source" is called out on the cover and the dark board — it is
-a real differentiator against the paid/subscription plugins in this category.
+### The feather
+
+`src/feather-source.png` is the master (a rendered crystal feather on near-black).
+Two derivatives:
+
+- **`src/feather.png`** — same feather with the background knocked out to alpha,
+  for placing on the dark boards. Made by mapping luminance to alpha with an SVG
+  `feColorMatrix`, then screenshotting with
+  `--default-background-color=00000000`. It only works on dark backgrounds: the
+  knockout eats the feather's own dark facets, so on cream it washes out.
+- **`icon-128.png`** — cropped straight from the *source*, background and all.
+  The alpha version loses those dark facets and goes thin at 128px.
+
+Palette (`src/tokens.css`): background `#0B0A0C` · warm gradient
+gold `#FFB347` → orange `#F2622A` → magenta `#C2478A` · text `#F6F3EF`.
+The gradient is sampled from the feather, and `.warm` applies it to type.
+
+"Free forever · open source" is called out on the cover and the brand board — it
+is a real differentiator against the paid/subscription plugins in this category.
 
 ## Release-note style
 
