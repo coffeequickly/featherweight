@@ -1,6 +1,6 @@
-# Featherweight
+# Featherweight – Compressed PDF Export with Real Fonts
 
-![Featherweight — light PDF export with real fonts](docs/brand/cover-1920x960.png)
+![Featherweight — compressed PDF export with real fonts](docs/brand/cover-1920x960.png)
 
 A Figma plugin that exports frames as **light PDFs with real embedded fonts**.
 
