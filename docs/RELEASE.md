@@ -176,6 +176,11 @@ npm run ui:preview
 #    icon.html at 128×128 → icon-128.png
 ```
 
+When you replace the cover, bump the `?v=` on the README's image link
+(`docs/brand/cover-1920x960.png?v=2`). GitHub proxies README images and caches
+them by URL, so same-name replacements keep serving the old bytes — the file on
+`raw.githubusercontent.com` updates immediately, the rendered README does not.
+
 `m3.html` carries the version number, so it needs a bump every release. The UI
 captures also carry the version in the corner — re-shoot them, don't reuse.
 
