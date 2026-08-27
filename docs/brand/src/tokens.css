@@ -21,8 +21,12 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,
 /* 깃털 이미지 — 배경(near-black)을 screen 으로 날리고 발광만 남긴다 */
 .feather{mix-blend-mode:screen;display:block}
 
-/* 웜 그라디언트 글자 — 깃털의 색을 타이포에 이어 붙인다 */
+/* 웜 그라디언트 글자 — 깃털의 색을 타이포에 이어 붙인다.
+   background-clip:text 는 배경 상자 밖으로 나간 획을 칠하지 않는다. .num 의 음수
+   letter-spacing(-0.04em)이 마지막 글자 뒤를 깎아서 상자가 글리프보다 짧아지는데,
+   그러면 끝 글자의 오른쪽이 잘린다(4.0MB 의 B). 상자만 조금 넓혀 준다. */
 .warm{
   background:linear-gradient(100deg,var(--gold) 0%,var(--orange) 46%,var(--magenta) 100%);
   -webkit-background-clip:text;background-clip:text;color:transparent;
+  padding-right:0.08em;
 }
