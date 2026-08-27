@@ -59,7 +59,7 @@
       "allowedDomains": [
         "https://cdn.jsdelivr.net"
       ],
-      "reasoning": "Downloads the open-licensed fonts the document uses (Pretendard, Nanum, Gothic A1, etc. — all SIL OFL) so text can be embedded as real fonts instead of outlines. Nothing is uploaded; document content never leaves the machine."
+      "reasoning": "Downloads the open-licensed fonts your document uses (Inter, Roboto, Pretendard, Noto Sans KR and 56 more — all SIL OFL) so text can be embedded as real fonts instead of vector outlines. Fonts are served from the jsDelivr CDN at pinned versions. Nothing is uploaded; your document content never leaves the machine."
     }
   }
 }
