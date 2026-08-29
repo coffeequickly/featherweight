@@ -10,19 +10,19 @@ import {
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
 
-import { formatNumber, t } from '../lib/i18n'
+import { formatNumber, formatReason, t } from '../lib/i18n'
 import { catalogEntry } from '../lib/fontCatalog'
+import { screenFontFile, weightMismatch } from '../lib/fontFile'
 import { fontKey } from '../lib/fontInventory'
 import { findStored, fitsWithin, formatBytes } from '../lib/fontStore'
 import {
   FontDeleteHandler,
   FontSaveHandler,
   FontUsage,
-  NoticeHandler,
   StoredFont,
   ToastHandler
 } from '../lib/types'
-import { createProbe } from './fontkitAdapter'
+import { createProbe, factsOf } from './fontkitAdapter'
 
 type Props = {
   fonts: FontUsage[]
@@ -30,6 +30,8 @@ type Props = {
   disabled: boolean
   embedText: boolean
   onEmbedTextChange: (value: boolean) => void
+  /** UI 안에서 난 일은 UI 가 띄운다 — emit('notice') 는 메인에 핸들러가 없어 죽는다 */
+  onNotice: (notice: { message: string; error: boolean }) => void
 }
 
 type Availability =
@@ -54,12 +56,15 @@ export function missingFonts(fonts: FontUsage[], stored: StoredFont[]): FontUsag
 }
 
 /** 내보내기 탭의 한 줄 요약 — "4종 · 전부 준비됨" */
-export function fontsSummaryText(fonts: FontUsage[], stored: StoredFont[]): string {
+/**
+ * 요약 칩 문구.
+ *
+ * 빠진 폰트가 있으면 바로 아래 경고 배너가 서체 이름까지 대고 말한다 — 칩까지 같은
+ * 말을 하면 한 화면에서 같은 사실을 두 번 읽게 된다. 그럴 때 칩은 개수만 센다.
+ */
+export function fontsSummaryText(fonts: FontUsage[]): string {
   if (fonts.length === 0) return ''
-  const missing = fonts.filter((font) => availabilityOf(font, stored).kind === 'missing').length
-  return missing === 0
-    ? t('fonts.summaryReady', { count: fonts.length })
-    : t('fonts.summaryMissing', { count: fonts.length, missing })
+  return t('fonts.summaryReady', { count: fonts.length })
 }
 
 export function FontPanel({
@@ -67,7 +72,8 @@ export function FontPanel({
   stored,
   disabled,
   embedText,
-  onEmbedTextChange
+  onEmbedTextChange,
+  onNotice
 }: Props): JSX.Element {
   if (fonts.length === 0) {
     return (
@@ -100,6 +106,7 @@ export function FontPanel({
           state={states[index]}
           all={stored}
           disabled={disabled}
+          onNotice={onNotice}
         />
       ))}
       <VerticalSpace space="extraSmall" />
@@ -108,7 +115,7 @@ export function FontPanel({
         <Fragment>
           <VerticalSpace space="extraSmall" />
           <Text>
-            <Muted>{t('fonts.missingNote', { missing })}</Muted>
+            <Muted>{t('fonts.uploadHint')}</Muted>
           </Text>
           <VerticalSpace space="extraSmall" />
           {/* 파일 선택창은 보안상 시작 폴더를 지정할 수 없다 —
@@ -205,12 +212,14 @@ function FontRow({
   font,
   state,
   all,
-  disabled
+  disabled,
+  onNotice
 }: {
   font: FontUsage
   state: Availability
   all: StoredFont[]
   disabled: boolean
+  onNotice: (notice: { message: string; error: boolean }) => void
 }): JSX.Element {
   async function handleFiles(files: File[]): Promise<void> {
     const file = files[0]
@@ -222,19 +231,40 @@ function FontRow({
     try {
       parsed = createProbe(bytes)
     } catch {
-      emit<NoticeHandler>('notice', {
+      onNotice({
         message: t('fonts.parseError', { file: file.name }),
         error: true
       })
       return
     }
 
+    // 파싱만 되면 통과시키면 안 된다 — OTF(CFF)는 텍스트 추출이 통째로 깨지고,
+    // 가변 폰트는 굵기가 조용히 틀린다. (src/lib/fontFile.ts)
+    const facts = factsOf(parsed)
+    const verdict = screenFontFile(facts)
+    if (!verdict.ok) {
+      onNotice({ message: formatReason(verdict.reason), error: true })
+      return
+    }
+
     if (!fitsWithin(all, font, bytes.length)) {
-      emit<NoticeHandler>('notice', {
+      onNotice({
         message: t('fonts.storageFull', { size: formatBytes(bytes.length) }),
         error: true
       })
       return
+    }
+
+    // 굵기가 어긋나도 막지는 않는다 — 파일 이름표가 틀린 경우가 있다. 대신 알려 준다.
+    const mismatch = weightMismatch(facts, { weight: font.weight, italic: font.italic })
+    if (mismatch.differs) {
+      onNotice({
+        message: t('fontFile.weightMismatch', {
+          fileStyle: `${mismatch.fileWeight}${mismatch.fileItalic ? ' Italic' : ''}`,
+          slotStyle: font.style
+        }),
+        error: false
+      })
     }
 
     emit<FontSaveHandler>('font:save', {
@@ -284,7 +314,7 @@ function FontRow({
       <div class="fontRowActions">
         {state.kind === 'catalog' ? null : (
           <FileUploadButton
-            acceptedFileTypes={['font/ttf', 'font/otf', '.ttf', '.otf']}
+            acceptedFileTypes={['font/ttf', '.ttf']}
             disabled={disabled}
             onSelectedFiles={(files: File[]) => {
               void handleFiles(files)

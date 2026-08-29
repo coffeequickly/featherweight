@@ -18,6 +18,8 @@
 import { t } from '../lib/i18n'
 import * as fontkit from 'fontkit'
 import { Font } from 'fontkit'
+
+import { FontFacts } from '../lib/fontFile'
 import { PDFDocument } from 'pdf-lib'
 
 /** 단일 폰트만 다룬다. TTC(컬렉션)는 대상이 아니다. */
@@ -38,6 +40,24 @@ function asFont(value: unknown): Font {
 /** 폰트 검사용 — 글리프 커버리지·글리프 수를 본다. */
 export function createProbe(bytes: Uint8Array): FontProbe {
   return asFont(fontkit.create(bytes as Buffer))
+}
+
+/**
+ * 순수 판정(screenFontFile)에 넘길 사실만 뽑는다.
+ * fontkit 타입을 lib 으로 새어 나가게 하지 않으려고 여기서 좁힌다.
+ */
+export function factsOf(font: FontProbe): FontFacts {
+  const inner = font as unknown as {
+    directory?: { tables?: Record<string, unknown> }
+    variationAxes?: Record<string, unknown>
+    'OS/2'?: { usWeightClass?: number; fsSelection?: { italic?: boolean } } | null
+  }
+  return {
+    tables: Object.keys(inner.directory?.tables ?? {}),
+    axes: Object.keys(inner.variationAxes ?? {}),
+    weightClass: inner['OS/2']?.usWeightClass,
+    italic: inner['OS/2']?.fsSelection?.italic
+  }
 }
 
 /** `PDFDocument.registerFontkit()` 에 넘길 객체. */
