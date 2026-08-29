@@ -11,8 +11,6 @@ export type TextCandidate = {
   fontRefs: FontRef[]
 }
 
-export type TextRejection = { nodeId: string; reason: Reason }
-
 /** 회전 성분이 있으면 좌표 변환이 단순 평행이동이 아니게 된다 — 그런 노드는 건드리지 않는다. */
 function isAxisAligned(node: TextNode): boolean {
   const [[a, b], [c, d]] = node.absoluteTransform

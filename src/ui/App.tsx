@@ -77,7 +77,7 @@ function AppBody(): JSX.Element {
     setManualOrder([]) // 선택이 바뀌면 손으로 잡은 순서·제외는 버린다
     setExcluded([])
   })
-  const { items, fonts, storedFonts, settings } = main
+  const { items, fonts, storedFonts, settings, showNotice } = main
 
   const exporter = useExport(storedFonts, settings.embedText)
 
@@ -94,15 +94,17 @@ function AppBody(): JSX.Element {
       autoHeight.current !== null && Math.abs(window.innerHeight - autoHeight.current) > 4
     if (manual) return
 
-    const HEADER = 56
+    // 내보내기 탭에 실제로 쌓이는 것만 센다. 이미지 설정은 탭 분리 때 Images 로
+    // 옮겨갔는데 그 몫(140px)이 계산에 남아 있어서, 목록이 짧아도 창이 그만큼 컸다.
+    const HEADER = 56 // 탭 바
+    const SUMMARY = 40 // 요약 칩 + 정렬
     const ROW = 44
     const LIST_PADDING = 24
-    const SETTINGS = 140
-    const FOOTER = 96
-    const rows = Math.max(items.length, 2) // 빈 상태 안내도 두 줄 몫은 차지한다
+    const FOOTER = 96 // 구분선 + 버튼 + 버전
+    const rows = Math.max(items.length, 1)
     const desired = Math.max(
-      420,
-      Math.min(680, HEADER + rows * ROW + LIST_PADDING + SETTINGS + FOOTER)
+      320,
+      Math.min(680, HEADER + SUMMARY + rows * ROW + LIST_PADDING + FOOTER)
     )
 
     autoHeight.current = desired
@@ -219,7 +221,7 @@ function AppBody(): JSX.Element {
                       >
                         <TypeGlyph />
                         <Text>
-                          <Muted>{fontsSummaryText(fonts, storedFonts)}</Muted>
+                          <Muted>{fontsSummaryText(fonts)}</Muted>
                         </Text>
                       </span>
                     )}
@@ -314,6 +316,7 @@ function AppBody(): JSX.Element {
               stored={storedFonts}
               disabled={exporter.busy}
               embedText={settings.embedText}
+              onNotice={showNotice}
               onEmbedTextChange={(value) => main.applySettings({ ...settings, embedText: value })}
             />
           </Fragment>
