@@ -15,12 +15,10 @@ export type MergeMeta = {
   drawText?: (document: PDFDocument, page: PDFPage, partIndex: number) => Promise<DrawResult>
 }
 
-export type MergeOutput = {
+export type MergeOutput = PdfContents & {
   bytes: Uint8Array
   textDrawn: number
   textFallbacks: Array<{ nodeId: string; reason: Reason }>
-  /** 아웃라인으로 남은 텍스트가 실제로 얼마나 차지하는가 */
-  outlines: OutlineCost
 }
 
 /**
@@ -34,6 +32,27 @@ export type MergeOutput = {
  *   · 우리 파이프라인의 누수를 잡는다. 전부 임베드했는데 Type 3 가 남아 있으면,
  *     글리프를 못 지운 것이다 (유령 텍스트 버그).
  */
+/** 만들어진 PDF 를 되읽어 실제로 뭐가 들었는지 잰다 */
+export type PdfContents = {
+  /** 실제 페이지 수. 프레임 하나가 여러 쪽으로 나뉠 수 있어 부분 개수와 다를 수 있다. */
+  pageCount: number
+  outlines: OutlineCost
+  images: ImageWeight
+}
+
+/**
+ * PDF 안의 이미지 실측.
+ *
+ * ⚠ 우리가 Figma 에 건넨 바이트와 다르다. createImage 로 꽂은 이미지를 Figma 가
+ * exportAsync 할 때 자기 방식으로 다시 인코딩한다 — 23.4MB PNG 를 넘겼는데 PDF 에는
+ * 1.7MB JPEG 로 들어간 적이 있다. 사용자에게는 파일에 실제로 든 것을 말해야 한다.
+ */
+export type ImageWeight = {
+  /** 알파 마스크(smask)는 빼고 센 장수 */
+  count: number
+  bytes: number
+}
+
 export type OutlineCost = {
   /** 남은 Type 3 폰트 개수. 우리가 글리프를 못 지웠는지 잡아내는 신호다. */
   fonts: number
@@ -67,9 +86,13 @@ export async function mergePdfs(
   for (const part of ordered) {
     const source = await PDFDocument.load(part.bytes)
     const pages = await out.copyPages(source, source.getPageIndices())
-    for (const page of pages) {
+    for (const [index, page] of pages.entries()) {
       out.addPage(page)
       if (meta.drawText === undefined) continue
+      // 텍스트 좌표는 프레임 하나를 기준으로 잰 것이다. 한 프레임이 여러 쪽으로
+      // 나뉘면 둘째 쪽부터는 그 좌표가 맞지 않는다 — 같은 문장을 쪽마다 겹쳐 그리게
+      // 되므로 첫 쪽에만 얹는다. (실제로는 프레임 1개 = 1쪽이라 거의 안 걸린다)
+      if (index > 0) continue
       const drawn = await meta.drawText(out, page, part.index)
       textDrawn += drawn.drawn
       textFallbacks.push(...drawn.fallbacks)
@@ -82,17 +105,55 @@ export async function mergePdfs(
   out.setCreationDate(meta.createdAt)
   out.setModificationDate(meta.createdAt)
 
-  const outlines = measureOutlines(out)
+  const contents = measurePdf(out)
 
   // save() 는 메타데이터를 건드리지 않는다. 덮어쓰는 쪽은 PDFDocument.load/create 이므로
   // 결과를 다시 읽어 확인할 때는 load(bytes, { updateMetadata: false }) 로 열어야 한다.
-  return { bytes: await out.save({ useObjectStreams: true }), textDrawn, textFallbacks, outlines }
+  return {
+    bytes: await out.save({ useObjectStreams: true }),
+    textDrawn,
+    textFallbacks,
+    ...contents
+  }
 }
 
 /**
  * 아웃라인의 무게를 잰다 — Type 3 폰트 개수와 페이지 벡터 콘텐츠의 바이트.
  * 둘 다 압축된 실제 크기로 센다 (파일에서 차지하는 몫).
  */
+function measurePdf(document: PDFDocument): PdfContents {
+  return {
+    pageCount: document.getPageCount(),
+    outlines: measureOutlines(document),
+    images: measureImages(document)
+  }
+}
+
+/** 이미지 XObject 의 장수와 압축된 바이트. smask 는 본체에 딸린 것이라 세지 않는다. */
+function measureImages(document: PDFDocument): ImageWeight {
+  // 알파 채널(smask)도 /Subtype /Image 이고 ColorSpace 도 갖는다 — 본체가 /SMask 로
+  // 가리키는 대상을 먼저 모아 두고 빼야 장수가 두 배로 세어지지 않는다.
+  const masks = new Set<string>()
+  for (const [, object] of document.context.enumerateIndirectObjects()) {
+    if (!(object instanceof PDFStream)) continue
+    const mask = object.dict.get(PDFName.of('SMask'))
+    if (mask !== undefined) masks.add(String(mask))
+  }
+
+  let count = 0
+  let bytes = 0
+  for (const [ref, object] of document.context.enumerateIndirectObjects()) {
+    if (!(object instanceof PDFStream)) continue
+    const subtype = object.dict.get(PDFName.of('Subtype'))
+    if (!(subtype instanceof PDFName) || subtype.asString() !== '/Image') continue
+
+    bytes += object instanceof PDFRawStream ? object.contents.length : object.sizeInBytes()
+    if (!masks.has(String(ref))) count += 1
+  }
+
+  return { count, bytes }
+}
+
 function measureOutlines(document: PDFDocument): OutlineCost {
   let fonts = 0
   for (const [, object] of document.context.enumerateIndirectObjects()) {

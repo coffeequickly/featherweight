@@ -48,7 +48,7 @@ export async function buildSelection(
       height: Math.round(node.height),
       x: node.x,
       y: node.y,
-      imageCount: scan.imageCount,
+      imageCount: scan.images.size,
       textCount: scan.textCount
     }
 
@@ -61,11 +61,17 @@ export async function buildSelection(
   return { items, fonts: aggregateFontUsage(segments) }
 }
 
-type Scan = { imageCount: number; textCount: number; fontSegments: RawFontSegment[] }
+type Scan = {
+  /** 서로 다른 이미지의 개수. 같은 사진을 열 군데 써도 파일에는 한 번 들어간다 —
+      리포트가 PDF 를 실측해 세는 수와 단위를 맞춘다. */
+  images: Set<string>
+  textCount: number
+  fontSegments: RawFontSegment[]
+}
 
 /** PDF export 는 숨겨진 노드를 빼므로 여기서도 visible=false 는 세지 않는다. */
 function scanNode(root: ExportableNode): Scan {
-  const scan: Scan = { imageCount: 0, textCount: 0, fontSegments: [] }
+  const scan: Scan = { images: new Set(), textCount: 0, fontSegments: [] }
 
   const visit = (current: SceneNode): void => {
     if (current.visible === false) return
@@ -77,7 +83,8 @@ function scanNode(root: ExportableNode): Scan {
 
     if ('fills' in current && Array.isArray(current.fills)) {
       for (const paint of current.fills) {
-        if (paint.type === 'IMAGE' && paint.visible !== false) scan.imageCount += 1
+        if (paint.type === 'IMAGE' && paint.visible !== false && paint.imageHash !== null)
+          scan.images.add(paint.imageHash)
       }
     }
 
