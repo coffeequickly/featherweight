@@ -23,7 +23,7 @@ import {
 import { formatBytes } from '../lib/fontStore'
 import { t } from '../lib/i18n'
 import { forgetOriginals } from './imageCache'
-import { downloadPdf, MergeOutput, mergePdfs, OutlineCost } from './pdf'
+import { downloadPdf, ImageWeight, MergeOutput, mergePdfs, OutlineCost } from './pdf'
 import { drawTextLayer, FontCache } from './textLayer'
 import { loadFontBytes } from './fontSource'
 
@@ -35,14 +35,14 @@ export type ExportReport = {
   cancelled: boolean
   skipped: DoneReport['skipped']
   imagesProcessed: number
-  imageBytesBefore: number
-  imageBytesAfter: number
   textDrawn: number
   fallbacks: Array<{ nodeId: string; reason: Reason }>
   /** 목표 용량 맞추기를 켰을 때만 있다 */
   fit: FitReport | null
   /** 아웃라인으로 남은 것의 무게 — Type 3 폰트 수와 벡터 바이트 */
   outlines: OutlineCost
+  /** PDF 에 실제로 든 이미지 — 우리가 Figma 에 건넨 바이트가 아니다 */
+  images: ImageWeight
   /** 추출될 텍스트 — "제출 전 확인" 이 보여준다 (문서 순서) */
   extractable: string[]
 }
@@ -180,12 +180,11 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
             cancelled: done.cancelled,
             skipped: done.skipped,
             imagesProcessed: 0,
-            imageBytesBefore: 0,
-            imageBytesAfter: 0,
             textDrawn: 0,
             fallbacks: [],
             fit: done.fit ?? null,
             outlines: { fonts: 0, vectorBytes: 0 },
+            images: { count: 0, bytes: 0 },
             extractable: []
           })
           return
@@ -203,14 +202,10 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
         const stats = collected.reduce(
           (sum, part) => ({
             imagesProcessed: sum.imagesProcessed + part.stats.imagesProcessed,
-            imageBytesBefore: sum.imageBytesBefore + part.stats.bytesBefore,
-            imageBytesAfter: sum.imageBytesAfter + part.stats.bytesAfter,
             fallbacks: [...sum.fallbacks, ...part.stats.fallbacks]
           }),
           {
             imagesProcessed: 0,
-            imageBytesBefore: 0,
-            imageBytesAfter: 0,
             fallbacks: [] as Array<{ nodeId: string; reason: Reason }>
           }
         )
@@ -218,17 +213,16 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
         setReport({
           fileName: done.fileName,
           byteLength: bytes.length,
-          pageCount: collected.length,
+          pageCount: merged.pageCount,
           elapsedMs: Date.now() - startedAt.current,
           cancelled: done.cancelled,
           skipped: done.skipped,
           imagesProcessed: stats.imagesProcessed,
-          imageBytesBefore: stats.imageBytesBefore,
-          imageBytesAfter: stats.imageBytesAfter,
           textDrawn: merged.textDrawn,
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
           fit: done.fit ?? null,
           outlines: merged.outlines,
+          images: merged.images,
           extractable: extractableText(collected)
         })
         setError(null)

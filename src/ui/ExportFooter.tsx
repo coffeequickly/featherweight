@@ -11,6 +11,9 @@ import { NodesFocusHandler } from '../lib/types'
 import { ExportReport, ExportState } from './useExport'
 import { Notice } from './useMainState'
 
+/** 이 아래면 그림으로 남은 글자의 무게를 굳이 말하지 않는다 */
+const OUTLINE_COST_FLOOR = 100_000
+
 type Props = {
   exporter: ExportState
   notice: Notice
@@ -158,7 +161,9 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
     ...report.fallbacks.map((item) => ({ reason: formatReason(item.reason), id: item.nodeId }))
   ])
 
-  const total = reasons.reduce((sum, item) => sum + item.count, 0)
+  // "아웃라인 처리된 텍스트 N개" 는 텍스트만 세야 한다. 통째로 실패한 프레임까지
+  // 합치면 프레임을 텍스트로 세는 셈이 된다 — 목록에는 둘 다 보여주되 수는 나눈다.
+  const outlinedTexts = report.fallbacks.length
 
   return (
     <Fragment>
@@ -182,15 +187,14 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
               {report.textDrawn > 0
                 ? t('report.textDrawn', { count: report.textDrawn })
                 : t('report.noText')}
-              {report.imagesProcessed > 0
+              {report.images.count > 0
                 ? t('report.images', {
-                    count: report.imagesProcessed,
-                    before: formatBytes(report.imageBytesBefore),
-                    after: formatBytes(report.imageBytesAfter)
+                    count: report.images.count,
+                    size: formatBytes(report.images.bytes)
                   })
                 : ''}
-              {report.outlines.vectorBytes > 0
-                ? t('report.outlineCost', { size: formatBytes(report.outlines.vectorBytes) })
+              {report.imagesProcessed > 0
+                ? t('report.imagesShrunk', { count: report.imagesProcessed })
                 : ''}
             </Muted>
           </Text>
@@ -231,8 +235,17 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
         {reasons.length === 0 ? null : (
           <Fragment>
             <VerticalSpace space="small" />
+            {/* 실패한 프레임만 있고 아웃라인 텍스트가 없으면 이 줄은 할 말이 없다 */}
             <Text>
-              <Muted>{t('report.outlines', { total, kinds: reasons.length })}</Muted>
+              <Muted>
+                {outlinedTexts === 0
+                  ? ''
+                  : t('report.outlines', { total: outlinedTexts, kinds: reasons.length })}
+                {/* 10KB 짜리 잔재까지 바이트를 대면 잡음이다 — 아까울 때만 말한다 */}
+                {outlinedTexts > 0 && report.outlines.vectorBytes >= OUTLINE_COST_FLOOR
+                  ? t('report.outlineCost', { size: formatBytes(report.outlines.vectorBytes) })
+                  : ''}
+              </Muted>
             </Text>
             <VerticalSpace space="extraSmall" />
             <div class="reasonList">
