@@ -48,6 +48,13 @@ export type MainState = {
   docName: string
   /** 설정을 바꾸고 clientStorage 에도 저장한다 */
   applySettings: (next: Settings) => void
+  /**
+   * UI 안에서 생긴 알림을 띄운다.
+   *
+   * emit('notice') 로 보내면 안 된다 — notice 는 메인→UI 단방향이라 메인에 핸들러가
+   * 없고, "No event handler with name `notice`" 로 죽는다. UI 에서 난 일은 UI 가 띄운다.
+   */
+  showNotice: (next: Notice) => void
 }
 
 export function useMainState(onSelectionChange: () => void): MainState {
@@ -137,5 +144,14 @@ export function useMainState(onSelectionChange: () => void): MainState {
     emit<SettingsSaveHandler>('settings:save', next)
   }
 
-  return { items, fonts, storedFonts, notice, settings, docName, applySettings }
+  return {
+    items,
+    fonts,
+    storedFonts,
+    notice,
+    settings,
+    docName,
+    applySettings,
+    showNotice: setNotice
+  }
 }
