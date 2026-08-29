@@ -48,15 +48,6 @@ export const PROFILE_LADDER: CompressionProfile[] = [
 /** 기준 export 에 쓰는 프로필 — 현재 Balanced 와 같은 자리 */
 export const BASELINE_INDEX = 3
 
-export function profileFromSettings(settings: Settings): CompressionProfile {
-  return {
-    multiplier: settings.multiplier,
-    maxEdge: settings.maxEdge,
-    quality: settings.quality,
-    reencodeOpaquePng: settings.reencodeOpaquePng
-  }
-}
-
 /**
  * 프로필을 Settings 에 얹는다. 사다리 값은 UI 세그먼트 union 밖이라 캐스팅이 필요하다 —
  * 이 값들은 계산에만 쓰이고 화면 세그먼트를 그리지 않으므로 안전하다.
@@ -150,10 +141,6 @@ const MB = 1024 * 1024
 
 export function mbToBytes(mb: number): number {
   return Math.round(mb * MB)
-}
-
-export function bytesToMb(bytes: number): number {
-  return bytes / MB
 }
 
 /** 목표 입력 허용 범위 — UI 와 저장값 양쪽에서 쓴다 */

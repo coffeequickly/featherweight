@@ -37,8 +37,8 @@ describe('t', () => {
   })
 
   it('영어 단복수를 처리한다', () => {
-    expect(t('report.textDrawn', { count: 1 })).toBe('1 text node embedded')
-    expect(t('report.textDrawn', { count: 4 })).toBe('4 text nodes embedded')
+    expect(t('report.textDrawn', { count: 1 })).toBe('1 text node in real fonts')
+    expect(t('report.textDrawn', { count: 4 })).toBe('4 text nodes in real fonts')
   })
 
   it('없는 파라미터는 자리 표시를 그대로 둔다 — 조용히 빈칸이 되지 않는다', () => {
@@ -118,6 +118,8 @@ describe('사전 무결성', () => {
     detail: 'd',
     target: '5.0MB',
     lines: 42,
+    fileStyle: '400',
+    slotStyle: 'Bold',
     floor: '7.2MB',
     sample: '가',
     type: 'SLICE',

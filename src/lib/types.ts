@@ -112,61 +112,6 @@ export type PartStats = {
   fallbacks: Array<{ nodeId: string; reason: Reason }>
 }
 
-export type MainToUI =
-  | { type: 'settings'; value: Settings }
-  | { type: 'selection'; items: FrameItem[] }
-  | { type: 'fonts'; items: FontUsage[] }
-  | {
-      type: 'image:resize'
-      reqId: string
-      bytes: Uint8Array
-      targetLongEdge: number
-      quality: number
-      reencodeOpaquePng: boolean
-    }
-  | {
-      type: 'text:validate'
-      reqId: string
-      items: Array<{
-        nodeId: string
-        characters: string
-        fontNames: Array<{ family: string; style: string }>
-      }>
-    }
-  | {
-      type: 'pdf:part'
-      index: number
-      name: string
-      bytes: Uint8Array
-      text: TextRunSource[]
-      stats: PartStats
-    }
-  | { type: 'progress'; label: string; current: number; total: number }
-  | { type: 'done'; skipped: Array<{ id: string; reason: Reason }>; fileName: string }
-  | { type: 'error'; message: string }
-
-export type UIToMain =
-  | { type: 'ui:ready'; locale: string }
-  | { type: 'settings:save'; value: Settings }
-  | { type: 'export'; order: string[]; settings: Settings; fileName: string }
-  | { type: 'cancel' }
-  | {
-      type: 'image:resize:result'
-      reqId: string
-      ok: true
-      bytes: Uint8Array
-      mime: 'image/jpeg' | 'image/png'
-      width: number
-      height: number
-    }
-  | { type: 'image:resize:result'; reqId: string; ok: false; reason: string }
-  | {
-      type: 'text:validate:result'
-      reqId: string
-      eligible: string[]
-      rejected: Array<{ nodeId: string; reason: Reason }>
-    }
-
 // create-figma-plugin 의 emit/on 용 핸들러 시그니처.
 // (타입만 가져온다 — lib 은 런타임 의존을 갖지 않는다.)
 import type { EventHandler } from '@create-figma-plugin/utilities'

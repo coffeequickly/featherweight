@@ -36,8 +36,8 @@ const MESSAGES = {
   'tab.fonts': { en: 'Fonts', ko: '폰트' },
   'fonts.none': { en: 'No text in this document', ko: '문서에 쓰인 폰트가 없습니다' },
   'app.missingWarn': {
-    en: '{names} — no font file, will stay as outlines. Add it in the Fonts tab',
-    ko: '{names} — 파일이 없어 아웃라인으로 나갑니다 · 폰트 탭에서 넣기'
+    en: '{names} — no font file, so the text is outlined. Add it in the Fonts tab',
+    ko: '{names} — 폰트가 없어 텍스트가 아웃라인 처리됩니다 · 폰트 탭에서 넣기'
   },
   'fonts.pathHelpMac': {
     en: 'Installed fonts are in the folders below. Click a path to copy it, then press ⌘⇧G in the file dialog and paste.',
@@ -119,10 +119,6 @@ const MESSAGES = {
     en: (p) => `${n(Number(p.count), 'font', 'fonts')} ready`,
     ko: '폰트 {count}종 준비됨'
   },
-  'fonts.summaryMissing': {
-    en: (p) => `${n(Number(p.missing), 'font', 'fonts')} missing`,
-    ko: '폰트 {missing}종 없음'
-  },
   'summary.imagesTip': {
     en: 'Image quality preset — click to open the Images tab',
     ko: '이미지 품질 프리셋 — 클릭하면 이미지 탭이 열립니다'
@@ -132,13 +128,8 @@ const MESSAGES = {
     ko: '문서 폰트 준비 상태 — 클릭하면 폰트 탭이 열립니다'
   },
   'fonts.help': {
-    en: 'Open-license fonts are downloaded automatically at export. Add a file only for fonts that cannot be fetched; anything missing stays as outlines — same look, just less savings.',
-    ko: '공개 폰트는 내보낼 때 자동으로 받아 옵니다. 구할 수 없는 서체만 파일을 넣으면 되고, 파일이 없는 자리는 아웃라인으로 남습니다 — 모양은 그대로 유지되고 용량만 줄지 않습니다.'
-  },
-  'fonts.missingNote': {
-    en: (p) =>
-      `${n(Number(p.missing), 'family has', 'families have')} no file and will stay as outlines`,
-    ko: '{missing}종은 파일이 없어 아웃라인으로 나갑니다'
+    en: 'Open-license fonts are downloaded automatically at export. Add a file only for fonts that cannot be fetched. Text without a font goes in as a picture — it looks identical, but it cannot be selected or searched, and the file stays big.',
+    ko: '공개 폰트는 내보낼 때 자동으로 받아 옵니다. 구할 수 없는 폰트만 파일을 넣으면 됩니다. 폰트가 없는 텍스트는 아웃라인 처리됩니다 — 보기에는 똑같지만 선택도 검색도 안 되고 용량도 줄지 않습니다.'
   },
   'fonts.detailCatalog': {
     en: (p) => `auto-downloaded · ${n(Number(p.count), 'text node', 'text nodes')}`,
@@ -213,40 +204,52 @@ const MESSAGES = {
     ko: '사유를 클릭하면 해당 레이어를 캔버스에서 선택합니다'
   },
   'report.textDrawn': {
-    en: (p) => `${n(Number(p.count), 'text node', 'text nodes')} embedded`,
-    ko: '텍스트 {count}개 임베드'
+    en: (p) => `${n(Number(p.count), 'text node', 'text nodes')} in real fonts`,
+    ko: '텍스트 {count}개 진짜 폰트로'
   },
-  'report.noText': { en: 'No text embedded', ko: '텍스트 임베드 없음' },
+  'report.noText': { en: 'No text embedded', ko: '진짜 폰트로 들어간 텍스트 없음' },
+  // 파일에 실제로 든 것을 말한다. 우리가 Figma 에 건넨 바이트는 중간 단계일 뿐이다 —
+  // Figma 가 PDF 로 내보내며 다시 인코딩해서, 23.4MB 로 넘긴 것이 1.7MB 로 들어간다.
   'report.images': {
-    en: (p) => ` · ${n(Number(p.count), 'image', 'images')} ${p.before}→${p.after}`,
-    ko: ' · 이미지 {count}장 {before}→{after}'
+    en: (p) => ` · ${n(Number(p.count), 'image', 'images')} ${p.size}`,
+    ko: ' · 이미지 {count}장 {size}'
+  },
+  'report.imagesShrunk': {
+    en: (p) => ` · ${p.count} shrunk`,
+    ko: ' · {count}장 줄임'
   },
   'report.outlines': {
-    en: (p) => `${p.total} kept as outlines · ${n(Number(p.kinds), 'reason', 'reasons')}`,
-    ko: '아웃라인으로 남은 텍스트 {total}개 · 사유 {kinds}가지'
+    en: (p) =>
+      Number(p.kinds) > 1
+        ? `${p.total} text nodes outlined · ${n(Number(p.kinds), 'reason', 'reasons')}`
+        : `${p.total} text nodes outlined`,
+    ko: (p) =>
+      Number(p.kinds) > 1
+        ? `아웃라인 처리된 텍스트 ${p.total}개 · 사유 ${p.kinds}가지`
+        : `아웃라인 처리된 텍스트 ${p.total}개`
   },
   'report.skipped': { en: 'Skipped — {name}: {reason}', ko: '건너뜀 — {name}: {reason}' },
-  // ── 아웃라인 무게 · 추출 미리보기 ─────────────────────
+  // ── 그림이 된 글자의 무게 · 추출 미리보기 ─────────────
   'report.outlineCost': {
-    en: (p) => ` · ${p.size} of vector outlines`,
-    ko: ' · 아웃라인 벡터 {size}'
+    en: (p) => ` · ${p.size}`,
+    ko: ' · {size}'
   },
   'report.leak': {
-    en: 'Some glyphs were left behind as invisible outlines. The text may be extracted twice — please report this.',
-    ko: '지워지지 않은 글리프가 남았습니다. 텍스트가 두 번 추출될 수 있습니다 — 제보해 주시면 고치겠습니다.'
+    en: 'Some invisible leftovers stayed in the file. The text may be read twice — please report this.',
+    ko: '보이지 않는 찌꺼기가 파일에 남았습니다. 글자가 두 번 읽힐 수 있습니다 — 제보해 주시면 고치겠습니다.'
   },
   'report.preview': { en: 'Check what a parser reads', ko: '파서가 읽을 내용 확인' },
   previewTitle: { en: 'Text a parser will read', ko: '파서가 읽어 갈 텍스트' },
   previewHelp: {
     en: (p) =>
       `${p.lines} lines embedded as real fonts. Outlined text is not listed — parsers drop or garble it.`,
-    ko: '진짜 폰트로 임베드된 {lines}줄입니다. 아웃라인으로 남은 텍스트는 빠져 있습니다 — 파서가 흘리거나 깨뜨리는 쪽입니다.'
+    ko: '진짜 폰트로 들어간 {lines}줄입니다. 아웃라인 처리된 텍스트는 빠져 있습니다 — 파서가 흘리거나 깨뜨리는 쪽입니다.'
   },
   previewCopy: { en: 'Copy all', ko: '전체 복사' },
   previewClose: { en: 'Close', ko: '닫기' },
   'report.fitOk': {
-    en: 'Fit to {target} — best quality that stays under the target',
-    ko: '{target} 목표 달성 — 목표를 지키는 가장 좋은 화질입니다'
+    en: 'Fits {target} — the best quality that stays under it',
+    ko: '{target} 안에 맞췄습니다 — 이 안에서 가장 좋은 화질입니다'
   },
   'report.fitAlready': {
     en: 'Already under {target} — quality left untouched',
@@ -278,14 +281,14 @@ const MESSAGES = {
   'reject.hidden': { en: 'hidden node', ko: '숨겨진 노드' },
   'reject.empty': { en: 'empty text', ko: '빈 텍스트' },
   'reject.rotated': { en: 'rotated or flipped text', ko: '회전·반전된 텍스트' },
-  'reject.mixedFill': { en: 'mixed fills', ko: 'fill 이 섞여 있음' },
-  'reject.noFill': { en: 'no fill', ko: 'fill 없음' },
+  'reject.mixedFill': { en: 'mixed fills', ko: '채우기가 섞여 있음' },
+  'reject.noFill': { en: 'no fill', ko: '채우기 없음' },
   'reject.nonSolidFill': {
     en: 'non-solid fill (gradient/image)',
-    ko: '단색이 아닌 fill (그라데이션·이미지)'
+    ko: '단색이 아닌 채우기 (그라데이션·이미지)'
   },
-  'reject.stroked': { en: 'has strokes', ko: '스트로크 있음' },
-  'reject.effects': { en: 'has effects (shadow/blur)', ko: '이펙트 있음 (그림자·블러)' },
+  'reject.stroked': { en: 'has strokes', ko: '선이 있음' },
+  'reject.effects': { en: 'has effects (shadow/blur)', ko: '효과가 있음 (그림자·흐림)' },
   'reject.decorated': {
     en: 'underline/strikethrough (not supported yet)',
     ko: '밑줄·취소선 텍스트 (미지원)'
@@ -328,6 +331,28 @@ const MESSAGES = {
     ko: '{family} 의 {style} 파일이 없습니다 (있는 것: {styles})'
   },
   'font.noFile': { en: 'no file for {family} {style}', ko: '{family} {style} 파일이 없습니다' },
+  // ── 올린 폰트 파일 거절 ────────────────────────────────
+  // 무엇이 잘못됐는지가 아니라 무엇을 올려야 하는지를 말한다
+  'fontFile.cff': {
+    en: 'This .otf uses PostScript outlines, which come out broken — the text becomes unselectable. Upload the .ttf version instead.',
+    ko: '이 .otf 는 PostScript 방식이라 넣으면 글자가 깨집니다 — 텍스트 선택이 안 됩니다. 같은 서체의 .ttf 파일을 올려 주세요.'
+  },
+  'fontFile.variable': {
+    en: 'This is a variable font — one file holding every weight. The weight cannot be picked, so it would embed the wrong one. Upload the single-weight (static) file for this style.',
+    ko: '이 파일은 굵기를 한 파일에 다 담은 가변(Variable) 폰트입니다. 굵기를 고를 수 없어 엉뚱한 굵기가 들어갑니다. 이 스타일 하나짜리(static) 파일을 올려 주세요.'
+  },
+  'fontFile.noOutlines': {
+    en: 'No usable glyphs in this file. Upload a .ttf.',
+    ko: '이 파일에서 쓸 수 있는 글자 모양을 찾지 못했습니다. .ttf 파일을 올려 주세요.'
+  },
+  'fontFile.weightMismatch': {
+    en: 'Saved, but this file looks like {fileStyle} while the slot is {slotStyle}. Check the exported PDF.',
+    ko: '저장했지만 파일은 {fileStyle} 로 보이고 자리는 {slotStyle} 입니다. 내보낸 PDF 를 확인해 주세요.'
+  },
+  'fonts.uploadHint': {
+    en: 'Upload a .ttf — one file per weight, not a variable font.',
+    ko: '.ttf 파일을 굵기마다 하나씩 올려 주세요. 가변(Variable) 폰트는 안 됩니다.'
+  },
   'font.ttc': {
     en: 'Font collections (TTC) are not supported. Add a single TTF/OTF.',
     ko: '폰트 컬렉션(TTC)은 지원하지 않습니다. 단일 TTF/OTF 파일을 넣어 주세요.'
