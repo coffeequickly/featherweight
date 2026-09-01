@@ -19,13 +19,15 @@ import { suggestFileName } from '../lib/fileName'
 import { t } from '../lib/i18n'
 import { sortItems } from '../lib/order'
 import { mbToBytes } from '../lib/fitToSize'
+import { summarizeMissing } from '../lib/fontInventory'
 import { formatBytes } from '../lib/fontStore'
 import { imageModeOf } from '../lib/presets'
 import { ImageGlyph, TypeGlyph } from './glyphs'
-import { FrameFocusHandler, FrameItem, ResizeWindowHandler, SortMode } from '../lib/types'
+import { FrameFocusHandler, FrameItem, ResizeWindowHandler, Settings, SortMode } from '../lib/types'
 import { PLUGIN_VERSION } from './buildInfo'
 import { ExportFooter } from './ExportFooter'
 import { FontPanel, fontsSummaryText, missingFonts } from './FontPanel'
+import { PreviewPanel } from './PreviewPanel'
 import { FrameList } from './FrameList'
 import { ImageSettings } from './ImageSettings'
 import { useExport } from './useExport'
@@ -62,12 +64,25 @@ class ErrorBoundary extends Component<{ children: ComponentChildren }, { crashed
   }
 }
 
+/**
+ * 요약 칩 문구. "이미지" + 프리셋 이름을 그냥 이으면 "이미지 직접" 처럼 말이 안 되는
+ * 조합이 나온다 — 그 경우만 따로 쓴다.
+ */
+function imageChipText(settings: Settings): string {
+  if (settings.fitToSize) {
+    return `${t('tab.images')} ≤ ${formatBytes(mbToBytes(settings.fitTargetMb))}`
+  }
+  const mode = imageModeOf(settings)
+  if (mode === 'custom') return t('summary.imagesCustom')
+  return `${t('tab.images')} ${t(`presets.${mode}` as const)}`
+}
+
 function AppBody(): JSX.Element {
   // 화면이 들고 있는 것: 탭·정렬·순서·제외. 메인에서 오는 것: useMainState.
   // 초기 탭 — ui-preview 캡처 자동화용 훅. Figma 안에서는 전역이 없어 항상 'export'.
-  const [tab, setTab] = useState<'export' | 'images' | 'fonts'>(() => {
+  const [tab, setTab] = useState<'export' | 'images' | 'fonts' | 'preview'>(() => {
     const preset = (window as { __PREVIEW_TAB__?: string }).__PREVIEW_TAB__
-    return preset === 'images' || preset === 'fonts' ? preset : 'export'
+    return preset === 'images' || preset === 'fonts' || preset === 'preview' ? preset : 'export'
   })
   const [sortMode, setSortMode] = useState<SortMode>('position')
   const [excluded, setExcluded] = useState<string[]>([])
@@ -101,15 +116,19 @@ function AppBody(): JSX.Element {
     const ROW = 44
     const LIST_PADDING = 24
     const FOOTER = 96 // 구분선 + 버튼 + 버전
-    const rows = Math.max(items.length, 1)
-    const desired = Math.max(
-      320,
-      Math.min(680, HEADER + SUMMARY + rows * ROW + LIST_PADDING + FOOTER)
-    )
+    // 탭마다 담기는 내용이 다르다. 프레임 수만 보고 높이를 정하면 이미지 탭처럼
+    // 내용이 고정된 화면이 프레임 두 개짜리 문서에서 잘린다.
+    const CONTENT: Record<typeof tab, number> = {
+      export: SUMMARY + Math.max(items.length, 1) * ROW + LIST_PADDING,
+      images: 530, // 영문 설명이 한글보다 길다 — 긴 쪽에 맞춘다
+      fonts: 300,
+      preview: 300
+    }
+    const desired = Math.max(320, Math.min(680, HEADER + CONTENT[tab] + FOOTER))
 
     autoHeight.current = desired
     emit<ResizeWindowHandler>('resize:window', { width: window.innerWidth, height: desired })
-  }, [items.length])
+  }, [items.length, tab])
 
   // 기본은 정렬 결과, 손으로 옮긴 뒤에는 그 순서를 따른다
   const ordered = useMemo(() => {
@@ -177,12 +196,14 @@ function AppBody(): JSX.Element {
             onValueChange={(value: string) => {
               if (value === t('tab.export')) setTab('export')
               else if (value === t('tab.images')) setTab('images')
+              else if (value === t('tab.preview')) setTab('preview')
               else setTab('fonts')
             }}
             options={[
               { value: t('tab.export'), children: null },
               { value: t('tab.images'), children: null },
-              { value: t('tab.fonts'), children: null }
+              { value: t('tab.fonts'), children: null },
+              { value: t('tab.preview'), children: null }
             ]}
             value={t(`tab.${tab}` as const)}
           />
@@ -205,12 +226,7 @@ function AppBody(): JSX.Element {
                     >
                       <ImageGlyph />
                       <Text>
-                        <Muted>
-                          {t('tab.images')}{' '}
-                          {settings.fitToSize
-                            ? `≤ ${formatBytes(mbToBytes(settings.fitTargetMb))}`
-                            : t(`presets.${imageModeOf(settings)}` as const)}
-                        </Muted>
+                        <Muted>{imageChipText(settings)}</Muted>
                       </Text>
                     </span>
                     {fonts.length === 0 ? null : (
@@ -241,9 +257,10 @@ function AppBody(): JSX.Element {
                     <VerticalSpace space="extraSmall" />
                     <div class="clickable missingLine ellipsis" onClick={() => setTab('fonts')}>
                       <Text>
-                        {t('app.missingWarn', {
-                          names: missing.map((font) => `${font.family} ${font.style}`).join(', ')
-                        })}
+                        {t(
+                          'app.missingWarn',
+                          summarizeMissing(missing.map((font) => `${font.family} ${font.style}`))
+                        )}
                       </Text>
                     </div>
                   </Fragment>
@@ -308,6 +325,13 @@ function AppBody(): JSX.Element {
           </Fragment>
         ) : null}
 
+        {tab === 'preview' ? (
+          <Fragment>
+            <VerticalSpace space="small" />
+            <PreviewPanel lines={exporter.report?.extractable ?? []} />
+          </Fragment>
+        ) : null}
+
         {tab === 'fonts' ? (
           <Fragment>
             <VerticalSpace space="small" />
@@ -333,6 +357,7 @@ function AppBody(): JSX.Element {
           notice={main.notice}
           pageCount={visible.length}
           onExport={handleExport}
+          onOpenPreview={() => setTab('preview')}
         />
         <VerticalSpace space="extraSmall" />
         <div class="versionLine">

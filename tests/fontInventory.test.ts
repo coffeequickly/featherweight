@@ -5,7 +5,8 @@ import {
   fontsJsonDraft,
   guessWeight,
   isItalic,
-  suggestFileName
+  suggestFileName,
+  summarizeMissing
 } from '../src/lib/fontInventory'
 import { RawFontSegment } from '../src/lib/types'
 
@@ -155,5 +156,35 @@ describe('fontsJsonDraft', () => {
         file: 'Pretendard-Bold.ttf'
       }
     ])
+  })
+})
+
+describe('summarizeMissing', () => {
+  it('하나면 이름만', () => {
+    expect(summarizeMissing(['Nexa Heavy'])).toEqual({ first: 'Nexa Heavy', rest: 0 })
+  })
+
+  it('여러 개면 첫 이름과 나머지 개수', () => {
+    expect(summarizeMissing(['Nexa Heavy', 'Suit Thin', 'Gilroy Bold'])).toEqual({
+      first: 'Nexa Heavy',
+      rest: 2
+    })
+  })
+
+  it('이름 하나가 길면 거기서 자른다 — 뒤에 붙는 안내가 살아야 한다', () => {
+    const long = 'Helvetica Neue Condensed Black Oblique'
+    const result = summarizeMissing([long, 'B'])
+    expect(result.first.length).toBeLessThanOrEqual(22)
+    expect(result.first.endsWith('…')).toBe(true)
+    expect(result.rest).toBe(1)
+  })
+
+  it('빈 목록에도 죽지 않는다', () => {
+    expect(summarizeMissing([])).toEqual({ first: '', rest: 0 })
+  })
+
+  it('자른 자리에 공백을 남기지 않는다', () => {
+    // 자르는 자리가 공백이면 그 공백까지 떼고 … 를 붙인다
+    expect(summarizeMissing(['Some Very Long Name Here'], 11).first).toBe('Some Very…')
   })
 })
