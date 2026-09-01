@@ -14,7 +14,7 @@ import {
   Probe,
   PROFILE_LADDER
 } from './lib/fitToSize'
-import { processFloor, transformScale } from './lib/imageTarget'
+import { skipFloor, transformScale } from './lib/imageTarget'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
 import { exportFrame, removeLeftoverClones } from './main/exporter'
 import { forgetSeenImages, OriginalSink, planFor, seenImageInfo } from './main/images'
@@ -309,7 +309,7 @@ async function runFitExport(order: string[], settings: Settings, outName: string
 
   const fixed = fixedBytes(measured.pdfBytes, measured.imageBytes)
 
-  const probes = await runProbes(order, fixed, targetBytes, measured.imageBytes)
+  const probes = await runProbes(order, fixed, targetBytes, measured.imageBytes, settings.minEdge)
   const outcome = chooseProfile(probes, fixed, targetBytes, measured.imageBytes)
   const fit: FitReport = {
     targetBytes,
@@ -343,7 +343,8 @@ async function runProbes(
   order: string[],
   fixed: number,
   targetBytes: number,
-  baselineImageBytes: number
+  baselineImageBytes: number,
+  minEdge: Settings['minEdge']
 ): Promise<Probe[]> {
   const probes: Probe[] = []
   if (predictSize(fixed, baselineImageBytes) <= targetBytes) return probes
@@ -360,7 +361,7 @@ async function runProbes(
       FIT_PROBE
     )
 
-    const items = await probeItemsFor(order, profile)
+    const items = await probeItemsFor(order, profile, minEdge)
     if (items.length === 0) break // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
 
     const reqId = nextRequestId('probe')
@@ -383,7 +384,8 @@ async function runProbes(
 /** 이 프로필로 처리한다면 각 이미지가 몇 바이트가 될지 UI 가 재볼 목록. */
 async function probeItemsFor(
   order: string[],
-  profile: CompressionProfile
+  profile: CompressionProfile,
+  minEdge: Settings['minEdge']
 ): Promise<ImageProbeItem[]> {
   const seen = seenImageInfo()
   const byHash = new Map<string, ImageProbeItem>()
@@ -394,7 +396,11 @@ async function probeItemsFor(
 
     const frame = node as SceneNode
     const scale = transformScale(frame.absoluteTransform)
-    const floor = processFloor(profile, Math.max(frame.width * scale.x, frame.height * scale.y))
+    // 탐색도 실제 export 와 같은 기준을 써야 예측이 맞는다
+    const floor = skipFloor(
+      { ...profile, minEdge },
+      Math.max(frame.width * scale.x, frame.height * scale.y)
+    )
 
     for (const plan of planFor(frame, profile)) {
       const info = seen.get(plan.imageHash)

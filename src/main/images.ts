@@ -7,7 +7,7 @@ import {
   ImageUsage,
   KEEP_BYTES_FLOOR,
   planImageTargets,
-  processFloor,
+  skipFloor,
   settleDelayMs,
   transformScale
 } from '../lib/imageTarget'
@@ -149,10 +149,7 @@ export async function shrinkImages(
   // 프레임 예산 안에 드는 이미지는 손대지 않는다 — 작은 로고까지 열화시킬 이유가 없다.
   // 프레임 자체가 스케일돼 있을 수 있으므로 여기서도 렌더 크기로 잰다.
   const rootScale = transformScale(root.absoluteTransform)
-  const floor = processFloor(
-    settings,
-    Math.max(root.width * rootScale.x, root.height * rootScale.y)
-  )
+  const floor = skipFloor(settings, Math.max(root.width * rootScale.x, root.height * rootScale.y))
 
   const replacement = new Map<string, string>()
 
