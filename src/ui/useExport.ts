@@ -55,6 +55,8 @@ export type ExportState = {
   start: (order: string[], settings: Settings, fileName: string) => void
   /** 마지막 요청 그대로 재시도. 실패 배너의 [다시 시도] 가 쓴다. */
   retry: () => void
+  /** 결과 카드를 닫는다. 다음 내보내기까지 계속 떠 있을 이유가 없다. */
+  dismiss: () => void
   cancel: () => void
 }
 
@@ -265,5 +267,10 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
     emit<CancelHandler>('cancel')
   }, [])
 
-  return { busy, progress, report, error, start, retry, cancel }
+  const dismiss = useCallback(() => {
+    setReport(null)
+    setError(null)
+  }, [])
+
+  return { busy, progress, report, error, start, retry, cancel, dismiss }
 }

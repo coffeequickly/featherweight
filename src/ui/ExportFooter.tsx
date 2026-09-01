@@ -1,9 +1,16 @@
 // 하단 고정 영역 — 내보내기 버튼·진행·오류·결과 리포트. 어느 탭에서든 보인다.
 
-import { Banner, Button, IconWarning16, Muted, Text, VerticalSpace } from '@create-figma-plugin/ui'
+import {
+  Banner,
+  Button,
+  IconClose16,
+  IconWarning16,
+  Muted,
+  Text,
+  VerticalSpace
+} from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
-import { useState } from 'preact/hooks'
 
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
@@ -20,9 +27,17 @@ type Props = {
   /** 내보낼 페이지 수 — 버튼 라벨과 활성화 여부에 쓴다 */
   pageCount: number
   onExport: () => void
+  /** 결과 카드에서 미리보기 탭으로 넘어간다 */
+  onOpenPreview: () => void
 }
 
-export function ExportFooter({ exporter, notice, pageCount, onExport }: Props): JSX.Element {
+export function ExportFooter({
+  exporter,
+  notice,
+  pageCount,
+  onExport,
+  onOpenPreview
+}: Props): JSX.Element {
   return (
     <Fragment>
       {notice === null ? null : (
@@ -75,7 +90,9 @@ export function ExportFooter({ exporter, notice, pageCount, onExport }: Props): 
         </Fragment>
       )}
 
-      {exporter.report === null ? null : <Report report={exporter.report} />}
+      {exporter.report === null ? null : (
+        <Report report={exporter.report} onClose={exporter.dismiss} onOpenPreview={onOpenPreview} />
+      )}
     </Fragment>
   )
 }
@@ -83,55 +100,6 @@ export function ExportFooter({ exporter, notice, pageCount, onExport }: Props): 
 function progressPercent(progress: { current: number; total: number } | null): number {
   if (progress === null || progress.total === 0) return 0
   return Math.min(100, Math.round((progress.current / progress.total) * 100))
-}
-
-/**
- * 제출 전에 "채용 시스템이 뭘 읽어 갈지" 를 보여준다.
- *
- * 아웃라인으로 남은 텍스트는 여기 없다 — 파서가 흘리거나 깨뜨리는 쪽이라 없는 셈
- * 치고 보여 주는 편이 정직하다. 사용자가 이름이나 연락처가 빠졌는지 눈으로 잡을 수 있다.
- */
-function ParserPreview({ lines }: { lines: string[] }): JSX.Element {
-  const [open, setOpen] = useState(false)
-
-  if (!open) {
-    return (
-      <div class="reportLine">
-        <span class="clickable pathChip" onClick={() => setOpen(true)}>
-          <Text>
-            <Muted>{t('report.preview')}</Muted>
-          </Text>
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div class="previewCard">
-      <div class="rowBetween">
-        <Text>{t('previewTitle')}</Text>
-        <span class="clickable pathChip" onClick={() => setOpen(false)}>
-          <Text>
-            <Muted>{t('previewClose')}</Muted>
-          </Text>
-        </span>
-      </div>
-      <VerticalSpace space="extraSmall" />
-      <Text>
-        <Muted>{t('previewHelp', { lines: lines.length })}</Muted>
-      </Text>
-      <VerticalSpace space="extraSmall" />
-      <div class="previewBody">
-        {lines.map((line, index) => (
-          <div key={index} class="previewLine">
-            <Text>
-              <Muted>{line}</Muted>
-            </Text>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 /**
@@ -150,7 +118,15 @@ function fitLine(fit: NonNullable<ExportReport['fit']>, actualBytes: number): st
   return t('report.fitOk', { target })
 }
 
-function Report({ report }: { report: ExportReport }): JSX.Element {
+function Report({
+  report,
+  onClose,
+  onOpenPreview
+}: {
+  report: ExportReport
+  onClose: () => void
+  onOpenPreview: () => void
+}): JSX.Element {
   // 같은 사유가 수십 번 반복된다 (폰트 하나가 없으면 그 폰트를 쓰는 노드마다 하나씩).
   // 그대로 늘어놓으면 읽을 수 없어서 묶어서 세고, 클릭하면 해당 노드를 캔버스에서 보여준다.
   const reasons = groupReasons([
@@ -169,16 +145,21 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
     <Fragment>
       <VerticalSpace space="small" />
       <div class="reportCard">
-        <div class="reportLine">
-          <Text>
-            {report.cancelled ? t('report.cancelledPrefix') : ''}
-            {t('report.summary', {
-              file: report.fileName,
-              pages: report.pageCount,
-              size: formatBytes(report.byteLength),
-              seconds: (report.elapsedMs / 1000).toFixed(1)
-            })}
-          </Text>
+        <div class="rowBetween">
+          <div class="reportLine ellipsis">
+            <Text>
+              {report.cancelled ? t('report.cancelledPrefix') : ''}
+              {t('report.summary', {
+                file: report.fileName,
+                pages: report.pageCount,
+                size: formatBytes(report.byteLength),
+                seconds: (report.elapsedMs / 1000).toFixed(1)
+              })}
+            </Text>
+          </div>
+          <span class="clickable pathChip" title={t('app.closeReport')} onClick={onClose}>
+            <IconClose16 />
+          </span>
         </div>
         <VerticalSpace space="extraSmall" />
         <div class="reportLine">
@@ -203,7 +184,13 @@ function Report({ report }: { report: ExportReport }): JSX.Element {
         {report.extractable.length === 0 ? null : (
           <Fragment>
             <VerticalSpace space="extraSmall" />
-            <ParserPreview lines={report.extractable} />
+            <div class="reportLine">
+              <span class="clickable pathChip" onClick={onOpenPreview}>
+                <Text>
+                  <Muted>{t('report.preview')}</Muted>
+                </Text>
+              </span>
+            </div>
           </Fragment>
         )}
 

@@ -121,3 +121,19 @@ export function fontsJsonDraft(usages: readonly FontUsage[]): string {
   }))
   return JSON.stringify(entries, null, 2)
 }
+
+/**
+ * 빠진 폰트를 배너 한 줄에 들어갈 이름으로 줄인다.
+ *
+ * 다 늘어놓으면 CSS 가 **줄 끝**을 잘라서 "· 폰트 탭에서 넣기" 라는 할 일이 먼저
+ * 사라진다. 이름은 여러 개여도 하나만 대면 충분하고, 나머지는 개수로 말한다.
+ * 이름 하나가 길어도 마찬가지라 거기서 한 번 더 자른다.
+ */
+export function summarizeMissing(
+  names: readonly string[],
+  maxChars = 22
+): { first: string; rest: number } {
+  const [head = '', ...tail] = names
+  const first = head.length > maxChars ? `${head.slice(0, maxChars - 1).trimEnd()}…` : head
+  return { first, rest: tail.length }
+}
