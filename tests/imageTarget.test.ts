@@ -11,7 +11,9 @@ import {
   needsDownscale,
   planImageTargets,
   scaledSize,
-  targetFor
+  targetFor,
+  edgeScale,
+  skipFloor
 } from '../src/lib/imageTarget'
 
 const SETTINGS = { multiplier: 1.5 as const, maxEdge: 2048 as const }
@@ -218,5 +220,49 @@ describe('settleDelayMs', () => {
 
   it('상한이 있다 — 이미지가 많아도 무한정 기다리지 않는다', () => {
     expect(settleDelayMs(100)).toBe(4000)
+  })
+})
+
+describe('edgeScale', () => {
+  it('FHD 를 기준으로 배율을 낸다', () => {
+    expect(edgeScale(1920, 4096).ratio).toBe(1)
+    expect(edgeScale(960, 4096).ratio).toBe(0.5)
+    expect(edgeScale(3840, 4096).ratio).toBe(2)
+  })
+
+  it('눈금 위 위치는 가장 큰 상한을 1 로 본다', () => {
+    expect(edgeScale(4096, 4096).fill).toBe(1)
+    expect(edgeScale(2048, 4096).fill).toBe(0.5)
+    expect(edgeScale(1920, 4096).fhd).toBeCloseTo(0.469, 3)
+  })
+
+  it('눈금 밖으로 넘치지 않는다', () => {
+    expect(edgeScale(9000, 4096).fill).toBe(1)
+    expect(edgeScale(1024, 1000).fhd).toBe(1)
+  })
+
+  it('눈금 폭이 0 이어도 죽지 않는다', () => {
+    expect(Number.isFinite(edgeScale(2048, 0).fill)).toBe(true)
+  })
+})
+
+describe('skipFloor', () => {
+  const base = { multiplier: 1.5 as const, maxEdge: 2048 as const }
+
+  it('프레임 예산과 절대 하한 중 큰 쪽을 쓴다', () => {
+    // A4(595pt) × 1.5 = 893 — 1000px 로고가 처리 대상이 되던 자리
+    expect(skipFloor({ ...base, minEdge: 1024 }, 595)).toBe(1024)
+  })
+
+  it('프레임이 크면 예산이 이긴다', () => {
+    expect(skipFloor({ ...base, minEdge: 640 }, 1920)).toBe(2048)
+  })
+
+  it('상한을 넘지 않는다 — 예산 쪽은 maxEdge 로 잘린다', () => {
+    expect(skipFloor({ ...base, minEdge: 640 }, 9999)).toBe(2048)
+  })
+
+  it('하한이 상한보다 크면 하한이 이긴다 — 그만큼 아무것도 안 건드린다', () => {
+    expect(skipFloor({ multiplier: 1, maxEdge: 1024, minEdge: 1600 }, 595)).toBe(1600)
   })
 })

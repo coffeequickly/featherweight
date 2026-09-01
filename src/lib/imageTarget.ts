@@ -76,6 +76,20 @@ export function processFloor(
 }
 
 /**
+ * 실제로 손대지 않고 넘길 크기.
+ *
+ * 프레임 예산(processFloor)은 프레임이 작으면 같이 작아진다 — A4(595pt) 문서에서
+ * 1.5배면 893px 이라, 1000px 짜리 로고가 처리 대상이 되어 열화된다. 프레임과 무관한
+ * 절대 하한(minEdge)을 함께 두어 작은 그림은 어떤 문서에서도 그대로 나가게 한다.
+ */
+export function skipFloor(
+  settings: { multiplier: number; maxEdge: number; minEdge: number },
+  frameLongEdge: number
+): number {
+  return Math.max(processFloor(settings, frameLongEdge), settings.minEdge)
+}
+
+/**
  * 아무리 작게 표시돼도 이 아래로는 줄이지 않는다.
  * 2383px 로고가 93pt 로 표시된다고 140px 로 뭉개면 줌·인쇄에서 바로 티가 난다 —
  * 640px 이면 로고·아이콘이 선명함을 유지하면서도 원본 대비 충분히 가볍다.
@@ -126,6 +140,36 @@ export function planImageTargets(
   }
 
   return [...byHash.values()]
+}
+
+/**
+ * 상한 눈금의 기준점. 사람들이 픽셀 수를 실감하는 단위는 "FHD 몇 배" 다 —
+ * 2048 이 큰지 작은지는 몰라도 "FHD 보다 조금 큼" 은 바로 안다.
+ */
+export const FHD_LONG_EDGE = 1920
+
+export type EdgeScale = {
+  /** 눈금 전체에서 이 상한이 차지하는 비율 (0~1) */
+  fill: number
+  /** 눈금 위 FHD 표시의 위치 (0~1) */
+  fhd: number
+  /** FHD 대비 배율. 1 이면 같다. */
+  ratio: number
+}
+
+/**
+ * 상한을 눈금 위 위치로 바꾼다.
+ *
+ * 눈금은 선형이다 — 로그로 그리면 1024 와 4096 의 차이가 실제보다 작아 보인다.
+ * 픽셀은 넓이로 체감되므로 오히려 과장되는 편이 맞다.
+ */
+export function edgeScale(maxEdge: number, widest: number): EdgeScale {
+  const span = Math.max(widest, 1)
+  return {
+    fill: Math.min(1, maxEdge / span),
+    fhd: Math.min(1, FHD_LONG_EDGE / span),
+    ratio: maxEdge / FHD_LONG_EDGE
+  }
 }
 
 /** 원본이 이미 목표보다 작으면 키우지 않는다. */

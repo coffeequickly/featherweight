@@ -22,7 +22,9 @@ export type Settings = {
   version: 2
   quality: number // 0.5–1.0
   multiplier: 1 | 1.5 | 2
-  maxEdge: 1024 | 1600 | 2048 | 4096
+  maxEdge: 1024 | 1600 | 1920 | 2048 | 4096
+  /** 원본이 이 픽셀 이하면 아예 손대지 않는다 — 로고·아이콘을 지키는 절대 하한 */
+  minEdge: 640 | 1024 | 1600
   reencodeOpaquePng: boolean
   embedText: boolean // Phase 2
   /** 목표 용량에 맞춰 압축을 자동으로 고른다 (docs/FIT-TO-SIZE.md) */
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 0.8,
   multiplier: 1.5,
   maxEdge: 2048,
+  minEdge: 640,
   reencodeOpaquePng: true,
   embedText: true,
   fitToSize: false,
