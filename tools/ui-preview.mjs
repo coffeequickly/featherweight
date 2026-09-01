@@ -69,6 +69,7 @@ const FIXTURE = {
     quality: 0.8,
     multiplier: 1.5,
     maxEdge: 2048,
+    minEdge: 640,
     reencodeOpaquePng: true,
     embedText: true,
     fitToSize: false,
