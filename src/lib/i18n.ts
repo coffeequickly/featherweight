@@ -24,6 +24,7 @@ const MESSAGES = {
   'app.restore': { en: 'Restore', ko: '복원' },
   'app.embedText': { en: 'Embed text as real fonts', ko: '텍스트를 실제 폰트로 임베드' },
   'app.preparing': { en: 'Preparing…', ko: '준비 중…' },
+  'app.closeReport': { en: 'Close', ko: '닫기' },
   'app.cancel': { en: 'Cancel', ko: '취소' },
   'app.export': {
     en: (p) =>
@@ -34,10 +35,18 @@ const MESSAGES = {
   'tab.export': { en: 'Export', ko: '내보내기' },
   'tab.images': { en: 'Images', ko: '이미지' },
   'tab.fonts': { en: 'Fonts', ko: '폰트' },
+  'tab.preview': { en: 'Text check', ko: '텍스트 확인' },
   'fonts.none': { en: 'No text in this document', ko: '문서에 쓰인 폰트가 없습니다' },
   'app.missingWarn': {
-    en: '{names} — no font file, so the text is outlined. Add it in the Fonts tab',
-    ko: '{names} — 폰트가 없어 텍스트가 아웃라인 처리됩니다 · 폰트 탭에서 넣기'
+    // 다 늘어놓으면 CSS 가 줄 끝을 잘라서 "폰트 탭에서 넣기" 라는 할 일이 먼저 사라진다
+    en: (p) =>
+      Number(p.rest) > 0
+        ? `${p.first} and ${p.rest} more — no font file, will be outlined · add them`
+        : `${p.first} — no font file, will be outlined · add it`,
+    ko: (p) =>
+      Number(p.rest) > 0
+        ? `${p.first} 외 ${p.rest}종 — 폰트가 없어 아웃라인 처리됩니다 · 폰트 지정하기`
+        : `${p.first} — 폰트가 없어 아웃라인 처리됩니다 · 폰트 지정하기`
   },
   'fonts.pathHelpMac': {
     en: 'Installed fonts are in the folders below. Click a path to copy it, then press ⌘⇧G in the file dialog and paste.',
@@ -93,6 +102,8 @@ const MESSAGES = {
   'presets.balanced': { en: 'Balanced', ko: '균형' },
   'presets.small': { en: 'Smallest', ko: '최소 용량' },
   'presets.custom': { en: 'Custom', ko: '직접' },
+  // 칩에서는 "이미지 직접" 이 되어 말이 안 된다 — 칩용 표기를 따로 둔다
+  'summary.imagesCustom': { en: 'Images · custom', ko: '이미지 직접 설정' },
   // 4칸짜리 세그먼트라 가로가 빠듯하다 — 영문은 짧게. 뜻은 아래 설명이 받는다.
   'presets.fit': { en: 'Target', ko: '목표 용량' },
   'images.fitTarget': { en: 'Target', ko: '목표' },
@@ -105,11 +116,63 @@ const MESSAGES = {
     ko: '보통 내보내기보다 두 배쯤 걸립니다.'
   },
   'images.help': {
-    en: 'Only images larger than the frame budget are downscaled. Small images like logos pass through untouched.',
-    ko: '프레임 기준을 넘는 큰 이미지만 줄입니다. 로고처럼 작은 이미지는 재인코딩 없이 그대로 둡니다.'
+    en: 'Only images larger than the frame budget are downscaled. Anything below the skip size is left alone in every document, so logos never get muddy.',
+    ko: '프레임 기준을 넘는 큰 이미지만 줄입니다. 건너뛰기 값보다 작은 이미지는 어떤 문서에서든 손대지 않습니다 — 로고가 뭉개지지 않습니다.'
   },
   'images.multiplier': { en: 'Scale', ko: '배율' },
   'images.maxEdge': { en: 'Max edge', ko: '상한' },
+  // 픽셀 수는 실감이 안 온다 — 다들 아는 크기에 견줘 말한다
+  'images.edgeSame': { en: 'same as FHD width', ko: 'FHD 가로폭과 같음' },
+  'images.edgeUnder': { en: (p) => `${p.percent}% of FHD width`, ko: 'FHD 가로폭의 {percent}%' },
+  'images.edgeOver': { en: (p) => `${p.times}× FHD width`, ko: 'FHD 가로폭의 {times}배' },
+  // ── 이미지 탭 섹션 ────────────────────────────────────
+  // 설명은 고정 문구가 아니라 지금 값을 되읽어 준다 — "내 설정이 뭘 하는지" 가
+  // "이 항목이 무엇인지" 보다 쓸모 있다.
+  'images.sectionSize': { en: 'Size', ko: '크기' },
+  'images.sectionKeep': { en: 'Leave alone', ko: '손대지 않을 것' },
+  'images.sectionQuality': { en: 'Compression', ko: '압축' },
+  'images.sizeSays': {
+    en: (p) =>
+      `Keeps pixels up to ${p.multiplier}× the size the image is shown at, never above ${p.maxEdge}px.`,
+    ko: '화면에 보이는 크기의 {multiplier}배까지 픽셀을 남기고, {maxEdge}px 을 넘지 않습니다.'
+  },
+  'images.keepSays': {
+    en: (p) => `Images ${p.minEdge}px or smaller are never touched, in any document.`,
+    ko: '{minEdge}px 이하 이미지는 어떤 문서에서도 손대지 않습니다.'
+  },
+  'images.qualitySays': {
+    en: (p) =>
+      Number(p.quality) >= 0.9
+        ? 'JPEG quality. Above 0.90 the difference is hard to see, and the file grows fast.'
+        : Number(p.quality) <= 0.7
+          ? 'JPEG quality. Below 0.70 flat areas start to band.'
+          : 'JPEG quality. 0.80 is a safe middle for screen and print.',
+    ko: (p) =>
+      Number(p.quality) >= 0.9
+        ? 'JPEG 압축 강도. 0.90 위로는 눈으로 차이를 알기 어렵고 용량만 빠르게 늡니다.'
+        : Number(p.quality) <= 0.7
+          ? 'JPEG 압축 강도. 0.70 아래로는 넓은 색면에 띠가 보이기 시작합니다.'
+          : 'JPEG 압축 강도. 0.80 은 화면·인쇄 양쪽에 무난합니다.'
+  },
+  'images.presetSays': {
+    en: (p) => `${p.name} — ${p.detail}`,
+    ko: '{name} — {detail}'
+  },
+  'presets.detailSharp': {
+    en: 'keeps the most pixels, for print or zooming in',
+    ko: '인쇄·확대를 생각해 픽셀을 가장 많이 남깁니다'
+  },
+  'presets.detailBalanced': {
+    en: 'enough for a PDF read on screen',
+    ko: '화면으로 볼 PDF 에 충분합니다'
+  },
+  'presets.detailSmall': { en: 'for tight upload limits', ko: '업로드 한도가 빡빡할 때' },
+  'presets.detailFit': {
+    en: 'you name the size, it finds the quality',
+    ko: '크기를 정하면 화질을 찾아 줍니다'
+  },
+  'presets.detailCustom': { en: 'your own numbers', ko: '숫자를 직접 정한 상태입니다' },
+  'images.minEdge': { en: 'Skip under', ko: '건너뛰기' },
   'images.quality': { en: 'Quality', ko: '품질' },
   'images.reencode': { en: 'Re-encode opaque PNGs as JPEG', ko: '투명 없는 PNG는 JPEG로' },
 
@@ -237,6 +300,10 @@ const MESSAGES = {
   'report.leak': {
     en: 'Some invisible leftovers stayed in the file. The text may be read twice — please report this.',
     ko: '보이지 않는 찌꺼기가 파일에 남았습니다. 글자가 두 번 읽힐 수 있습니다 — 제보해 주시면 고치겠습니다.'
+  },
+  'preview.empty': {
+    en: 'Export first — the text a parser reads will show up here.',
+    ko: '먼저 내보내 주세요. 파서가 읽어 갈 텍스트가 여기 나옵니다.'
   },
   'report.preview': { en: 'Check what a parser reads', ko: '파서가 읽을 내용 확인' },
   previewTitle: { en: 'Text a parser will read', ko: '파서가 읽어 갈 텍스트' },
