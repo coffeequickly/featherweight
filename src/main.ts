@@ -20,7 +20,14 @@ import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from '
 import { exportFrame, removeLeftoverClones } from './main/exporter'
 import { forgetSeenImages, OriginalSink, planFor, seenImageInfo } from './main/images'
 import { loadEdgeCache } from './main/imageSize'
-import { deleteFont, listFonts, pruneOrphanFonts, readFontBytes, saveFont } from './main/fontStore'
+import {
+  deleteFont,
+  listFonts,
+  pruneOrphanFonts,
+  readFontBytes,
+  saveFont,
+  setFontFacts
+} from './main/fontStore'
 import {
   CancelHandler,
   DEFAULT_SETTINGS,
@@ -30,6 +37,8 @@ import {
   ExportHandler,
   ExportRequest,
   FontDeleteHandler,
+  FontFactsHandler,
+  FontFileFacts,
   FontRef,
   FontSaveHandler,
   FontsHandler,
@@ -140,6 +149,11 @@ export default async function main(): Promise<void> {
 
   on<FontDeleteHandler>('font:delete', (ref) => {
     void dropFont(ref)
+  })
+
+  // 옛 버전이 넣은 파일의 사실(굵기·가변 여부)을 UI 가 읽어 보내면 인덱스에 남긴다
+  on<FontFactsHandler>('font:facts', (payload) => {
+    fontOps = fontOps.then(() => recordFontFacts(payload.ref, payload.facts))
   })
 
   on<FrameThumbsRequestHandler>('frames:thumbs:request', () => {
@@ -634,6 +648,14 @@ async function storeFont(font: StoredFont, bytes: Uint8Array, quiet: boolean): P
       error: true
     })
     void sendStoredFonts()
+  }
+}
+
+async function recordFontFacts(ref: FontRef, facts: FontFileFacts): Promise<void> {
+  try {
+    emit<StoredFontsHandler>('fonts:stored', await setFontFacts(ref, facts))
+  } catch {
+    // 못 적으면 다음에 열 때 다시 읽는다
   }
 }
 

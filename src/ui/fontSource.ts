@@ -43,6 +43,11 @@ async function fetchFromCatalog(ref: FontRef): Promise<Uint8Array | undefined> {
   }
 }
 
+/** 넣어 둔 파일 그대로 — 카탈로그를 거치지 않는다 (같은 이름이 카탈로그에도 있을 수 있다) */
+export function loadStoredFontBytes(ref: FontRef): Promise<Uint8Array | undefined> {
+  return fetchFromStorage(ref)
+}
+
 async function fetchFromStorage(ref: FontRef): Promise<Uint8Array | undefined> {
   const reqId = nextRequestId('font')
   const promise = awaitResponse<{ bytes: Uint8Array | null }>(reqId)

@@ -8,7 +8,7 @@ import {
   upsertFont
 } from '../lib/fontStore'
 import { createSerialQueue } from '../lib/serialQueue'
-import { FontRef, StoredFont } from '../lib/types'
+import { FontFileFacts, FontRef, StoredFont } from '../lib/types'
 
 /**
  * 인덱스는 읽고→고치고→쓰기라 동시에 실행되면 먼저 쓴 항목이 사라진다.
@@ -30,6 +30,17 @@ export function saveFont(font: StoredFont, bytes: Uint8Array): Promise<StoredFon
   return queue(async () => {
     await figma.clientStorage.setAsync(fontStorageKey(font), bytes)
     const next = upsertFont(await listFonts(), font)
+    await figma.clientStorage.setAsync(FONT_INDEX_KEY, next)
+    return next
+  })
+}
+
+/** 옛 항목에 파일 사실을 적는다. 자리가 사라졌으면 그냥 지금 인덱스 */
+export function setFontFacts(ref: FontRef, facts: FontFileFacts): Promise<StoredFont[]> {
+  return queue(async () => {
+    const next = (await listFonts()).map((font) =>
+      font.family === ref.family && font.style === ref.style ? { ...font, facts } : font
+    )
     await figma.clientStorage.setAsync(FONT_INDEX_KEY, next)
     return next
   })

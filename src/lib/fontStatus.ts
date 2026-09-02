@@ -4,8 +4,9 @@
 // 폰트 화면과 체크리스트가 같은 판정을 써야 두 화면이 다른 말을 하지 않는다.
 
 import { catalogEntry } from './fontCatalog'
+import { screenFontFile, weightMismatch } from './fontFile'
 import { findStored } from './fontStore'
-import { FontUsage, StoredFont } from './types'
+import { FontUsage, StoredFont, Reason } from './types'
 
 export type FontAvailability =
   { kind: 'catalog' } | { kind: 'uploaded'; font: StoredFont } | { kind: 'missing' }
@@ -14,6 +15,42 @@ export function availabilityOf(font: FontUsage, stored: readonly StoredFont[]): 
   if (catalogEntry(font) !== undefined) return { kind: 'catalog' }
   const uploaded = findStored(stored, font)
   return uploaded === undefined ? { kind: 'missing' } : { kind: 'uploaded', font: uploaded }
+}
+
+/** 넣어 둔 파일이 그 자리에 맞지 않는 경우 — 내보내면 굵기가 틀리거나 글자가 깨진다 */
+export type StoredFileProblem =
+  | { kind: 'unusable'; reason: Reason }
+  | { kind: 'mismatch'; fileWeight: number; fileItalic: boolean }
+
+/**
+ * 넣는 순간에만 검사하고 그 뒤로 믿으면, 옛 버전이 받아 준 가변 폰트가 "준비됨" 으로
+ * 남는다 (실측: SUIT Regular 자리의 SUIT-Variable.ttf 가 본문을 Thin 으로 내보냈다).
+ * 파일 사실이 아직 없으면(옛 항목, 읽는 중) 모른다 — null.
+ */
+export function storedFileProblem(font: StoredFont): StoredFileProblem | null {
+  if (font.facts === undefined) return null
+  const verdict = screenFontFile(font.facts)
+  if (!verdict.ok) return { kind: 'unusable', reason: verdict.reason }
+  const mismatch = weightMismatch(font.facts, { weight: font.weight, italic: font.italic })
+  if (mismatch.differs) {
+    return { kind: 'mismatch', fileWeight: mismatch.fileWeight, fileItalic: mismatch.fileItalic }
+  }
+  return null
+}
+
+/** 이 문서가 쓰는 폰트 중 넣어 둔 파일이 자리에 맞지 않는 것들 */
+export function uploadedProblems(
+  fonts: readonly FontUsage[],
+  stored: readonly StoredFont[]
+): Array<{ font: StoredFont; problem: StoredFileProblem }> {
+  const out: Array<{ font: StoredFont; problem: StoredFileProblem }> = []
+  for (const usage of fonts) {
+    const availability = availabilityOf(usage, stored)
+    if (availability.kind !== 'uploaded') continue
+    const problem = storedFileProblem(availability.font)
+    if (problem !== null) out.push({ font: availability.font, problem })
+  }
+  return out
 }
 
 /** 파일이 없어 아웃라인으로 나갈 폰트들 */

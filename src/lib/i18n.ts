@@ -126,6 +126,17 @@ const MESSAGES = {
     ko: '{names} · 일부는 직접 넣은 파일'
   },
   // 폰트 줄은 원인만 말한다 — "아웃라인" 이라는 결말은 텍스트 줄 하나가 맡는다
+  'preflight.fontsFileProblem': {
+    en: (p) =>
+      Number(p.count) === 1
+        ? "1 added file doesn't match its slot"
+        : `${p.count} added files don't match their slots`,
+    ko: '직접 넣은 파일 {count}종이 자리와 맞지 않습니다'
+  },
+  'preflight.fontsFileProblemMore': {
+    en: (p) => ` and ${p.count} more`,
+    ko: ' 외 {count}종'
+  },
   'preflight.fontsMissing': {
     en: (p) =>
       `${n(Number(p.missing), 'font', 'fonts')} missing · used in ${n(Number(p.texts), 'text', 'texts')}`,
@@ -582,6 +593,18 @@ const MESSAGES = {
   'fontFile.noOutlines': {
     en: 'No usable glyphs in this file. Upload a .ttf.',
     ko: '이 파일에서 쓸 수 있는 글자 모양을 찾지 못했습니다. .ttf 파일을 올려 주세요.'
+  },
+  'fonts.fileVariable': {
+    en: 'Variable font file · exports in the wrong weight · replace with the static .ttf for this weight',
+    ko: '가변 폰트 파일 · 굵기가 틀리게 나갑니다 · 이 굵기의 static .ttf 로 교체하세요'
+  },
+  'fonts.fileUnusable': {
+    en: 'This file cannot be embedded · replace with a .ttf',
+    ko: '넣을 수 없는 파일 · .ttf 로 교체하세요'
+  },
+  'fonts.fileMismatch': {
+    en: "File is {fileStyle}, slot is {slotStyle} · exports in the file's weight",
+    ko: '파일은 {fileStyle}, 자리는 {slotStyle} · 파일 굵기로 나갑니다'
   },
   'fontFile.weightMismatch': {
     en: 'Saved, but this file looks like {fileStyle} while the slot is {slotStyle}. Check the exported PDF.',

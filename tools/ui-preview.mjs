@@ -249,6 +249,8 @@ function page(uiScript, query) {
   const platform = query.get('platform') ?? ''
   const frames = query.get('frames')
   const allFontsReady = query.get('fonts') === 'ready'
+  // ?fonts=badfile — 카탈로그 밖 서체 자리에 가변 폰트 파일이 들어 있는 상태 (옛 버전이 받아 준 경우)
+  const badFile = query.get('fonts') === 'badfile'
   const fitToSize = query.get('fit') === '1'
   // ?text=clean — 아웃라인 처리될 텍스트가 없는 상태
   const textClean = query.get('text') === 'clean'
@@ -283,6 +285,7 @@ const FIXTURE = ${JSON.stringify(FIXTURE)}
 const UI_SCRIPT = ${JSON.stringify(uiScript)}
 const VARS = ${JSON.stringify(dark ? FIGMA_VARS_DARK : FIGMA_VARS)}\nconst FRAME_COUNT = ${frames === null ? 'null' : Number(frames)}
 const ALL_FONTS_READY = ${allFontsReady}
+const BAD_FILE = ${badFile}
 const FIT_TO_SIZE = ${fitToSize}
 const TEXT_CLEAN = ${textClean}
 const WIDE = ${wide} || ${editor === 'slides' ? 'true' : 'false'}
@@ -334,7 +337,25 @@ window.addEventListener('message', (event) => {
     )
     // ?fonts=ready — 카탈로그 밖 서체를 빼고 전부 준비된 상태로 (마케팅 캡처용)
     send('fonts', ALL_FONTS_READY ? FIXTURE.fonts.filter((f) => f.family !== 'Nexa') : FIXTURE.fonts)
-    send('fonts:stored', FIXTURE.storedFonts)
+    send(
+      'fonts:stored',
+      BAD_FILE
+        ? [
+            ...FIXTURE.storedFonts,
+            {
+              family: 'Nexa',
+              style: 'Heavy',
+              weight: 900,
+              italic: false,
+              byteLength: 1548000,
+              numGlyphs: 3000,
+              codePoints: 2000,
+              fileName: 'Nexa-Variable.ttf',
+              facts: { tables: ['glyf', 'fvar'], axes: ['wght'], weightClass: 100, italic: false }
+            }
+          ]
+        : FIXTURE.storedFonts
+    )
     // 체크리스트 재료는 목록 뒤에 따로 온다 — 실제 메인과 같은 순서
     send('preflight', {
       frames: selection.map((frame, i) => ({

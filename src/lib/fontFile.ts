@@ -15,19 +15,10 @@
 //
 // 그래서 파일을 받기 전에 걸러내고, 무엇을 올려야 하는지 말해 준다.
 
-import { Reason } from './types'
+import { FontFileFacts, Reason } from './types'
 
-/** 검사에 필요한 만큼만 — fontkit Font 의 부분집합이라 순수 테스트가 된다 */
-export type FontFacts = {
-  /** 폰트가 들고 있는 테이블 이름들 */
-  tables: readonly string[]
-  /** 가변 축 이름들. 비어 있으면 static. */
-  axes: readonly string[]
-  /** OS/2 의 usWeightClass */
-  weightClass?: number
-  /** 이탤릭 플래그 (OS/2 fsSelection) */
-  italic?: boolean
-}
+/** 검사에 필요한 만큼만 — fontkit Font 의 부분집합이라 순수 테스트가 된다. 저장 타입과 같다. */
+export type FontFacts = FontFileFacts
 
 export type FontVerdict = { ok: true } | { ok: false; reason: Reason }
 
