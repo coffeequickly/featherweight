@@ -9,7 +9,7 @@ import { Fragment, JSX } from 'preact'
 
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
-import { groupReasons } from '../lib/preflight'
+import { groupReasons, unifyMissingGlyphs } from '../lib/preflight'
 import { NodesFocusHandler } from '../lib/types'
 import { ExportReport } from './useExport'
 
@@ -47,7 +47,10 @@ export function ReportCard({ report, onClose, onOpenPreview }: Props): JSX.Eleme
       reason: t('report.skipped', { name: skip.name, reason: formatReason(skip.reason) }),
       id: skip.id
     })),
-    ...report.fallbacks.map((item) => ({ reason: formatReason(item.reason), id: item.nodeId }))
+    ...unifyMissingGlyphs(report.fallbacks).map((item) => ({
+      reason: formatReason(item.reason),
+      id: item.nodeId
+    }))
   ])
 
   // "아웃라인 처리된 텍스트 N개" 는 텍스트만 세야 한다. 통째로 실패한 프레임까지
@@ -156,8 +159,7 @@ export function ReportCard({ report, onClose, onOpenPreview }: Props): JSX.Eleme
               >
                 <Text>
                   <Muted>
-                    {item.reason}
-                    {item.count > 1 ? ` × ${item.count}` : ''}
+                    {item.reason} × {item.count}
                   </Muted>
                 </Text>
               </div>
