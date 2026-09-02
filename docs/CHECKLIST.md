@@ -8,24 +8,59 @@ fonts).
 
 Work through this before publishing a new version to the Community.
 Run `npm run install:local` first, then reopen the plugin and confirm the version
-in the bottom-right corner is the build you mean to ship.
+in the header is the build you mean to ship.
 
 ## Layout & states
 
-- [ ] Three tabs (Export / Images / Fonts); the export button, progress and
-      result stay visible from every tab
-- [ ] Export tab: the summary line ("Balanced · 4 fonts ready") matches reality,
-      and clicking each chip opens the matching tab
-- [ ] Clicking a frame row reveals that frame on the canvas (selection unchanged)
-- [ ] Dragging a row reorders it; ↑↓ buttons still work; ✕ excludes and the
-      excluded list restores individually
-- [ ] Images tab: the three presets switch; touching a number shows "Custom"
-- [ ] Fonts tab: "Embed text as real fonts" is **on** by default; the font list
-      and Add button work; clicking a path copies it (toast confirms)
-- [ ] With one or two frames the window is compact; resizing it by hand stops the
-      automatic sizing from taking over again
-- [ ] Empty state: no sort control, no "(0 pages)" in the button
-- [ ] Nothing is clipped — Hangul ascenders/descenders and Latin g/j/y tails
+- [ ] One main screen: preset tiles, value chips, "Before you export"
+      checklist. No header of its own (Figma's title bar already says
+      Featherweight). The gear next to the export button opens Advanced
+      settings and disappears while exporting; the button and progress stay
+      visible from every sub-screen; "‹" returns to the main screen
+- [ ] Every checklist row has a title and exactly one detail line, in every
+      preset including Target — the four rows line up
+- [ ] Presets: four square tiles (icon · name · one-line tag); the chosen one
+      has a blue border and tint; picking one changes the three chips; touching
+      a number in Advanced settings deselects every tile and adds a "Reset"
+      chip; Target puts the MB field and a single "auto" chip in the same row —
+      the checklist below never moves when switching presets
+- [ ] After an export the result card appears under the checklist on the main
+      screen (you are brought back there from any sub-screen); ✕ closes it;
+      "Check what a parser reads" opens the Text check screen
+- [ ] Target: typing "0.8" works, an emptied field falls back to the previous
+      value (never silently 0.5), and −/+ step by 1 MB (0.5 ↔ 1 at the bottom)
+- [ ] Checklist matches reality: frame count and size; "N of M images will be
+      downscaled" appears a moment after the list (it arrives with the
+      thumbnails); a font outside the catalog turns the Fonts row orange with
+      the font's name and "Add fonts ›" (the Fonts row states the cause only);
+      the Text row alone states the outcome, counting stroked/gradient/effect
+      texts and texts in missing fonts together, with "Show layers ›"
+- [ ] Selecting frames shows the list immediately; thumbnails fill in afterwards
+      without resetting a custom order
+- [ ] Arrange: clicking a row reveals that frame on the canvas
+      (selection unchanged); dragging reorders; ↑↓ still work; ✕ excludes and
+      the excluded list restores individually; the Frames row then says
+      "Custom order · 1 excluded"
+- [ ] Advanced settings opens with the resolution chart: HD / FHD / QHD / 4K
+      nested from the bottom-left, the chosen cap tinted, and a dashed box for
+      frame × scale (in the frame's own aspect). When the dashed box pokes out
+      of the tinted one it turns amber and the line below says the cap
+      decides, not the scale. Every choice (Scale, Max edge, Keep under) is a row of buttons in
+      the same style as the preset tiles — no segmented controls; Max edge is
+      HD / FHD / QHD / 4K with the pixel count as the tag. A 1.4 install that
+      had 2048 / 4096 / 1600 stored comes up as FHD / 4K / HD, not unselected;
+      "Reset" in the header restores defaults; in Target mode
+      the Size and Compression sections are replaced by a note; "Export all
+      text as outlines" is **off** by default and turning it on makes the Text
+      row orange with a "Turn off" action; the version is shown at the bottom
+- [ ] Fonts: the font list and Add button work; "Find in a font folder…" opens
+      a folder picker, reads the .ttf files and adds the matching ones (the
+      notice says how many of the missing fonts were added); clicking a path
+      copies it (toast confirms)
+- [ ] Empty state: the card asks for a selection, the promise line is shown, no
+      "(0 pages)" in the button
+- [ ] Nothing is clipped — Hangul ascenders/descenders and Latin g/j/y tails;
+      English checklist details wrap to two lines instead of being cut
 
 ## Language & platform
 
@@ -36,7 +71,9 @@ in the bottom-right corner is the build you mean to ship.
 - [ ] Figma in the browser: export and download still work
 
 `npm run ui:preview` renders most of these without Figma:
-`?tab=fonts&theme=dark&lang=en-US&platform=win&frames=12&bare=1`.
+`?screen=fonts&theme=dark&lang=en-US&platform=win&frames=12&bare=1`
+(`screen` = `settings` / `frames` / `fonts` / `text` / `preview`; `text=clean`
+for a document with nothing to outline; `report=1` for the result card).
 
 ## Export behaviour
 
@@ -60,7 +97,8 @@ in the bottom-right corner is the build you mean to ship.
 
 - [ ] A catalog font (e.g. Nanum Gothic) is embedded with no upload needed
 - [ ] A font outside the catalog shows "no file" and stays as outlines — the
-      export tab warns with the font's name and jumps to the Fonts tab
+      checklist's Fonts row warns with the font's name and "Add fonts ›" opens
+      the Fonts screen
 - [ ] Offline (Wi-Fi off): catalog fonts fall back to outlines and the PDF still
       exports cleanly
 
