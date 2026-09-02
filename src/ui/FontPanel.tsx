@@ -1,5 +1,5 @@
 import {
-  Checkbox,
+  Button,
   FileUploadButton,
   IconButton,
   IconTrash24,
@@ -9,12 +9,13 @@ import {
 } from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
+import { useRef, useState } from 'preact/hooks'
 
 import { formatNumber, formatReason, t } from '../lib/i18n'
-import { catalogEntry } from '../lib/fontCatalog'
-import { screenFontFile, weightMismatch } from '../lib/fontFile'
+import { FontFacts, screenFontFile, weightMismatch } from '../lib/fontFile'
 import { fontKey } from '../lib/fontInventory'
-import { findStored, fitsWithin, formatBytes } from '../lib/fontStore'
+import { availabilityOf, FontAvailability, missingFonts } from '../lib/fontStatus'
+import { fitsWithin, formatBytes, upsertFont } from '../lib/fontStore'
 import {
   FontDeleteHandler,
   FontSaveHandler,
@@ -22,78 +23,45 @@ import {
   StoredFont,
   ToastHandler
 } from '../lib/types'
-import { createProbe, factsOf } from './fontkitAdapter'
+import { findFontFiles } from './fontFolder'
+import { createProbe, factsOf, FontProbe } from './fontkitAdapter'
+
+type Notice = { message: string; error: boolean }
 
 type Props = {
   fonts: FontUsage[]
   stored: StoredFont[]
   disabled: boolean
-  embedText: boolean
-  onEmbedTextChange: (value: boolean) => void
   /** UI 안에서 난 일은 UI 가 띄운다 — emit('notice') 는 메인에 핸들러가 없어 죽는다 */
-  onNotice: (notice: { message: string; error: boolean }) => void
-}
-
-type Availability =
-  { kind: 'catalog' } | { kind: 'uploaded'; font: StoredFont } | { kind: 'missing' }
-
-function availabilityOf(font: FontUsage, stored: StoredFont[]): Availability {
-  if (catalogEntry(font) !== undefined) return { kind: 'catalog' }
-  const uploaded = findStored(stored, font)
-  return uploaded === undefined ? { kind: 'missing' } : { kind: 'uploaded', font: uploaded }
+  onNotice: (notice: Notice) => void
 }
 
 /**
  * 문서가 쓰는 폰트와 그 폰트를 구할 수 있는지 보여준다.
  *
- * 공개 폰트는 내보낼 때 알아서 받아 온다(카탈로그). 못 구하는 서체만 사용자가 넣는다.
- * 파일에서 family/style 을 자동으로 읽지 않는 이유: variable 에서 뽑은 static 인스턴스의
- * 이름표가 Figma 가 부르는 이름과 어긋난다("Pretendard Variable SemiBold / Regular").
+ * 공개 폰트는 내보낼 때 알아서 받아 온다(카탈로그). 못 구하는 서체만 사용자가 넣는다 —
+ * 파일 하나씩, 또는 폰트 폴더를 통째로 골라 자동으로.
+ * 파일에서 family/style 을 자동으로 읽어 자리를 정하지 않는 이유: variable 에서 뽑은 static
+ * 인스턴스의 이름표가 Figma 가 부르는 이름과 어긋난다("Pretendard Variable SemiBold / Regular").
  */
-/** 파일이 없어 아웃라인으로 나갈 폰트들 — 내보내기 탭 경고에 쓴다 */
-export function missingFonts(fonts: FontUsage[], stored: StoredFont[]): FontUsage[] {
-  return fonts.filter((font) => availabilityOf(font, stored).kind === 'missing')
-}
-
-/** 내보내기 탭의 한 줄 요약 — "4종 · 전부 준비됨" */
-/**
- * 요약 칩 문구.
- *
- * 빠진 폰트가 있으면 바로 아래 경고 배너가 서체 이름까지 대고 말한다 — 칩까지 같은
- * 말을 하면 한 화면에서 같은 사실을 두 번 읽게 된다. 그럴 때 칩은 개수만 센다.
- */
-export function fontsSummaryText(fonts: FontUsage[]): string {
-  if (fonts.length === 0) return ''
-  return t('fonts.summaryReady', { count: fonts.length })
-}
-
-export function FontPanel({
-  fonts,
-  stored,
-  disabled,
-  embedText,
-  onEmbedTextChange,
-  onNotice
-}: Props): JSX.Element {
+export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Element {
   if (fonts.length === 0) {
     return (
-      <Text>
-        <Muted>{t('fonts.none')}</Muted>
-      </Text>
+      <Fragment>
+        <VerticalSpace space="small" />
+        <Text>
+          <Muted>{t('fonts.none')}</Muted>
+        </Text>
+      </Fragment>
     )
   }
 
   const states = fonts.map((font) => availabilityOf(font, stored))
-  const missing = states.filter((state) => state.kind === 'missing').length
+  const missing = missingFonts(fonts, stored)
 
   return (
     <Fragment>
-      <VerticalSpace space="extraSmall" />
-      {/* 끄면 이 플러그인의 반쪽이 죽는다 — 끌 일이 드물어 여기로 접어 둔다 */}
-      <Checkbox disabled={disabled} onValueChange={onEmbedTextChange} value={embedText}>
-        <Text>{t('app.embedText')}</Text>
-      </Checkbox>
-      <VerticalSpace space="extraSmall" />
+      <VerticalSpace space="small" />
       <Text>
         <Muted>{t('fonts.help')}</Muted>
       </Text>
@@ -109,11 +77,12 @@ export function FontPanel({
           onNotice={onNotice}
         />
       ))}
-      <VerticalSpace space="extraSmall" />
 
-      {missing === 0 ? null : (
+      {missing.length === 0 ? null : (
         <Fragment>
-          <VerticalSpace space="extraSmall" />
+          <VerticalSpace space="medium" />
+          <FolderScan missing={missing} stored={stored} disabled={disabled} onNotice={onNotice} />
+          <VerticalSpace space="medium" />
           <Text>
             <Muted>{t('fonts.uploadHint')}</Muted>
           </Text>
@@ -140,6 +109,168 @@ export function FontPanel({
       )}
     </Fragment>
   )
+}
+
+/**
+ * 폰트 폴더를 통째로 골라 없는 폰트를 한 번에 넣는다.
+ *
+ * 파일 선택창에 폴더 모드(webkitdirectory)가 있다 — 라이브러리 업로드 버튼에는 그 옵션이
+ * 없어 input 을 직접 둔다. 폴더 안 파일은 전부 이 컴퓨터에서만 읽힌다.
+ */
+function FolderScan({
+  missing,
+  stored,
+  disabled,
+  onNotice
+}: {
+  missing: FontUsage[]
+  stored: StoredFont[]
+  disabled: boolean
+  onNotice: (notice: Notice) => void
+}): JSX.Element {
+  const input = useRef<HTMLInputElement>(null)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+
+  async function scan(files: File[]): Promise<void> {
+    setProgress({ done: 0, total: 0 })
+    try {
+      const found = await findFontFiles(files, missing, (done, total) =>
+        setProgress({ done, total })
+      )
+
+      // 저장은 순서대로 쌓인다 — 한도(5MB) 계산에 방금 넣은 것까지 넣어야 한다
+      let have = stored
+      let saved = 0
+      let skipped = 0
+      for (const font of missing) {
+        const match = found.get(fontKey(font))
+        if (match === undefined) continue
+        const verdict = screenUpload(
+          match.bytes,
+          match.fileName,
+          match.probe,
+          match.facts,
+          font,
+          have
+        )
+        if (!verdict.ok) {
+          skipped += 1
+          continue
+        }
+        emit<FontSaveHandler>('font:save', verdict.save)
+        have = upsertFont(have, verdict.save.font)
+        saved += 1
+      }
+
+      if (found.size === 0) {
+        onNotice({ message: t('fonts.scanNone'), error: true })
+        return
+      }
+      onNotice({
+        message:
+          t('fonts.scanResult', { found: saved, missing: missing.length }) +
+          (skipped > 0 ? t('fonts.scanSkipped', { count: skipped }) : ''),
+        error: saved === 0
+      })
+    } finally {
+      setProgress(null)
+      if (input.current !== null) input.current.value = ''
+    }
+  }
+
+  return (
+    <Fragment>
+      <div class="rowBetween">
+        <Button
+          disabled={disabled || progress !== null}
+          onClick={() => input.current?.click()}
+          secondary
+        >
+          {t('fonts.scanFolder')}
+        </Button>
+        {progress === null ? null : (
+          <Text>
+            <Muted>{t('fonts.scanning', { current: progress.done, total: progress.total })}</Muted>
+          </Text>
+        )}
+      </div>
+      <VerticalSpace space="extraSmall" />
+      <Text>
+        <Muted>{t('fonts.scanHint')}</Muted>
+      </Text>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        hidden
+        {...{ webkitdirectory: '' }}
+        onChange={(event) => {
+          const list = (event.currentTarget as HTMLInputElement).files
+          if (list !== null && list.length > 0) void scan([...list])
+        }}
+      />
+    </Fragment>
+  )
+}
+
+type UploadVerdict =
+  | { ok: true; save: { font: StoredFont; bytes: Uint8Array }; notice?: Notice }
+  | { ok: false; notice: Notice }
+
+/**
+ * 파일 하나를 이 자리에 넣어도 되는가. 한 번 올리기와 폴더 스캔이 같은 문을 지난다.
+ *
+ * 파싱만 되면 통과시키면 안 된다 — OTF(CFF)는 텍스트 추출이 통째로 깨지고, 가변 폰트는
+ * 굵기가 조용히 틀린다 (src/lib/fontFile.ts). 굵기가 어긋나도 막지는 않는다 —
+ * 파일 이름표가 틀린 경우가 있다. 대신 알려 준다.
+ */
+function screenUpload(
+  bytes: Uint8Array,
+  fileName: string,
+  probe: FontProbe,
+  facts: FontFacts,
+  font: FontUsage,
+  all: readonly StoredFont[]
+): UploadVerdict {
+  const verdict = screenFontFile(facts)
+  if (!verdict.ok)
+    return { ok: false, notice: { message: formatReason(verdict.reason), error: true } }
+
+  if (!fitsWithin(all, font, bytes.length)) {
+    return {
+      ok: false,
+      notice: { message: t('fonts.storageFull', { size: formatBytes(bytes.length) }), error: true }
+    }
+  }
+
+  const mismatch = weightMismatch(facts, { weight: font.weight, italic: font.italic })
+  const notice: Notice | undefined = mismatch.differs
+    ? {
+        message: t('fontFile.weightMismatch', {
+          fileStyle: `${mismatch.fileWeight}${mismatch.fileItalic ? ' Italic' : ''}`,
+          slotStyle: font.style
+        }),
+        error: false
+      }
+    : undefined
+
+  return {
+    ok: true,
+    notice,
+    save: {
+      font: {
+        family: font.family,
+        style: font.style,
+        weight: font.weight,
+        italic: font.italic,
+        byteLength: bytes.length,
+        numGlyphs: probe.numGlyphs,
+        codePoints: probe.characterSet.length,
+        fileName
+      },
+      bytes
+    }
+  }
 }
 
 /**
@@ -216,10 +347,10 @@ function FontRow({
   onNotice
 }: {
   font: FontUsage
-  state: Availability
+  state: FontAvailability
   all: StoredFont[]
   disabled: boolean
-  onNotice: (notice: { message: string; error: boolean }) => void
+  onNotice: (notice: Notice) => void
 }): JSX.Element {
   async function handleFiles(files: File[]): Promise<void> {
     const file = files[0]
@@ -227,59 +358,21 @@ function FontRow({
 
     const bytes = new Uint8Array(await file.arrayBuffer())
 
-    let parsed
+    let probe: FontProbe
     try {
-      parsed = createProbe(bytes)
+      probe = createProbe(bytes)
     } catch {
-      onNotice({
-        message: t('fonts.parseError', { file: file.name }),
-        error: true
-      })
+      onNotice({ message: t('fonts.parseError', { file: file.name }), error: true })
       return
     }
 
-    // 파싱만 되면 통과시키면 안 된다 — OTF(CFF)는 텍스트 추출이 통째로 깨지고,
-    // 가변 폰트는 굵기가 조용히 틀린다. (src/lib/fontFile.ts)
-    const facts = factsOf(parsed)
-    const verdict = screenFontFile(facts)
+    const verdict = screenUpload(bytes, file.name, probe, factsOf(probe), font, all)
     if (!verdict.ok) {
-      onNotice({ message: formatReason(verdict.reason), error: true })
+      onNotice(verdict.notice)
       return
     }
-
-    if (!fitsWithin(all, font, bytes.length)) {
-      onNotice({
-        message: t('fonts.storageFull', { size: formatBytes(bytes.length) }),
-        error: true
-      })
-      return
-    }
-
-    // 굵기가 어긋나도 막지는 않는다 — 파일 이름표가 틀린 경우가 있다. 대신 알려 준다.
-    const mismatch = weightMismatch(facts, { weight: font.weight, italic: font.italic })
-    if (mismatch.differs) {
-      onNotice({
-        message: t('fontFile.weightMismatch', {
-          fileStyle: `${mismatch.fileWeight}${mismatch.fileItalic ? ' Italic' : ''}`,
-          slotStyle: font.style
-        }),
-        error: false
-      })
-    }
-
-    emit<FontSaveHandler>('font:save', {
-      font: {
-        family: font.family,
-        style: font.style,
-        weight: font.weight,
-        italic: font.italic,
-        byteLength: bytes.length,
-        numGlyphs: parsed.numGlyphs,
-        codePoints: parsed.characterSet.length,
-        fileName: file.name
-      },
-      bytes
-    })
+    if (verdict.notice !== undefined) onNotice(verdict.notice)
+    emit<FontSaveHandler>('font:save', verdict.save)
   }
 
   const detail =

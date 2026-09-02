@@ -16,7 +16,7 @@ describe('presetOf', () => {
 
   it('하나라도 다르면 custom', () => {
     expect(presetOf({ ...DEFAULT_SETTINGS, quality: 0.55 })).toBe('custom')
-    expect(presetOf({ ...DEFAULT_SETTINGS, maxEdge: 4096 })).toBe('custom')
+    expect(presetOf({ ...DEFAULT_SETTINGS, maxEdge: 3840 })).toBe('custom')
   })
 })
 

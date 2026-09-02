@@ -23,7 +23,7 @@ type Props = {
   onExclude: (id: string) => void
 }
 
-const ROW_HEIGHT = 44 // .frameRow 실측 높이(패딩 8 포함) — 드래그 인덱스 계산에 쓴다
+export const ROW_HEIGHT = 44 // .frameRow 실측 높이(패딩 8 포함) — 드래그 인덱스 계산에 쓴다
 const DRAG_THRESHOLD = 4 // px — 이보다 덜 움직이면 클릭으로 본다
 
 type DragState = {

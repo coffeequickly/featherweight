@@ -17,16 +17,20 @@ type Props = {
 export function PreviewPanel({ lines }: Props): JSX.Element {
   if (lines.length === 0) {
     return (
-      <Text>
-        <Muted>{t('preview.empty')}</Muted>
-      </Text>
+      <div>
+        <VerticalSpace space="small" />
+        <Text>
+          <Muted>{t('preview.empty')}</Muted>
+        </Text>
+      </div>
     )
   }
 
   return (
     <div>
+      <VerticalSpace space="small" />
       <Text>
-        <Muted>{t('previewHelp', { lines: lines.length })}</Muted>
+        <Muted>{t('preview.help', { lines: lines.length })}</Muted>
       </Text>
       <VerticalSpace space="small" />
       <div class="previewBody">

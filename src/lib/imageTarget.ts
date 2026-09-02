@@ -3,17 +3,10 @@
 // 핵심: 화면에 보이는 크기의 multiplier 배를 넘는 픽셀은 버린다.
 // 3000px 스크린샷을 600pt 박스에 넣어도 Figma 는 3000px 그대로 임베드한다.
 
-import { Settings } from './types'
+import { ImageUsage, Settings } from './types'
 
-/** 이미지 fill 을 쓰는 노드 하나 */
-export type ImageUsage = {
-  nodeId: string
-  imageHash: string
-  /** 노드의 표시 크기 (px) */
-  width: number
-  height: number
-  scaleMode: 'FILL' | 'FIT' | 'CROP' | 'TILE'
-}
+// ImageUsage 는 메인↔UI 메시지에도 실리므로 types.ts 에 산다. 계산 쪽 이름은 그대로 둔다.
+export type { ImageUsage } from './types'
 
 export type ImagePlan = {
   imageHash: string
@@ -140,36 +133,6 @@ export function planImageTargets(
   }
 
   return [...byHash.values()]
-}
-
-/**
- * 상한 눈금의 기준점. 사람들이 픽셀 수를 실감하는 단위는 "FHD 몇 배" 다 —
- * 2048 이 큰지 작은지는 몰라도 "FHD 보다 조금 큼" 은 바로 안다.
- */
-export const FHD_LONG_EDGE = 1920
-
-export type EdgeScale = {
-  /** 눈금 전체에서 이 상한이 차지하는 비율 (0~1) */
-  fill: number
-  /** 눈금 위 FHD 표시의 위치 (0~1) */
-  fhd: number
-  /** FHD 대비 배율. 1 이면 같다. */
-  ratio: number
-}
-
-/**
- * 상한을 눈금 위 위치로 바꾼다.
- *
- * 눈금은 선형이다 — 로그로 그리면 1024 와 4096 의 차이가 실제보다 작아 보인다.
- * 픽셀은 넓이로 체감되므로 오히려 과장되는 편이 맞다.
- */
-export function edgeScale(maxEdge: number, widest: number): EdgeScale {
-  const span = Math.max(widest, 1)
-  return {
-    fill: Math.min(1, maxEdge / span),
-    fhd: Math.min(1, FHD_LONG_EDGE / span),
-    ratio: maxEdge / FHD_LONG_EDGE
-  }
 }
 
 /** 원본이 이미 목표보다 작으면 키우지 않는다. */

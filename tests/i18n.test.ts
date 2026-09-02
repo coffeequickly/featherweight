@@ -121,6 +121,7 @@ describe('사전 무결성', () => {
     fileStyle: '400',
     first: 'Nexa Heavy',
     minEdge: 640,
+    frame: 1920,
     rest: 2,
     percent: 53,
     times: 2.1,
@@ -131,7 +132,15 @@ describe('사전 무결성', () => {
     why: 'w',
     message: 'm',
     names: 'Nexa Heavy',
-    current: 2
+    current: 2,
+    shrink: 1,
+    fhd: 'same as FHD',
+    found: 1,
+    more: 1,
+    auto: 2,
+    version: '2.0.0',
+    wanted: 2880,
+    effective: 1920
   }
 
   it('모든 키가 양 언어에서 비지 않은 문장을 준다', () => {

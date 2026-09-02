@@ -5,13 +5,12 @@ import {
   fitsWithin,
   fontStorageKey,
   formatBytes,
-  missingFonts,
   remainingBytes,
   removeFont,
   upsertFont,
   usedBytes
 } from '../src/lib/fontStore'
-import { CLIENT_STORAGE_LIMIT, FontUsage, StoredFont } from '../src/lib/types'
+import { CLIENT_STORAGE_LIMIT, StoredFont } from '../src/lib/types'
 
 function stored(family: string, style: string, weight: number, byteLength: number): StoredFont {
   return {
@@ -24,10 +23,6 @@ function stored(family: string, style: string, weight: number, byteLength: numbe
     codePoints: 2913,
     fileName: `${family}-${style}.ttf`
   }
-}
-
-function usage(family: string, style: string, weight: number): FontUsage {
-  return { family, style, weight, italic: false, nodeCount: 1, charCount: 10 }
 }
 
 const MB = 1024 * 1024
@@ -103,22 +98,6 @@ describe('fitsWithin', () => {
     const fonts = [stored('P', 'Regular', 400, 4 * MB)]
     expect(fitsWithin(fonts, { family: 'P', style: 'Regular' }, 4 * MB)).toBe(true)
     expect(fitsWithin(fonts, { family: 'P', style: 'Bold' }, 4 * MB)).toBe(false)
-  })
-})
-
-describe('missingFonts', () => {
-  it('보관되지 않은 폰트만 남긴다', () => {
-    const usages = [
-      usage('Pretendard Variable', 'Regular', 400),
-      usage('Pretendard Variable', 'Bold', 700)
-    ]
-    const have = [stored('Pretendard Variable', 'Regular', 400, 1)]
-    expect(missingFonts(usages, have).map((f) => f.style)).toEqual(['Bold'])
-  })
-
-  it('전부 있으면 빈 배열', () => {
-    const usages = [usage('P', 'Regular', 400)]
-    expect(missingFonts(usages, [stored('P', 'Regular', 400, 1)])).toEqual([])
   })
 })
 

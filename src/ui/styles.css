@@ -1,4 +1,4 @@
-/* 380px 폭에서 넘치지 않게 하는 게 이 파일의 목적이다.
+/* 400px 폭에서 넘치지 않게 하는 게 이 파일의 목적이다.
    Figma 컴포넌트가 못 잡아 주는 부분만 최소로 손댄다. */
 
 /* create-figma-plugin 기본은 Inter(라틴) 기준이다.
@@ -28,6 +28,407 @@
   gap: 8px;
 }
 
+.rowEnd {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 리포트 사유·칩·행 — 클릭하면 어딘가로 간다 */
+.clickable {
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.clickable:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+/* ── 세로 3단 레이아웃: 헤더·푸터 고정, 가운데만 스크롤 ── */
+
+.appRoot {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* 맨 위 한 줄. 메인은 이름·버전, 하위 화면은 "‹ 제목" — 이동 규칙은 이것 하나다 */
+.appHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--figma-color-border);
+}
+
+/* IconButton 은 32px 상자다 — 화살표가 본문 16px 그리드에 오게 당긴다 */
+.headerBack {
+  margin-left: -8px;
+}
+
+.headerTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.headerTitle * {
+  font-weight: 600;
+}
+
+.headerAction {
+  flex: 0 0 auto;
+  padding: 3px 4px;
+  margin-right: -4px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--figma-color-text-brand, #007be5);
+}
+
+.headerAction:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.headerAction * {
+  color: inherit;
+}
+
+.headerActionDisabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.appFooter {
+  flex: 0 0 auto;
+  padding: 0 16px;
+}
+
+/* 헤더·푸터에 내용이 딱 붙으면 답답하다 — 스크롤 영역 자체에 숨통을 준다 */
+.appScroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 6px 16px 14px;
+}
+
+/* ── 프리셋 바 ─────────────────────────────── */
+
+/* 프리셋 타일 넷. 정사각에 가깝게 — 아이콘·이름·한 줄 설명이 세로로 쌓인다 */
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.presetTile {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 8px;
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
+  font: 11px/16px var(--font-family);
+  cursor: pointer;
+  /* 브라우저 버튼 기본값을 지운다 */
+  margin: 0;
+  outline: 0;
+}
+
+.presetTile svg {
+  color: var(--figma-color-icon-secondary);
+  margin-bottom: 2px;
+}
+
+.presetTile:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.presetTile:focus-visible {
+  box-shadow: 0 0 0 2px var(--figma-color-border-brand-strong, var(--figma-color-bg-brand));
+}
+
+.presetTile:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 고른 타일 — 파란 테두리를 두 겹으로 굵히고 옅은 파란 바탕 */
+.presetTileOn {
+  border-color: var(--figma-color-border-brand, var(--figma-color-text-brand, #007be5));
+  box-shadow: inset 0 0 0 1px var(--figma-color-border-brand, var(--figma-color-text-brand, #007be5));
+  background: var(--figma-color-bg-brand-tertiary, #e5f4ff);
+}
+
+.presetTileOn svg,
+.presetTileOn .presetTileName {
+  color: var(--figma-color-text-brand, #007be5);
+}
+
+.presetTileName {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.presetTileTag {
+  font-size: 10px;
+  line-height: 13px;
+  color: var(--figma-color-text-secondary);
+  white-space: nowrap;
+}
+
+/* 칸 아래 한 줄. 값 칩·목표 용량 입력·되돌리기가 전부 여기 든다.
+   입력칸(28px)이 있는 상태와 칩(22px)만 있는 상태의 높이가 같아야 아래가 안 움직인다 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  margin-top: 8px;
+}
+
+/* 목표 용량: "파일 크기 [−] 5 [+] MB 이하" */
+.fitField {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ± 스테퍼. 입력칸과 버튼이 한 덩어리로 보이게 테두리 하나 안에 둔다 */
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  height: 24px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--figma-color-bg);
+}
+
+.stepBtn {
+  width: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--figma-color-bg-secondary);
+  color: var(--figma-color-text);
+  font: 14px/22px var(--font-family);
+  cursor: pointer;
+}
+
+.stepBtn:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.stepBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stepInput {
+  width: 44px;
+  border: 0;
+  padding: 0;
+  text-align: center;
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
+  font: 11px/22px var(--font-family);
+  font-variant-numeric: tabular-nums;
+  outline: 0;
+}
+
+.stepInput:disabled {
+  color: var(--figma-color-text-disabled);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px 0 7px;
+  border-radius: 11px;
+  /* 회색 채움은 흰 바탕에서 거의 안 뜬다 — 테두리가 형태를 잡는다 */
+  border: 1px solid var(--figma-color-border);
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
+  font: 11px/20px var(--font-family);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.chip svg {
+  color: var(--figma-color-text-secondary);
+  flex: none;
+}
+
+.chipAuto {
+  color: var(--figma-color-text-secondary);
+}
+
+/* 눌리는 칩 — 직접 상태의 되돌리기 */
+.chipLink {
+  cursor: pointer;
+  border-color: var(--figma-color-border-brand, var(--figma-color-text-brand, #007be5));
+  color: var(--figma-color-text-brand, #007be5);
+}
+
+.chipLink svg {
+  color: inherit;
+}
+
+.chipLink:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.chipDisabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── 내보내기 전 체크리스트 ────────────────── */
+
+.checklist {
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 8px 10px 12px;
+}
+
+.checkRow + .checkRow {
+  border-top: 1px solid var(--figma-color-border);
+}
+
+/* 경고 줄은 옅은 띠를 깐다 — 주황 글자만으로는 탁해서 "문제" 로 안 읽혔다.
+   Figma 의 경고 3차 배경이라 다크에서도 같은 뜻으로 나온다. */
+.checkWarn {
+  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
+}
+
+/* 갈 곳이 있는 줄은 줄 전체가 눌린다 */
+.checkLink {
+  cursor: pointer;
+}
+
+.checkLink:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.checkWarn.checkLink:hover {
+  background: var(--figma-color-bg-warning-secondary, var(--figma-color-bg-warning-tertiary, #fff1c2));
+  filter: brightness(0.97);
+}
+
+/* 아이콘은 첫 줄 글자 높이(18px)에 맞춰 세로 가운데 */
+.checkIcon {
+  flex: 0 0 16px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  color: var(--figma-color-icon-success, #14ae5c);
+}
+
+/* Figma 의 경고 아이콘색은 노랑(#ffcd29)이라 노란 띠 위에서 묻힌다 — 글자와 같은 앰버로 */
+.checkWarn .checkIcon {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.checkIcon svg {
+  display: block;
+  fill: currentColor;
+}
+
+.checkBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.checkHead * {
+  font-weight: 600;
+}
+
+.checkWarn .checkHead * {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+/* 오른쪽 끝 "폰트 지정 ›" — 이 줄의 할 일.
+   평소엔 회색이다: 경고 줄에 주황·파랑이 같이 있으면 시선이 두 번 튄다.
+   줄에 마우스를 올리면 파랗게 — 그때는 누르려는 중이다. */
+.checkAction {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  height: 18px;
+  padding-left: 4px;
+  white-space: nowrap;
+  color: var(--figma-color-text-secondary);
+}
+
+.checkLink:hover .checkAction {
+  color: var(--figma-color-text-brand, #007be5);
+}
+
+.checkAction * {
+  color: inherit;
+}
+
+.checkAction svg {
+  fill: currentColor;
+  margin-right: -2px;
+}
+
+/* 아무것도 선택하지 않았을 때 체크리스트 자리에 */
+.emptyCard {
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+  padding: 14px 12px;
+}
+
+/* 푸터: 톱니 + 내보내기 버튼 한 줄 */
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footerGear {
+  flex: 0 0 auto;
+  margin-left: -8px;
+}
+
+.footerGear svg {
+  color: var(--figma-color-icon-secondary);
+}
+
+.footerMain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 배율·상한 관계 그림 — 설정 화면 맨 위 */
+.sizeDiagram {
+  padding: 8px 12px 10px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+}
+
+/* 설정 화면 맨 아래 — 메인에서 헤더를 뺐으니 버전은 여기 */
+.aboutLine {
+  margin-top: 24px;
+  text-align: center;
+}
+
 /* ── 프레임 목록 ───────────────────────────── */
 
 .frameRow {
@@ -39,10 +440,19 @@
   padding: 8px;
   margin: 0 -8px;
   border-radius: 6px;
+  position: relative;
+  transition: transform 0.12s ease;
 }
 
 .frameRow:hover {
   background: var(--figma-color-bg-hover);
+}
+
+.frameRowDragging {
+  transition: none;
+  z-index: 2;
+  background: var(--figma-color-bg-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .frameIndex {
@@ -72,9 +482,29 @@
   align-items: center;
 }
 
+/* 행 왼쪽(썸네일·이름)은 클릭하면 캔버스로, 끌면 순서 변경 */
+.frameMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.frameRowDragging .frameMain {
+  cursor: grabbing;
+}
+
 .emptyState {
   padding: 28px 0;
   text-align: center;
+}
+
+.excludedRow {
+  padding: 2px 0;
 }
 
 /* ── 폰트 ─────────────────────────────────── */
@@ -105,31 +535,144 @@
   gap: 2px;
 }
 
-/* ── 설정 ─────────────────────────────────── */
-
-.settingRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 28px;
+.pathChip {
+  /* create-figma-plugin 의 Text 컴포넌트는 자체적으로 pointer-events: none 이다 —
+     Text 안에 중첩된 클릭 요소는 이 속성이 상속돼 클릭이 그대로 통과해버린다.
+     명시적으로 되돌린다. (실측: 이 한 줄이 없으면 클릭이 조용히 아무 반응도 없다) */
+  pointer-events: auto;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  user-select: text;
 }
 
-/* 라벨이 세로로 쪼개지던 문제: 폭 고정 + 줄바꿈 금지 */
-.settingLabel {
-  flex: 0 0 60px;
+/* ── 설정 ─────────────────────────────────── */
+
+/* 라벨 위, 컨트롤 아래. 라벨을 옆에 두면 5칸짜리 상한이 좁아진다 */
+.field + .field {
+  margin-top: 10px;
+}
+
+.fieldLabel {
+  margin-bottom: 5px;
+}
+
+/* 라벨 앞 아이콘 — 메인 화면의 값 칩과 같은 그림 */
+.labelGlyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* "하나를 고른다" 버튼 묶음 — 메인의 프리셋 타일과 같은 문법, 낮은 키 */
+.choiceRow {
+  display: grid;
+  gap: 6px;
+}
+
+.choiceRowCompact {
+  display: inline-flex;
+}
+
+.choiceBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 30px;
+  margin: 0;
+  padding: 5px 6px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
+  font: 11px/16px var(--font-family);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  outline: 0;
   white-space: nowrap;
 }
 
-.settingControl {
+.choiceRowCompact .choiceBtn {
+  padding: 0 10px;
+  min-height: 28px;
+}
+
+.choiceBtn:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.choiceBtn:focus-visible {
+  box-shadow: 0 0 0 2px var(--figma-color-border-brand-strong, var(--figma-color-bg-brand));
+}
+
+.choiceBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.choiceBtnOn {
+  border-color: var(--figma-color-border-brand, var(--figma-color-text-brand, #007be5));
+  box-shadow: inset 0 0 0 1px var(--figma-color-border-brand, var(--figma-color-text-brand, #007be5));
+  background: var(--figma-color-bg-brand-tertiary, #e5f4ff);
+  color: var(--figma-color-text-brand, #007be5);
+}
+
+.choiceLabel {
+  font-weight: 600;
+}
+
+.choiceTag {
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--figma-color-text-secondary);
+}
+
+.choiceBtnOn .choiceTag {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* 품질 슬라이더 + 오른쪽 값 */
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sliderTrack {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.settingValue {
-  flex: 0 0 30px;
+.sliderValue {
+  flex: 0 0 34px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* 설정 섹션. 컨트롤 일곱 개가 설명 하나를 나눠 쓰면 각각이 뭘 하는지 알 수 없다 —
+   묶고, 이름을 붙이고, 지금 값이 무슨 뜻인지 아래에 한 줄로 적는다. */
+.section {
+  padding-top: 10px;
+}
+
+.section + .section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--figma-color-border);
+}
+
+.sectionTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* 그 섹션의 지금 값이 무슨 뜻인지 — 컨트롤 바로 아래 붙는다 */
+.sectionSays {
+  margin-top: 8px;
+}
+
 
 /* ── 결과 ─────────────────────────────────── */
 
@@ -149,6 +692,11 @@
   overflow-y: auto;
 }
 
+/* 아웃라인 텍스트 화면은 그 목록이 화면의 전부다 — 잘라 둘 이유가 없다 */
+.reasonListTall {
+  max-height: none;
+}
+
 /* 음수 마진 트릭은 스크롤 높이 계산을 흐트러뜨려 1줄짜리에도 스크롤바를 만든다.
    디센더 여유는 전역 줄높이(18px)가 이미 준다. */
 .reasonItem {
@@ -159,40 +707,13 @@
   white-space: nowrap;
 }
 
-.versionLine {
-  text-align: right;
+/* 목표를 못 맞췄을 때 — 실패가 아니라 "여기가 하한이다" 라는 안내다 */
+.reportWarn {
+  color: var(--figma-color-text-warning, #b86200);
 }
 
-/* 행 왼쪽(썸네일·이름)은 클릭하면 캔버스로, 끌면 순서 변경 */
-.frameMain {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 auto;
-  min-width: 0;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.frameRow {
-  position: relative;
-  transition: transform 0.12s ease;
-}
-
-.frameRowDragging {
-  transition: none;
-  z-index: 2;
-  background: var(--figma-color-bg-hover);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
-
-.frameRowDragging .frameMain {
-  cursor: grabbing;
-}
-
-.excludedRow {
-  padding: 2px 0;
+.reportWarn * {
+  color: inherit;
 }
 
 /* ── 진행 바 ──────────────────────────────── */
@@ -211,186 +732,10 @@
   transition: width 0.2s ease;
 }
 
-/* ── 리포트 사유 — 클릭하면 캔버스에서 찾아간다 ── */
-
-.clickable {
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-.clickable:hover {
-  background: var(--figma-color-bg-hover);
-}
-
-/* ── 세로 3단 레이아웃: 헤더·푸터 고정, 가운데만 스크롤 ── */
-
-.appRoot {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.appHeader,
-.appFooter {
-  flex: 0 0 auto;
-  padding: 0 16px;
-}
-
-/* 탭 바·푸터에 내용이 딱 붙으면 답답하다 — 스크롤 영역 자체에 숨통을 준다 */
-.appScroll {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 6px 16px 14px;
-}
-
-.rowEnd {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* 탭 텍스트를 본문 16px 그리드에 맞추고, 탭 자체 보더를 창 끝까지 편다 */
-.tabsBar {
-  margin: 0 -16px;
-}
-
-/* 파일 없는 폰트 경고 — 배경 있는 배너로 클릭 영역을 분명하게. 클릭하면 폰트 탭으로 */
-/* 빠진 폰트 경고.
-   한 줄로 묶으면 CSS 가 줄 끝을 잘라서 "폰트 탭에서 넣기" 라는 할 일이 먼저 사라진다 —
-   이름은 남고 행동만 없어지는 최악의 잘림이다. 두 줄까지 허용하고, 그래도 넘치면
-   그때 자른다. 이름 자체는 summarizeMissing 이 미리 줄여 둔다. */
-.missingLine {
-  color: var(--figma-color-text-warning, #b45309);
-  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
-  border-radius: 6px;
-  padding: 8px 10px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.missingLine:hover {
-  filter: brightness(1.05);
-}
-
-.missingLine * {
-  color: inherit;
-}
-
-/* 탭 픽토그램. Tabs 컴포넌트는 라벨 문자열만 받아 슬롯이 없다 — ::before 에 마스크로
-   얹으면 currentColor 를 따라가므로 선택·호버 색이 저절로 맞는다.
-   모양은 glyphs.tsx 의 것과 같게 유지한다. */
-.tabsBar label > div {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.tabsBar label > div::before {
-  content: '';
-  width: 12px;
-  height: 12px;
-  flex: none;
-  background-color: currentColor;
-  -webkit-mask: var(--tabGlyph) center / contain no-repeat;
-  mask: var(--tabGlyph) center / contain no-repeat;
-}
-
-/* export */
-.tabsBar label:nth-of-type(1) > div {
-  --tabGlyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v12'/%3E%3Cpath d='M7 11l5 5 5-5'/%3E%3Cpath d='M4 21h16'/%3E%3C/svg%3E");
-}
-
-/* images */
-.tabsBar label:nth-of-type(2) > div {
-  --tabGlyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5' fill='black' stroke='none'/%3E%3Cpath d='M21 15l-5-5L5 21'/%3E%3C/svg%3E");
-}
-
-/* fonts */
-.tabsBar label:nth-of-type(3) > div {
-  --tabGlyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20L12 4l8 16'/%3E%3Cpath d='M7 14h10'/%3E%3C/svg%3E");
-}
-
-/* preview */
-.tabsBar label:nth-of-type(4) > div {
-  --tabGlyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M4 17h9'/%3E%3C/svg%3E");
-}
-
-/* 프리셋 세그먼트에 아이콘을 넣으면 라이브러리의 .text 래퍼(패딩)를 안 거친다 —
-   여기서 직접 준다. 4칸이라 가로가 빠듯해 패딩을 한 단계 줄였다. */
-.segItem {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  white-space: nowrap;
-}
-
-/* 설정 섹션. 컨트롤 일곱 개가 설명 하나를 나눠 쓰면 각각이 뭘 하는지 알 수 없다 —
-   묶고, 이름을 붙이고, 지금 값이 무슨 뜻인지 아래에 한 줄로 적는다. */
-.section + .section {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--figma-color-border);
-}
-
-.sectionTitle {
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-/* 그 섹션의 지금 값이 무슨 뜻인지 — 컨트롤 바로 아래 붙는다 */
-.sectionSays {
-  margin-top: 8px;
-}
-
-/* 상한 크기 비교 그림.
-   막대로 그렸더니 바로 아래 품질 슬라이더와 똑같이 보여서 끌 수 있는 줄 안다.
-   같은 모서리에서 겹친 두 사각형이면 크기 비교로만 읽히고 조작으로는 안 읽힌다. */
-.edgeBox {
-  position: relative;
-  width: 64px;
-  height: 36px;
-  flex: 0 0 auto;
-}
-
-/* 고른 상한 — 채워서 '내 것' 임을 말한다 */
-.edgeBoxMine {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  background: var(--figma-color-text-secondary);
-  opacity: 0.35;
-  border-radius: 1px;
-}
-
-/* FHD 기준선 — 테두리만. 채운 것이 이 선을 넘으면 FHD 보다 크다 */
-.edgeBoxFhd {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  /* 점선이라야 '기준' 으로 읽힌다. 상한이 FHD 와 가까우면 두 사각형이 거의
-     겹치는데, 실선이면 그냥 한 덩어리로 보인다. */
-  border: 1px dashed var(--figma-color-text-secondary);
-  border-radius: 1px;
-}
-
-.edgeScaleRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* 파서 미리보기 — 결과 카드 안에서 접었다 편다 */
-.previewCard {
-  margin-top: 8px;
-  padding: 10px;
-  border: 1px solid var(--figma-color-border);
-  border-radius: 6px;
-}
+/* ── 텍스트 확인 ──────────────────────────── */
 
 .previewBody {
-  max-height: 220px;
+  max-height: 340px;
   overflow-y: auto;
   background: var(--figma-color-bg-secondary);
   border-radius: 4px;
@@ -401,48 +746,18 @@
   margin-top: 4px;
 }
 
-/* 목표 용량 입력칸. 두세 자리 숫자에 한 줄을 다 내주면 무엇을 넣으라는 건지 흐려진다 */
-.targetInput {
-  flex: 0 0 92px;
-}
 
-/* 목표를 못 맞췄을 때 — 실패가 아니라 "여기가 하한이다" 라는 안내다 */
-.reportWarn {
-  color: var(--figma-color-text-warning, #b45309);
-}
 
-.reportWarn * {
-  color: inherit;
-}
-
-.pathChip {
-  /* create-figma-plugin 의 Text 컴포넌트는 자체적으로 pointer-events: none 이다 —
-     Text 안에 중첩된 클릭 요소는 이 속성이 상속돼 클릭이 그대로 통과해버린다.
-     명시적으로 되돌린다. (실측: 이 한 줄이 없으면 클릭이 조용히 아무 반응도 없다) */
-  pointer-events: auto;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  user-select: text;
-}
-
-/* 상단 요약 — 픽토그램 + 문구 칩, 클릭하면 해당 탭 */
-.summaryRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.summaryChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 6px;
-  margin-left: -6px;
-  border-radius: 4px;
-  /* 픽토그램이 currentColor 를 따르므로 여기서 정한다 — 옆 글자(Muted)와 같은 톤 */
+/* 체크리스트 설명 줄 — 영문은 한 줄에 안 들어온다. 두 줄까지 허용하고 그 뒤를 자른다.
+   Text 컴포넌트를 안 쓴다: 그 안쪽 상자에 클램프를 걸면 첫 줄 위가 잘리고,
+   바깥에 걸면 줄 사이가 벌어졌다. 글꼴·색만 Muted 와 같게 맞춘다. */
+.checkDetail {
+  margin-top: 1px;
+  font: 11px/16px var(--font-family);
   color: var(--figma-color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.summaryChip + .summaryChip {
-  margin-left: 0;
-}

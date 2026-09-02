@@ -1,10 +1,9 @@
 // 화면에서 쓰는 픽토그램을 한곳에 모은다.
 //
 // 규칙: viewBox 24 를 12px 로 그린다(= 화면에서 1px 스트로크), 색은 currentColor 를
-// 따라간다. 요약 칩·탭·프리셋이 같은 굵기로 보이려면 이 셋이 어긋나면 안 된다.
-//
-// 탭 아이콘은 여기 없다 — Tabs 컴포넌트가 라벨 문자열만 받아서 슬롯이 없고,
-// styles.css 에서 마스크로 얹는다. 모양은 여기 것과 같게 유지한다.
+// 따라간다. 프리셋 칸·값 칩·설정 라벨이 같은 굵기로 보이려면 이 셋이 어긋나면 안 된다.
+// 같은 뜻은 어디서나 같은 그림이다 — 칩에서 본 아이콘을 설정 라벨에서 다시 만나야
+// 칩만 보고도 무슨 값인지 읽힌다.
 
 import { JSX } from 'preact'
 
@@ -27,7 +26,7 @@ function Glyph({ size = 12, children }: GlyphProps & { children: JSX.Element }):
   )
 }
 
-/** 이미지 — 산과 해가 있는 액자 */
+/** 품질(JPEG) — 산과 해가 있는 액자 */
 export function ImageGlyph({ size }: GlyphProps = {}): JSX.Element {
   return (
     <Glyph size={size}>
@@ -40,14 +39,20 @@ export function ImageGlyph({ size }: GlyphProps = {}): JSX.Element {
   )
 }
 
-/** 폰트 — 대문자 A */
-export function TypeGlyph({ size }: GlyphProps = {}): JSX.Element {
+/** 배율 — 양쪽 귀퉁이로 벌어지는 화살표. "보이는 크기의 몇 배까지" */
+export function ScaleGlyph({ size }: GlyphProps = {}): JSX.Element {
   return (
     <Glyph size={size}>
-      <g>
-        <path d="M4 20L12 4l8 16" />
-        <path d="M7 14h10" />
-      </g>
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </Glyph>
+  )
+}
+
+/** 상한 — 양 끝이 막힌 가로선. "긴 변이 여기까지" */
+export function EdgeGlyph({ size }: GlyphProps = {}): JSX.Element {
+  return (
+    <Glyph size={size}>
+      <path d="M3 12h18M3 7v10M21 7v10" />
     </Glyph>
   )
 }
@@ -84,6 +89,18 @@ export function CompressGlyph({ size }: GlyphProps = {}): JSX.Element {
       <g>
         <path d="M5 6l7 3 7-3" />
         <path d="M5 18l7-3 7 3" />
+      </g>
+    </Glyph>
+  )
+}
+
+/** 되돌리기 — 반시계 화살표. 직접 만진 숫자를 프리셋으로 */
+export function ResetGlyph({ size }: GlyphProps = {}): JSX.Element {
+  return (
+    <Glyph size={size}>
+      <g>
+        <path d="M3 4v6h6" />
+        <path d="M5.5 15a8 8 0 1 0 1.9-8.3L3 10" />
       </g>
     </Glyph>
   )

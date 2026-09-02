@@ -4,29 +4,21 @@
 
 import {
   ImagePlan,
-  ImageUsage,
   KEEP_BYTES_FLOOR,
   planImageTargets,
   skipFloor,
   settleDelayMs,
   transformScale
 } from '../lib/imageTarget'
-import { Reason } from '../lib/types'
+import {
+  ImageUsage,
+  Reason,
+  ResizeRequestPayload,
+  ResizeResultPayload,
+  Settings
+} from '../lib/types'
 import { withTimeout } from '../lib/withTimeout'
-import { Settings } from '../lib/types'
 import { awaitResponse, nextRequestId } from './bridge'
-
-export type ResizeResponse =
-  | {
-      reqId: string
-      ok: true
-      bytes: Uint8Array
-      mime: string
-      width: number
-      height: number
-      changed: boolean
-    }
-  | { reqId: string; ok: false; reason: string }
 
 export type ImageStats = {
   processed: number
@@ -57,15 +49,8 @@ export function forgetSeenImages(): void {
   seenImages.clear()
 }
 
-export type ImageRequestSender = (payload: {
-  reqId: string
-  bytes: Uint8Array
-  targetLongEdge: number
-  quality: number
-  reencodeOpaquePng: boolean
-  /** UI 가 목표 용량 탐색용으로 원본을 캐시하는 키 */
-  imageHash?: string
-}) => void
+/** 리사이즈 요청을 UI 로 보내는 통로 — 메시지 모양은 types.ts 의 것 하나뿐이다 */
+export type ImageRequestSender = (payload: ResizeRequestPayload) => void
 
 type FillsNode = SceneNode & { fills: readonly Paint[] | typeof figma.mixed }
 
@@ -76,7 +61,6 @@ function hasFills(node: SceneNode): node is FillsNode {
 /** 새로 만든 이미지가 그릴 수 있는 상태가 되기를 기다리는 한도 */
 const READY_TIMEOUT_MS = 20_000
 
-/** 클론 전체에서 이미지 fill 을 쓰는 자리를 모은다. */
 /**
  * 탐색용: 이 프로필로 처리한다면 각 이미지의 목표 크기가 얼마인지.
  * 실제 처리는 하지 않는다 — UI 가 바이트만 재보게 넘길 목록이다.
@@ -92,28 +76,40 @@ export function planFor(
   })
 }
 
+/**
+ * 이 노드 하나가 쓰는 이미지 fill 들. 선택 시점의 예고(selection.ts)와 export 가
+ * 같은 눈으로 봐야 "줄임 예정" 과 실제 결과가 어긋나지 않는다.
+ */
+export function imageUsagesOf(node: SceneNode): ImageUsage[] {
+  if (!hasFills(node) || !Array.isArray(node.fills)) return []
+
+  const usages: ImageUsage[] = []
+  let scale: { x: number; y: number } | null = null
+
+  for (const paint of node.fills) {
+    if (paint.type !== 'IMAGE' || paint.visible === false) continue
+    if (paint.imageHash === null) continue
+    // 부모가 확대·축소돼 있으면 node.width 는 화면 크기가 아니다 — 배율을 곱한다
+    scale ??= transformScale(node.absoluteTransform)
+    usages.push({
+      nodeId: node.id,
+      imageHash: paint.imageHash,
+      width: node.width * scale.x,
+      height: node.height * scale.y,
+      scaleMode: paint.scaleMode
+    })
+  }
+
+  return usages
+}
+
+/** 클론 전체에서 이미지 fill 을 쓰는 자리를 모은다. */
 export function collectImageUsages(root: SceneNode): ImageUsage[] {
   const usages: ImageUsage[] = []
 
   const visit = (node: SceneNode): void => {
     if (node.visible === false) return
-
-    if (hasFills(node) && Array.isArray(node.fills)) {
-      for (const paint of node.fills) {
-        if (paint.type !== 'IMAGE' || paint.visible === false) continue
-        if (paint.imageHash === null) continue
-        // 부모가 확대·축소돼 있으면 node.width 는 화면 크기가 아니다 — 배율을 곱한다
-        const scale = transformScale(node.absoluteTransform)
-        usages.push({
-          nodeId: node.id,
-          imageHash: paint.imageHash,
-          width: node.width * scale.x,
-          height: node.height * scale.y,
-          scaleMode: paint.scaleMode
-        })
-      }
-    }
-
+    usages.push(...imageUsagesOf(node))
     if ('children' in node) {
       for (const child of node.children) visit(child)
     }
@@ -218,7 +214,7 @@ async function shrinkOne(
   stats.bytesBefore += original.length
 
   const reqId = nextRequestId('img')
-  const promise = awaitResponse<ResizeResponse>(reqId)
+  const promise = awaitResponse<ResizeResultPayload>(reqId)
   send({
     reqId,
     bytes: original,

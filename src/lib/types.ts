@@ -22,7 +22,8 @@ export type Settings = {
   version: 2
   quality: number // 0.5–1.0
   multiplier: 1 | 1.5 | 2
-  maxEdge: 1024 | 1600 | 1920 | 2048 | 4096
+  /** 긴 변 상한 — HD · FHD · QHD · 4K. 옛 값(1024·1600·2048·4096)은 settingsOptions.snapSettings 가 옮긴다 */
+  maxEdge: 1280 | 1920 | 2560 | 3840
   /** 원본이 이 픽셀 이하면 아예 손대지 않는다 — 로고·아이콘을 지키는 절대 하한 */
   minEdge: 640 | 1024 | 1600
   reencodeOpaquePng: boolean
@@ -38,7 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   version: 2,
   quality: 0.8,
   multiplier: 1.5,
-  maxEdge: 2048,
+  maxEdge: 1920,
   minEdge: 640,
   reencodeOpaquePng: true,
   embedText: true,
@@ -67,12 +68,14 @@ export type FontRef = { family: string; style: string }
 /** 트리를 걸으며 모은 원자료 (TextNode 세그먼트 1개) */
 export type RawFontSegment = FontRef & { nodeId: string; charCount: number }
 
-/** family+style 로 합친 결과. UI 폰트 목록과 fonts.json 초안에 쓴다. */
+/** family+style 로 합친 결과. UI 폰트 목록과 체크리스트에 쓴다. */
 export type FontUsage = FontRef & {
   weight: number
   italic: boolean
   nodeCount: number
   charCount: number
+  /** 이 폰트를 쓰는 텍스트 노드들 — 폰트가 없으면 이 노드들이 아웃라인으로 나간다 */
+  nodeIds: string[]
 }
 
 export type TextSegment = {
@@ -143,6 +146,53 @@ export interface SelectionHandler extends EventHandler {
 export interface FontsHandler extends EventHandler {
   name: 'fonts'
   handler: (items: FontUsage[]) => void
+}
+
+/**
+ * 썸네일은 목록보다 늦게 온다. 프레임마다 exportAsync 를 기다렸다가 목록을 보내면
+ * 30장짜리 선택에서 몇 초 동안 빈 화면이 된다 — 목록을 먼저 보내고 그림은 따라 붙인다.
+ */
+export interface FrameThumbsHandler extends EventHandler {
+  name: 'frames:thumbs'
+  handler: (thumbs: Array<{ id: string; thumb: Uint8Array }>) => void
+}
+
+/** 이미지 fill 을 쓰는 노드 하나 — 표시 크기는 부모 배율까지 곱한 렌더 기준이다 */
+export type ImageUsage = {
+  nodeId: string
+  imageHash: string
+  /** 노드의 표시 크기 (px) */
+  width: number
+  height: number
+  scaleMode: 'FILL' | 'FIT' | 'CROP' | 'TILE'
+}
+
+export type PreflightFrame = {
+  id: string
+  /** 렌더 기준 긴 변(px) — 건너뛸 기준선(skipFloor)을 셈하는 데 쓴다 */
+  longEdge: number
+  images: ImageUsage[]
+}
+
+/** 구조 때문에 진짜 폰트로 못 넣는 텍스트 — 선·효과·그라데이션 등. 폰트 유무는 따로 본다. */
+export type TextReject = { nodeId: string; name: string; reason: Reason }
+
+/**
+ * 선택 시점에 미리 본 것 — 내보내기 전 체크리스트의 재료.
+ *
+ * 설정(배율·상한·하한)에 따라 달라지는 판단은 UI 가 한다. 메인은 설정을 모르는 사실만
+ * 보낸다 — 그래야 설정을 바꿀 때마다 메인을 다시 부르지 않는다.
+ */
+export type Preflight = {
+  frames: PreflightFrame[]
+  /** 이미지 해시 → 원본 긴 변(px). 크기를 못 읽은 이미지는 빠진다. */
+  imageEdges: Record<string, number>
+  textRejects: TextReject[]
+}
+
+export interface PreflightHandler extends EventHandler {
+  name: 'preflight'
+  handler: (preflight: Preflight) => void
 }
 
 export type ExportRequest = { order: string[]; settings: Settings; fileName: string }

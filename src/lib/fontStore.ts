@@ -2,7 +2,7 @@
 // 폰트 바이트를 번들에 굽지 않고 clientStorage 에 두면 UI 번들이 3.3MB 안 늘어난다.
 // 대신 플러그인당 5MB 한도 안에서 관리해야 한다. (S8)
 
-import { CLIENT_STORAGE_LIMIT, FontRef, FontUsage, StoredFont } from './types'
+import { CLIENT_STORAGE_LIMIT, FontRef, StoredFont } from './types'
 
 export const FONT_INDEX_KEY = 'sheaf.fonts.v1'
 export const FONT_KEY_PREFIX = 'sheaf.font.'
@@ -56,14 +56,6 @@ export function fitsWithin(
 ): boolean {
   const others = removeFont(fonts, ref)
   return usedBytes(others) + byteLength <= CLIENT_STORAGE_LIMIT
-}
-
-/** 문서가 쓰는데 아직 보관되지 않은 폰트. UI 가 이 목록으로 "파일 없음" 을 띄운다. */
-export function missingFonts(
-  usages: readonly FontUsage[],
-  stored: readonly StoredFont[]
-): FontUsage[] {
-  return usages.filter((usage) => findStored(stored, usage) === undefined)
 }
 
 export function formatBytes(bytes: number): string {
