@@ -80,10 +80,15 @@ function imageBytesOf(parts: readonly PdfPart[]): number {
   return parts.reduce((sum, part) => sum + part.stats.bytesAfter + part.stats.bytesUntouched, 0)
 }
 
+/** ui-preview 캡처 자동화용 — Figma 안에서는 전역이 없어 항상 null */
+function previewReport(): ExportReport | null {
+  return (window as { __PREVIEW_REPORT__?: ExportReport }).__PREVIEW_REPORT__ ?? null
+}
+
 export function useExport(storedFonts: StoredFont[], embedText: boolean): ExportState {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
-  const [report, setReport] = useState<ExportReport | null>(null)
+  const [report, setReport] = useState<ExportReport | null>(previewReport)
   const [error, setError] = useState<string | null>(null)
 
   const parts = useRef<PdfPart[]>([])

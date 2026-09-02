@@ -22,7 +22,6 @@ const MESSAGES = {
   'app.sortName': { en: 'Name', ko: '이름순' },
   'app.excluded': { en: '{count} excluded', ko: '제외됨 {count}개' },
   'app.restore': { en: 'Restore', ko: '복원' },
-  'app.embedText': { en: 'Embed text as real fonts', ko: '텍스트를 실제 폰트로 임베드' },
   'app.preparing': { en: 'Preparing…', ko: '준비 중…' },
   'app.closeReport': { en: 'Close', ko: '닫기' },
   'app.cancel': { en: 'Cancel', ko: '취소' },
@@ -32,21 +31,129 @@ const MESSAGES = {
     ko: (p) => (Number(p.count) > 0 ? `PDF 내보내기 (${p.count}쪽)` : 'PDF 내보내기')
   },
   'app.retry': { en: 'Try again', ko: '다시 시도' },
-  'tab.export': { en: 'Export', ko: '내보내기' },
-  'tab.images': { en: 'Images', ko: '이미지' },
-  'tab.fonts': { en: 'Fonts', ko: '폰트' },
-  'tab.preview': { en: 'Text check', ko: '텍스트 확인' },
+  // ── 화면 이동 ─────────────────────────────────────────
+  // 메인 한 화면 + 하위 화면. 하위 화면 헤더에 "‹ 제목" 으로 뜬다.
+  'screen.back': { en: 'Back', ko: '뒤로' },
+  'screen.settings': { en: 'Advanced settings', ko: '고급 설정' },
+  'screen.frames': { en: 'Arrange', ko: '정렬하기' },
+  'screen.fonts': { en: 'Fonts', ko: '폰트' },
+  'screen.text': { en: 'Outlined text', ko: '아웃라인 처리될 텍스트' },
+  'screen.preview': { en: 'Text check', ko: '텍스트 확인' },
+  'settings.reset': { en: 'Reset', ko: '기본값으로' },
   'fonts.none': { en: 'No text in this document', ko: '문서에 쓰인 폰트가 없습니다' },
-  'app.missingWarn': {
-    // 다 늘어놓으면 CSS 가 줄 끝을 잘라서 "폰트 탭에서 넣기" 라는 할 일이 먼저 사라진다
+  // 아무것도 선택하지 않았을 때만 보이는 약속 — 프레임을 고르면 체크리스트가 대신 말한다
+  'app.promise': {
+    en: 'Images in the selected frames are downscaled to the size they are shown at, and text is embedded with real fonts.',
+    ko: '선택한 프레임의 이미지는 보이는 크기에 맞춰 줄이고, 텍스트는 진짜 폰트로 넣습니다.'
+  },
+
+  // ── 내보내기 전 체크리스트 ───────────────────────────────
+  // 네 줄: 프레임 · 이미지 · 폰트 · 텍스트. 문제가 있으면 그 줄이 경고가 되고 갈 곳을 단다.
+  'preflight.title': { en: 'Before you export', ko: '내보내기 전에' },
+  'preflight.checking': { en: 'Checking…', ko: '확인 중…' },
+  'preflight.frames': {
+    en: (p) => `${n(Number(p.count), 'frame', 'frames')} · ${p.size}`,
+    ko: '프레임 {count}장 · {size}'
+  },
+  'preflight.framesMixed': { en: 'mixed sizes', ko: '크기 여러 가지' },
+  'preflight.framesAsIs': { en: 'As selected on the canvas', ko: '캔버스에서 선택한 그대로' },
+  'preflight.framesReordered': { en: 'Custom order', ko: '순서 직접 정함' },
+  'preflight.framesExcluded': {
+    en: (p) => `${p.count} excluded`,
+    ko: '{count}장 제외'
+  },
+  // 줄마다 제목 + 한 줄 설명 — 설명이 없는 줄이 섞이면 줄 높이가 달라져 정렬이 깨진다
+  'preflight.imagesNone': { en: 'No images', ko: '이미지 없음' },
+  'preflight.imagesNoneDetail': { en: 'Nothing to downscale', ko: '줄일 것이 없습니다' },
+  'preflight.imagesRule': {
+    en: 'up to {multiplier}× shown size · max {maxEdge}px',
+    ko: '보이는 크기의 {multiplier}배까지 · 최대 {maxEdge}px'
+  },
+  'preflight.imagesFitDetail': {
+    en: 'quality chosen to fit {target}',
+    ko: '화질은 {target}에 맞춰 정합니다'
+  },
+  'preflight.noTextDetail': {
+    en: 'No text layers in the selection',
+    ko: '선택한 프레임에 텍스트가 없습니다'
+  },
+  'preflight.textOffDetail': {
+    en: 'No search, copy or ATS parsing',
+    ko: '검색·복사·ATS 파싱이 안 됩니다'
+  },
+  'preflight.images': {
+    en: (p) => n(Number(p.count), 'image', 'images'),
+    ko: '이미지 {count}장'
+  },
+  'preflight.imagesShrink': {
+    en: (p) => `${p.shrink} of ${p.total} images will be downscaled`,
+    ko: '이미지 {total}장 중 {shrink}장 줄임 예정'
+  },
+  'preflight.imagesAllKept': {
+    en: (p) => `${n(Number(p.total), 'image', 'images')} · nothing to downscale`,
+    ko: '이미지 {total}장 · 줄일 것 없음'
+  },
+  'preflight.imagesKeptTiny': {
+    en: (p) => `${p.count} at or under ${p.minEdge}px stay untouched`,
+    ko: '{minEdge}px 이하 {count}장은 그대로 둡니다'
+  },
+  'preflight.imagesWithinBudget': {
+    en: 'All within the frame budget — kept as they are',
+    ko: '전부 프레임 크기 안이라 그대로 둡니다'
+  },
+  'preflight.fontsNone': { en: 'No text', ko: '텍스트 없음' },
+  'preflight.fontsReady': {
+    en: (p) => `All ${n(Number(p.count), 'font', 'fonts')} ready`,
+    ko: '폰트 {count}종 전부 준비됨'
+  },
+  'preflight.fontsAuto': {
+    en: '{names} · downloaded automatically',
+    ko: '{names} · 자동으로 받아옵니다'
+  },
+  'preflight.fontsMixed': {
+    en: '{names} · some from your files',
+    ko: '{names} · 일부는 직접 넣은 파일'
+  },
+  // 폰트 줄은 원인만 말한다 — "아웃라인" 이라는 결말은 텍스트 줄 하나가 맡는다
+  'preflight.fontsMissing': {
     en: (p) =>
-      Number(p.rest) > 0
-        ? `${p.first} and ${p.rest} more — no font file, will be outlined · add them`
-        : `${p.first} — no font file, will be outlined · add it`,
+      `${n(Number(p.missing), 'font', 'fonts')} missing · used in ${n(Number(p.texts), 'text', 'texts')}`,
+    ko: '폰트 {missing}종 없음 · 텍스트 {texts}개에 쓰임'
+  },
+  // first = 없는 폰트 첫 이름, more = 없는 폰트 나머지 수, auto = 자동으로 받아올 수
+  'preflight.fontsMissingDetail': {
+    en: (p) =>
+      `${p.first}${Number(p.more) > 0 ? ` and ${p.more} more` : ''}${
+        Number(p.auto) > 0 ? ` · the other ${p.auto} download automatically` : ''
+      }`,
     ko: (p) =>
-      Number(p.rest) > 0
-        ? `${p.first} 외 ${p.rest}종 — 폰트가 없어 아웃라인 처리됩니다 · 폰트 지정하기`
-        : `${p.first} — 폰트가 없어 아웃라인 처리됩니다 · 폰트 지정하기`
+      `${p.first}${Number(p.more) > 0 ? ` 외 ${p.more}종` : ''}${
+        Number(p.auto) > 0 ? ` · 나머지 ${p.auto}종은 자동으로 받아옵니다` : ''
+      }`
+  },
+  'preflight.fontsAction': { en: 'Add fonts', ko: '폰트 지정' },
+  'preflight.textNone': { en: 'No text', ko: '텍스트 없음' },
+  'preflight.textAll': {
+    en: (p) => `All ${n(Number(p.count), 'text', 'texts')} in real fonts`,
+    ko: '텍스트 {count}개 전부 진짜 폰트로'
+  },
+  'preflight.textAllDetail': {
+    en: 'Nothing will be outlined',
+    ko: '아웃라인 처리될 것이 없습니다'
+  },
+  'preflight.textSome': {
+    en: (p) => `${n(Number(p.count), 'text', 'texts')} will be outlined`,
+    ko: '텍스트 {count}개가 아웃라인 처리됩니다'
+  },
+  'preflight.textAction': { en: 'Show layers', ko: '레이어 보기' },
+  'preflight.textOff': {
+    en: 'All text goes out as outlines — the option is on',
+    ko: '아웃라인 내보내기가 켜져 있어 텍스트 전부 아웃라인 처리됩니다'
+  },
+  'preflight.textOffAction': { en: 'Turn off', ko: '끄기' },
+  'preflight.moreReasons': {
+    en: (p) => ` · ${p.count} more`,
+    ko: ' 외 {count}가지'
   },
   'fonts.pathHelpMac': {
     en: 'Installed fonts are in the folders below. Click a path to copy it, then press ⌘⇧G in the file dialog and paste.',
@@ -92,50 +199,72 @@ const MESSAGES = {
     ko: '클릭하면 캔버스에서 보여줍니다 · 끌면 순서가 바뀝니다'
   },
   'frames.meta': {
-    en: '{width}×{height} · images {images} · text {texts}',
+    en: (p) =>
+      `${p.width}×${p.height} · ${n(Number(p.images), 'image', 'images')} · ${n(Number(p.texts), 'text', 'texts')}`,
     ko: '{width}×{height} · 이미지 {images} · 텍스트 {texts}'
   },
 
   // ── 이미지 설정 ─────────────────────────────────────────
-  'images.preset': { en: 'Preset', ko: '프리셋' },
+  // 메인 화면 맨 위의 네 칸. 4칸짜리 세그먼트라 가로가 빠듯하다 — 영문은 짧게.
   'presets.sharp': { en: 'Sharp', ko: '선명하게' },
   'presets.balanced': { en: 'Balanced', ko: '균형' },
   'presets.small': { en: 'Smallest', ko: '최소 용량' },
-  'presets.custom': { en: 'Custom', ko: '직접' },
-  // 칩에서는 "이미지 직접" 이 되어 말이 안 된다 — 칩용 표기를 따로 둔다
-  'summary.imagesCustom': { en: 'Images · custom', ko: '이미지 직접 설정' },
-  // 4칸짜리 세그먼트라 가로가 빠듯하다 — 영문은 짧게. 뜻은 아래 설명이 받는다.
   'presets.fit': { en: 'Target', ko: '목표 용량' },
-  'images.fitTarget': { en: 'Target', ko: '목표' },
+  // "직접" 은 고를 수 있는 칸이 아니라 상태다 — 고급 설정에서 숫자를 만지면 아무 칸도
+  // 켜지지 않고 이 줄이 대신 뜬다
+  // 타일 아래 한 줄. 짧아야 한다 — 86px 폭에 한 줄
+  'presets.tagSharp': { en: 'Print & zoom', ko: '인쇄·확대' },
+  'presets.tagBalanced': { en: 'Default', ko: '기본값' },
+  'presets.tagSmall': { en: 'Upload limits', ko: '업로드 한도' },
+  'presets.tagFit': { en: 'Name a size', ko: 'MB 지정' },
+  'presets.reset': { en: 'Reset', ko: '되돌리기' },
+  'presets.resetTip': {
+    en: 'Custom numbers — back to the Balanced preset',
+    ko: '숫자를 직접 정한 상태입니다 — 균형 프리셋으로 되돌립니다'
+  },
   'images.fitHelp': {
-    en: 'Picks the best image quality that still fits the target. Quality never drops below a floor — if the target is out of reach, you get the smallest possible file and a note saying so.',
-    ko: '목표를 지키는 가장 좋은 화질을 골라 줍니다. 화질에는 하한이 있어서, 목표가 무리면 가능한 가장 작은 파일과 함께 그 사실을 알려 드립니다.'
+    en: 'Picks the best image quality that still fits the target. Quality never drops below a floor — if the target is out of reach, you get the smallest possible file and a note saying so. Takes about twice as long.',
+    ko: '목표를 지키는 가장 좋은 화질을 골라 줍니다. 화질에는 하한이 있어서, 목표가 무리면 가능한 가장 작은 파일과 함께 그 사실을 알려 드립니다. 보통보다 두 배쯤 걸립니다.'
   },
-  'images.fitSlower': {
-    en: 'Takes about twice as long as a normal export.',
-    ko: '보통 내보내기보다 두 배쯤 걸립니다.'
+  'fit.label': { en: 'File size', ko: '파일 크기' },
+  'fit.under': { en: 'MB or less', ko: 'MB 이하' },
+  // 프리셋 아래 칩 세 개 — 눌렀을 때 실제로 바뀌는 숫자. 뜻은 툴팁이 받는다.
+  'chip.scaleTip': {
+    en: (p) => `Keeps pixels up to ${p.multiplier}× the size the image is shown at`,
+    ko: '보이는 크기의 {multiplier}배까지 픽셀을 남깁니다'
   },
-  'images.help': {
-    en: 'Only images larger than the frame budget are downscaled. Anything below the skip size is left alone in every document, so logos never get muddy.',
-    ko: '프레임 기준을 넘는 큰 이미지만 줄입니다. 건너뛰기 값보다 작은 이미지는 어떤 문서에서든 손대지 않습니다 — 로고가 뭉개지지 않습니다.'
+  'chip.edgeTip': {
+    en: (p) => `Long edge never above ${p.maxEdge}px · ${p.fhd}`,
+    ko: '긴 변이 {maxEdge}px 를 넘지 않게 줄입니다 · {fhd}'
+  },
+  'chip.auto': { en: 'auto', ko: '자동' },
+  'chip.autoTip': {
+    en: 'Chosen automatically to fit the target size',
+    ko: '목표 용량에 맞춰 자동으로 정합니다'
   },
   'images.multiplier': { en: 'Scale', ko: '배율' },
   'images.maxEdge': { en: 'Max edge', ko: '상한' },
-  // 픽셀 수는 실감이 안 온다 — 다들 아는 크기에 견줘 말한다
-  'images.edgeSame': { en: 'same as FHD width', ko: 'FHD 가로폭과 같음' },
-  'images.edgeUnder': { en: (p) => `${p.percent}% of FHD width`, ko: 'FHD 가로폭의 {percent}%' },
-  'images.edgeOver': { en: (p) => `${p.times}× FHD width`, ko: 'FHD 가로폭의 {times}배' },
+  // ── 크기 그림 (SizeDiagram) ─────────────────────────────
+  'diagram.frame': { en: 'Frame long edge {frame}pt', ko: '장표 긴 변 {frame}pt' },
+  'diagram.frameSample': { en: 'e.g. a {frame}pt frame', ko: '예: {frame}pt 장표' },
+  'diagram.wanted': {
+    en: '× scale {multiplier} = {wanted}px',
+    ko: '× 배율 {multiplier} = {wanted}px'
+  },
+  'diagram.result': {
+    en: 'Full-bleed images keep up to {effective}px',
+    ko: '전면 이미지는 {effective}px까지 남깁니다'
+  },
+  'diagram.resultCapped': {
+    en: ' — the cap decides, not the scale',
+    ko: ' — 배율이 아니라 상한이 정합니다'
+  },
   // ── 이미지 탭 섹션 ────────────────────────────────────
   // 설명은 고정 문구가 아니라 지금 값을 되읽어 준다 — "내 설정이 뭘 하는지" 가
   // "이 항목이 무엇인지" 보다 쓸모 있다.
   'images.sectionSize': { en: 'Size', ko: '크기' },
   'images.sectionKeep': { en: 'Leave alone', ko: '손대지 않을 것' },
   'images.sectionQuality': { en: 'Compression', ko: '압축' },
-  'images.sizeSays': {
-    en: (p) =>
-      `Keeps pixels up to ${p.multiplier}× the size the image is shown at, never above ${p.maxEdge}px.`,
-    ko: '화면에 보이는 크기의 {multiplier}배까지 픽셀을 남기고, {maxEdge}px 을 넘지 않습니다.'
-  },
   'images.keepSays': {
     en: (p) => `Images ${p.minEdge}px or smaller are never touched, in any document.`,
     ko: '{minEdge}px 이하 이미지는 어떤 문서에서도 손대지 않습니다.'
@@ -154,10 +283,7 @@ const MESSAGES = {
           ? 'JPEG 압축 강도. 0.70 아래로는 넓은 색면에 띠가 보이기 시작합니다.'
           : 'JPEG 압축 강도. 0.80 은 화면·인쇄 양쪽에 무난합니다.'
   },
-  'images.presetSays': {
-    en: (p) => `${p.name} — ${p.detail}`,
-    ko: '{name} — {detail}'
-  },
+  // 프리셋 칸의 툴팁
   'presets.detailSharp': {
     en: 'keeps the most pixels, for print or zooming in',
     ko: '인쇄·확대를 생각해 픽셀을 가장 많이 남깁니다'
@@ -171,27 +297,28 @@ const MESSAGES = {
     en: 'you name the size, it finds the quality',
     ko: '크기를 정하면 화질을 찾아 줍니다'
   },
-  'presets.detailCustom': { en: 'your own numbers', ko: '숫자를 직접 정한 상태입니다' },
-  'images.minEdge': { en: 'Skip under', ko: '건너뛰기' },
+  // "건너뛰기" 는 뭘 건너뛰는지 안 읽혔다 — 작은 그림은 손대지 않고 통과한다는 뜻이다
+  'images.minEdge': { en: 'Keep under', ko: '그대로 두기' },
   'images.quality': { en: 'Quality', ko: '품질' },
   'images.reencode': { en: 'Re-encode opaque PNGs as JPEG', ko: '투명 없는 PNG는 JPEG로' },
+  'settings.sectionText': { en: 'Text', ko: '텍스트' },
+  // 진짜 폰트로 넣는 건 기본 기능이다 — 옵션은 그 반대(전부 아웃라인)를 켜는 쪽이다
+  'settings.outlineAll': {
+    en: 'Export all text as outlines',
+    ko: '모든 텍스트를 아웃라인으로 내보내기'
+  },
+  'settings.outlineAllSays': {
+    en: 'Only when the fonts cannot be had. Outlined text cannot be searched, copied or read by an ATS.',
+    ko: '폰트를 구할 수 없을 때만 쓰세요. 아웃라인 텍스트는 검색·복사·ATS 파싱이 안 됩니다.'
+  },
+  'settings.fitNote': {
+    en: 'Target size mode picks size and compression automatically. Only the settings below still apply.',
+    ko: '목표 용량 모드에서는 크기·압축을 자동으로 정합니다. 아래 항목만 적용됩니다.'
+  },
 
-  // ── 폰트 패널 ───────────────────────────────────────────
-  'fonts.title': { en: 'Fonts', ko: '폰트' },
-  'fonts.summaryReady': {
-    en: (p) => `${n(Number(p.count), 'font', 'fonts')} ready`,
-    ko: '폰트 {count}종 준비됨'
-  },
-  'summary.imagesTip': {
-    en: 'Image quality preset — click to open the Images tab',
-    ko: '이미지 품질 프리셋 — 클릭하면 이미지 탭이 열립니다'
-  },
-  'summary.fontsTip': {
-    en: 'Font readiness for this document — click to open the Fonts tab',
-    ko: '문서 폰트 준비 상태 — 클릭하면 폰트 탭이 열립니다'
-  },
+  // ── 폰트 화면 ───────────────────────────────────────────
   'fonts.help': {
-    en: 'Open-license fonts are downloaded automatically at export. Add a file only for fonts that cannot be fetched. Text without a font goes in as a picture — it looks identical, but it cannot be selected or searched, and the file stays big.',
+    en: 'Open-license fonts are downloaded automatically at export. Add a file only for fonts that cannot be fetched. Text without a font is outlined — it looks identical, but it cannot be selected or searched, and the file stays big.',
     ko: '공개 폰트는 내보낼 때 자동으로 받아 옵니다. 구할 수 없는 폰트만 파일을 넣으면 됩니다. 폰트가 없는 텍스트는 아웃라인 처리됩니다 — 보기에는 똑같지만 선택도 검색도 안 되고 용량도 줄지 않습니다.'
   },
   'fonts.detailCatalog': {
@@ -207,6 +334,28 @@ const MESSAGES = {
     ko: '파일 없음 · 텍스트 {count}개 · {chars}자'
   },
   'fonts.replace': { en: 'Replace', ko: '교체' },
+  // ── 폰트 폴더에서 자동으로 찾기 ────────────────────────
+  'fonts.scanFolder': { en: 'Find in a font folder…', ko: '폰트 폴더에서 찾기…' },
+  'fonts.scanHint': {
+    en: 'Pick your font folder and the matching .ttf files are added for you. Nothing leaves this computer.',
+    ko: '폰트 폴더를 고르면 없는 폰트에 맞는 .ttf 를 찾아 넣습니다. 파일은 이 컴퓨터 밖으로 나가지 않습니다.'
+  },
+  'fonts.scanning': {
+    en: 'Reading fonts… {current}/{total}',
+    ko: '폰트 읽는 중… {current}/{total}'
+  },
+  'fonts.scanResult': {
+    en: (p) => `Added ${p.found} of ${p.missing} missing fonts`,
+    ko: '없는 폰트 {missing}종 중 {found}종을 넣었습니다'
+  },
+  'fonts.scanNone': {
+    en: 'No matching .ttf in that folder',
+    ko: '그 폴더에서 맞는 .ttf 를 찾지 못했습니다'
+  },
+  'fonts.scanSkipped': {
+    en: (p) => ` · ${p.count} skipped (variable/OTF, or no storage left)`,
+    ko: ' · {count}종은 넣지 못함 (가변·OTF 이거나 저장 공간 부족)'
+  },
   'fonts.add': { en: 'Add', ko: '넣기' },
   'fonts.parseError': {
     en: 'Could not read {file} as a font. It must be a static TTF/OTF.',
@@ -233,10 +382,6 @@ const MESSAGES = {
       Number(p.total) > 1
         ? `${p.page}/${p.pages}쪽 · 이미지 최적화 ${p.current}/${p.total}`
         : `${p.page}/${p.pages}쪽 · 이미지 최적화`
-  },
-  'progress.pageSettle': {
-    en: 'Page {page}/{pages} · finishing images',
-    ko: '{page}/{pages}쪽 · 이미지 마무리'
   },
   // ── 목표 용량 맞추기 ──────────────────────────────────
   'progress.measure': {
@@ -306,14 +451,17 @@ const MESSAGES = {
     ko: '먼저 내보내 주세요. 파서가 읽어 갈 텍스트가 여기 나옵니다.'
   },
   'report.preview': { en: 'Check what a parser reads', ko: '파서가 읽을 내용 확인' },
-  previewTitle: { en: 'Text a parser will read', ko: '파서가 읽어 갈 텍스트' },
-  previewHelp: {
+  'preview.help': {
     en: (p) =>
       `${p.lines} lines embedded as real fonts. Outlined text is not listed — parsers drop or garble it.`,
     ko: '진짜 폰트로 들어간 {lines}줄입니다. 아웃라인 처리된 텍스트는 빠져 있습니다 — 파서가 흘리거나 깨뜨리는 쪽입니다.'
   },
-  previewCopy: { en: 'Copy all', ko: '전체 복사' },
-  previewClose: { en: 'Close', ko: '닫기' },
+  // ── 아웃라인 처리될 텍스트 화면 ─────────────────────────
+  'text.help': {
+    en: 'These keep their exact look but go out as outlines. Remove the stroke or effect and they embed as real fonts. Click a reason to select those layers on the canvas.',
+    ko: '이 텍스트는 모양은 그대로지만 아웃라인으로 나갑니다. 선·효과를 빼면 진짜 폰트로 들어갑니다. 사유를 클릭하면 해당 레이어를 캔버스에서 선택합니다.'
+  },
+  'text.none': { en: 'Nothing will be outlined.', ko: '아웃라인 처리될 텍스트가 없습니다.' },
   'report.fitOk': {
     en: 'Fits {target} — the best quality that stays under it',
     ko: '{target} 안에 맞췄습니다 — 이 안에서 가장 좋은 화질입니다'
@@ -330,7 +478,6 @@ const MESSAGES = {
   // ── 메인 스레드 알림 ────────────────────────────────────
   'main.cancelled': { en: 'Cancelled', ko: '취소했습니다' },
   'main.exportFinished': { en: 'Export finished', ko: '내보내기가 끝났습니다' },
-  'main.selectFirst': { en: 'Select frames first', ko: '프레임을 먼저 선택해 주세요' },
   'main.orphanCleaned': {
     en: (p) => `Cleaned up ${n(Number(p.count), 'orphaned font blob', 'orphaned font blobs')}.`,
     ko: '저장소에 남아 있던 폰트 조각 {count}개를 정리했습니다.'
@@ -361,6 +508,13 @@ const MESSAGES = {
     ko: '밑줄·취소선 텍스트 (미지원)'
   },
   'reject.noBounds': { en: 'cannot read bounding box', ko: '바운딩 박스를 읽을 수 없음' },
+  // 체크리스트·텍스트 화면용 — export 리포트의 font.* 사유와 달리 미리 아는 것
+  'reject.missingFont': {
+    en: 'no font file ({family} {style})',
+    ko: '폰트 없음 ({family} {style})'
+  },
+  // 체크리스트 요약용 — 서체마다 한 줄씩 늘어놓으면 "폰트 없음" 이 세 번 반복된다
+  'reject.missingFontAny': { en: 'no font file', ko: '폰트 없음' },
   'reject.svgEmpty': { en: 'no text found in SVG', ko: 'SVG 에서 텍스트를 찾지 못함' },
 
   // ── 폰트 구하기 실패 사유 ───────────────────────────────

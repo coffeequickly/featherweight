@@ -15,6 +15,7 @@ import {
   PROFILE_LADDER
 } from './lib/fitToSize'
 import { skipFloor, transformScale } from './lib/imageTarget'
+import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
 import { exportFrame, removeLeftoverClones } from './main/exporter'
 import { forgetSeenImages, OriginalSink, planFor, seenImageInfo } from './main/images'
@@ -47,7 +48,9 @@ import {
   ImageProbeHandler,
   ImageProbeItem,
   FrameFocusHandler,
+  FrameThumbsHandler,
   NodesFocusHandler,
+  PreflightHandler,
   ProgressHandler,
   Reason,
   ToastHandler,
@@ -66,7 +69,7 @@ import {
   UiReadyHandler
 } from './lib/types'
 import { detectLocale, setLocale, t } from './lib/i18n'
-import { buildSelection, exportableSelection } from './main/selection'
+import { exportableSelection, imageEdges, renderThumbs, scanSelection } from './main/selection'
 
 export default async function main(): Promise<void> {
   await cleanupLeftovers()
@@ -116,8 +119,10 @@ export default async function main(): Promise<void> {
     })
   })
 
+  // 폴더에서 여러 개를 한꺼번에 넣으면 인덱스 읽기-수정-쓰기가 겹쳐 앞의 것이 사라진다 — 줄 세운다
+  let fontOps: Promise<void> = Promise.resolve()
   on<FontSaveHandler>('font:save', (payload) => {
-    void storeFont(payload.font, payload.bytes)
+    fontOps = fontOps.then(() => storeFont(payload.font, payload.bytes))
   })
 
   on<FontDeleteHandler>('font:delete', (ref) => {
@@ -146,18 +151,21 @@ export default async function main(): Promise<void> {
       squelchSelectionEvents -= 1
       return
     }
-    void sendSelection()
+    scheduleSelection()
   })
 
   on<ResizeWindowHandler>('resize:window', (size) => {
     figma.ui.resize(size.width, size.height)
   })
 
-  showUI({ width: 400, height: 480 })
+  showUI({ width: 400, height: WINDOW_HEIGHT })
 }
 
 let cancelled = false
 let exporting = false
+
+/** 메인 한 화면이 스크롤 없이 들어가는 높이. 하위 화면은 안에서 스크롤한다. */
+const WINDOW_HEIGHT = 560
 
 /**
  * 프레임을 하나씩 순차로 내보낸다. 동시성 1 — 빠르게 만들려다 메모리로 죽는 쪽이 더 비싸다.
@@ -470,9 +478,10 @@ async function requestTextValidation(
 
 async function sendSettings(): Promise<void> {
   const stored = (await figma.clientStorage.getAsync(SETTINGS_KEY)) as Settings | undefined
+  // 상한 선택지가 바뀌었다(2.0) — 옛 값은 가장 가까운 버튼으로 옮긴다
   const value =
     stored !== undefined && stored.version === DEFAULT_SETTINGS.version
-      ? { ...DEFAULT_SETTINGS, ...stored }
+      ? snapSettings(stored)
       : DEFAULT_SETTINGS
   emit<SettingsHandler>('settings', value)
 }
@@ -502,10 +511,46 @@ async function focusNodes(ids: string[]): Promise<void> {
   figma.viewport.scrollAndZoomIntoView(nodes)
 }
 
+/** 드래그로 선택이 빠르게 바뀔 때 매번 트리를 걷지 않는다 — 마지막 것만 */
+const SELECTION_DEBOUNCE_MS = 60
+let selectionTimer: ReturnType<typeof setTimeout> | null = null
+let selectionGeneration = 0
+
+function scheduleSelection(): void {
+  if (selectionTimer !== null) clearTimeout(selectionTimer)
+  selectionTimer = setTimeout(() => {
+    selectionTimer = null
+    void sendSelection()
+  }, SELECTION_DEBOUNCE_MS)
+}
+
+/**
+ * 목록은 즉시, 이미지 크기와 썸네일은 뒤따라 보낸다.
+ * 도중에 선택이 또 바뀌면(세대가 넘어가면) 늦게 끝난 것은 버린다 — 옛 선택의 그림이
+ * 새 목록 위에 얹히는 일이 없어야 한다.
+ */
 async function sendSelection(): Promise<void> {
-  const { items, fonts } = await buildSelection(exportableSelection())
-  emit<SelectionHandler>('selection', items)
-  emit<FontsHandler>('fonts', fonts)
+  selectionGeneration += 1
+  const generation = selectionGeneration
+  const isStale = (): boolean => generation !== selectionGeneration
+
+  const nodes = exportableSelection()
+  const scan = scanSelection(nodes)
+  emit<SelectionHandler>('selection', scan.items)
+  emit<FontsHandler>('fonts', scan.fonts)
+
+  const hashes = scan.frames.flatMap((frame) => frame.images.map((usage) => usage.imageHash))
+  const edges = await imageEdges(hashes)
+  if (isStale()) return
+  emit<PreflightHandler>('preflight', {
+    frames: scan.frames,
+    imageEdges: edges,
+    textRejects: scan.textRejects
+  })
+
+  const thumbs = await renderThumbs(nodes, isStale)
+  if (isStale() || thumbs.length === 0) return
+  emit<FrameThumbsHandler>('frames:thumbs', thumbs)
 }
 
 /** 인덱스에서 빠진 폰트 바이트가 한도만 차지하고 있으면 지운다. */

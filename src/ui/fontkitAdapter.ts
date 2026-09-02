@@ -60,6 +60,25 @@ export function factsOf(font: FontProbe): FontFacts {
   }
 }
 
+/**
+ * 이름 테이블의 family/subfamily. typographic 이름(16/17)이 있으면 그것, 없으면 기본(1/2).
+ * 옛 파일은 기본 이름에 굵기를 넣어 "SUIT Heavy"/"Regular" 로 적는다 — 그건 lib/fontFolder 가 다룬다.
+ */
+export function namesOf(font: FontProbe): { family: string; subfamily: string } {
+  const records =
+    (font as unknown as { name?: { records?: Record<string, Record<string, string>> } }).name
+      ?.records ?? {}
+  const pick = (key: string): string | undefined => {
+    const entry = records[key]
+    if (entry === undefined) return undefined
+    return entry.en ?? Object.values(entry)[0]
+  }
+  return {
+    family: pick('preferredFamily') ?? pick('fontFamily') ?? font.familyName ?? '',
+    subfamily: pick('preferredSubfamily') ?? pick('fontSubfamily') ?? font.subfamilyName ?? ''
+  }
+}
+
 /** `PDFDocument.registerFontkit()` 에 넘길 객체. */
 export function pdfLibFontkit(): PdfLibFontkit {
   const adapter = {

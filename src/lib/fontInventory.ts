@@ -57,7 +57,8 @@ export function isItalic(style: string): boolean {
 
 /** family + style 이 같으면 한 줄로 합친다. 많이 쓴 폰트가 위로. */
 export function aggregateFontUsage(segments: readonly RawFontSegment[]): FontUsage[] {
-  const map = new Map<string, FontUsage & { nodeIds: Set<string> }>()
+  // 집계 중에는 Set 으로 중복을 거르고, 내보낼 때 배열로 바꾼다
+  const map = new Map<string, Omit<FontUsage, 'nodeIds'> & { nodeIds: Set<string> }>()
 
   for (const segment of segments) {
     const key = fontKey(segment)
@@ -86,7 +87,8 @@ export function aggregateFontUsage(segments: readonly RawFontSegment[]): FontUsa
       weight: entry.weight,
       italic: entry.italic,
       nodeCount: entry.nodeCount,
-      charCount: entry.charCount
+      charCount: entry.charCount,
+      nodeIds: [...entry.nodeIds]
     }))
     .sort(
       (a, b) =>

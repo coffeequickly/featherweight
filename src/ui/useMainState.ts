@@ -1,12 +1,12 @@
 // 메인 스레드와의 배선을 한곳에 모은다. (PRD §7.3, C3)
 //
 // 두 가지 일을 한다:
-//   1. 상태 수신 — selection / doc:name / fonts / fonts:stored / notice / settings
+//   1. 상태 수신 — selection / preflight / frames:thumbs / doc:name / fonts / fonts:stored / notice / settings
 //   2. 메인이 못 하는 일 대행 — 이미지 리사이즈(Canvas)·텍스트 검증(fontkit)·폰트 바이트 응답
 // 핸들러는 마운트 때 한 번만 등록되므로, 갱신되는 값은 ref 로 본다.
 
 import { emit, on } from '@create-figma-plugin/utilities'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
 import {
   DEFAULT_SETTINGS,
@@ -15,12 +15,15 @@ import {
   FontsHandler,
   FontUsage,
   FrameItem,
+  FrameThumbsHandler,
   ImageCacheHandler,
   ImageProbeHandler,
   ImageProbeResultHandler,
   ImageResizeHandler,
   ImageResizeResultHandler,
   NoticeHandler,
+  Preflight,
+  PreflightHandler,
   SelectionHandler,
   Settings,
   SettingsHandler,
@@ -39,8 +42,15 @@ import { validateSources } from './validateText'
 
 export type Notice = { message: string; error: boolean } | null
 
+/** 슬라이더를 끄는 동안 틱마다 clientStorage 에 쓰지 않는다 — 손을 뗀 뒤 한 번 */
+const SAVE_DEBOUNCE_MS = 200
+
 export type MainState = {
   items: FrameItem[]
+  /** 선택이 바뀔 때마다 1 씩 는다 — 화면 쪽 상태(순서·제외)를 되돌리는 신호 */
+  selectionSerial: number
+  /** 체크리스트 재료. 목록보다 늦게 오므로 그 사이에는 null 이다. */
+  preflight: Preflight | null
   fonts: FontUsage[]
   storedFonts: StoredFont[]
   notice: Notice
@@ -57,8 +67,10 @@ export type MainState = {
   showNotice: (next: Notice) => void
 }
 
-export function useMainState(onSelectionChange: () => void): MainState {
+export function useMainState(): MainState {
   const [items, setItems] = useState<FrameItem[]>([])
+  const [selectionSerial, setSelectionSerial] = useState(0)
+  const [preflight, setPreflight] = useState<Preflight | null>(null)
   const [fonts, setFonts] = useState<FontUsage[]>([])
   const [storedFonts, setStoredFonts] = useState<StoredFont[]>([])
   const [notice, setNotice] = useState<Notice>(null)
@@ -67,13 +79,23 @@ export function useMainState(onSelectionChange: () => void): MainState {
 
   const storedFontsRef = useRef<StoredFont[]>(storedFonts)
   storedFontsRef.current = storedFonts
-  const onSelectionChangeRef = useRef(onSelectionChange)
-  onSelectionChangeRef.current = onSelectionChange
 
   useEffect(() => {
     const offSelection = on<SelectionHandler>('selection', (next) => {
       setItems(next)
-      onSelectionChangeRef.current() // 화면 쪽 상태(순서·제외)는 App 이 되돌린다
+      setPreflight(null) // 새 선택의 재료는 뒤따라 온다
+      setSelectionSerial((serial) => serial + 1)
+    })
+    const offPreflight = on<PreflightHandler>('preflight', setPreflight)
+    // 썸네일은 목록 뒤에 따로 온다 — 있는 행에만 얹는다
+    const offThumbs = on<FrameThumbsHandler>('frames:thumbs', (thumbs) => {
+      const byId = new Map(thumbs.map((entry) => [entry.id, entry.thumb]))
+      setItems((previous) =>
+        previous.map((item) => {
+          const thumb = byId.get(item.id)
+          return thumb === undefined ? item : { ...item, thumb }
+        })
+      )
     })
     const offDocName = on<DocNameHandler>('doc:name', setDocName)
     const offFonts = on<FontsHandler>('fonts', setFonts)
@@ -125,6 +147,8 @@ export function useMainState(onSelectionChange: () => void): MainState {
 
     return () => {
       offSelection()
+      offPreflight()
+      offThumbs()
       offDocName()
       offFonts()
       offStored()
@@ -139,13 +163,20 @@ export function useMainState(onSelectionChange: () => void): MainState {
     }
   }, [])
 
-  function applySettings(next: Settings): void {
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const applySettings = useCallback((next: Settings): void => {
     setSettings(next)
-    emit<SettingsSaveHandler>('settings:save', next)
-  }
+    if (saveTimer.current !== null) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null
+      emit<SettingsSaveHandler>('settings:save', next)
+    }, SAVE_DEBOUNCE_MS)
+  }, [])
 
   return {
     items,
+    selectionSerial,
+    preflight,
     fonts,
     storedFonts,
     notice,

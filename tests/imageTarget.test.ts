@@ -12,11 +12,10 @@ import {
   planImageTargets,
   scaledSize,
   targetFor,
-  edgeScale,
   skipFloor
 } from '../src/lib/imageTarget'
 
-const SETTINGS = { multiplier: 1.5 as const, maxEdge: 2048 as const }
+const SETTINGS = { multiplier: 1.5 as const, maxEdge: 1920 as const }
 
 function usage(
   nodeId: string,
@@ -38,7 +37,7 @@ describe('targetFor', () => {
   })
 
   it('maxEdge 를 넘지 않는다', () => {
-    expect(targetFor(usage('n', 'h', 4000, 4000), SETTINGS)).toBe(2048)
+    expect(targetFor(usage('n', 'h', 4000, 4000), SETTINGS)).toBe(1920)
   })
 
   it('소수점은 올린다 (하한 위에서)', () => {
@@ -46,12 +45,12 @@ describe('targetFor', () => {
   })
 
   it('multiplier 1 이고 하한보다 크면 표시 크기 그대로', () => {
-    expect(targetFor(usage('n', 'h', 800, 400), { multiplier: 1, maxEdge: 4096 })).toBe(800)
+    expect(targetFor(usage('n', 'h', 800, 400), { multiplier: 1, maxEdge: 3840 })).toBe(800)
   })
 
   it('작게 표시돼도 하한(640) 아래로 줄이지 않는다 — 로고가 뭉개지지 않게', () => {
     expect(targetFor(usage('n', 'h', 93, 31), SETTINGS)).toBe(MIN_TARGET_LONG_EDGE)
-    expect(targetFor(usage('n', 'h', 600, 400), { multiplier: 1, maxEdge: 4096 })).toBe(
+    expect(targetFor(usage('n', 'h', 600, 400), { multiplier: 1, maxEdge: 3840 })).toBe(
       MIN_TARGET_LONG_EDGE
     )
   })
@@ -105,7 +104,7 @@ describe('planImageTargets', () => {
       [usage('a', 'h', 5000, 5000), usage('b', 'h', 100, 100)],
       SETTINGS
     )
-    expect(plans[0].targetLongEdge).toBe(2048)
+    expect(plans[0].targetLongEdge).toBe(1920)
   })
 })
 
@@ -152,7 +151,7 @@ describe('processFloor', () => {
   })
 
   it('16:9 1920 프레임, 1x 면 1920 이 기준선이다', () => {
-    expect(processFloor({ multiplier: 1, maxEdge: 4096 }, 1920)).toBe(1920)
+    expect(processFloor({ multiplier: 1, maxEdge: 3840 }, 1920)).toBe(1920)
   })
 
   it('maxEdge 를 넘지 않는다', () => {
@@ -220,29 +219,6 @@ describe('settleDelayMs', () => {
 
   it('상한이 있다 — 이미지가 많아도 무한정 기다리지 않는다', () => {
     expect(settleDelayMs(100)).toBe(4000)
-  })
-})
-
-describe('edgeScale', () => {
-  it('FHD 를 기준으로 배율을 낸다', () => {
-    expect(edgeScale(1920, 4096).ratio).toBe(1)
-    expect(edgeScale(960, 4096).ratio).toBe(0.5)
-    expect(edgeScale(3840, 4096).ratio).toBe(2)
-  })
-
-  it('눈금 위 위치는 가장 큰 상한을 1 로 본다', () => {
-    expect(edgeScale(4096, 4096).fill).toBe(1)
-    expect(edgeScale(2048, 4096).fill).toBe(0.5)
-    expect(edgeScale(1920, 4096).fhd).toBeCloseTo(0.469, 3)
-  })
-
-  it('눈금 밖으로 넘치지 않는다', () => {
-    expect(edgeScale(9000, 4096).fill).toBe(1)
-    expect(edgeScale(1024, 1000).fhd).toBe(1)
-  })
-
-  it('눈금 폭이 0 이어도 죽지 않는다', () => {
-    expect(Number.isFinite(edgeScale(2048, 0).fill)).toBe(true)
   })
 })
 

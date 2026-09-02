@@ -93,16 +93,13 @@ describe('aggregateFontUsage', () => {
     expect(aggregateFontUsage([])).toEqual([])
   })
 
-  it('내부 집계용 nodeIds 는 밖으로 새지 않는다', () => {
-    const out = aggregateFontUsage([seg('Pretendard', 'Bold', 'n1', 1)])
-    expect(Object.keys(out[0]).sort()).toEqual([
-      'charCount',
-      'family',
-      'italic',
-      'nodeCount',
-      'style',
-      'weight'
+  it('노드 id 를 중복 없이 들고 나간다 — 체크리스트가 아웃라인될 노드를 합쳐 센다', () => {
+    const out = aggregateFontUsage([
+      seg('Pretendard', 'Bold', 'n1', 1),
+      seg('Pretendard', 'Bold', 'n1', 1),
+      seg('Pretendard', 'Bold', 'n2', 1)
     ])
+    expect(out[0].nodeIds).toEqual(['n1', 'n2'])
   })
 })
 

@@ -1,6 +1,6 @@
 // 이미지 설정 프리셋. Figma·DOM 의존 금지.
 //
-// 품질 0.80·배율 1.5x·상한 2048 은 만드는 사람의 언어다. 쓰는 사람에게는
+// 품질 0.80·배율 1.5x·상한 FHD 는 만드는 사람의 언어다. 쓰는 사람에게는
 // "선명하게 / 균형 / 최소 용량" 세 단어면 충분하고, 숫자는 고급 설정으로 접는다.
 
 import { Settings } from './types'
@@ -11,11 +11,11 @@ type PresetValues = Pick<Settings, 'quality' | 'multiplier' | 'maxEdge'>
 
 export const PRESETS: Record<PresetId, PresetValues> = {
   /** 인쇄·확대를 생각하면 픽셀을 더 남긴다 */
-  sharp: { quality: 0.9, multiplier: 2, maxEdge: 4096 },
+  sharp: { quality: 0.9, multiplier: 2, maxEdge: 3840 },
   /** 기본값 — 화면 확인용 PDF 에 충분 */
-  balanced: { quality: 0.8, multiplier: 1.5, maxEdge: 2048 },
+  balanced: { quality: 0.8, multiplier: 1.5, maxEdge: 1920 },
   /** 업로드 한도가 빡빡할 때 */
-  small: { quality: 0.7, multiplier: 1, maxEdge: 1600 }
+  small: { quality: 0.7, multiplier: 1, maxEdge: 1280 }
 }
 
 export const PRESET_IDS: PresetId[] = ['sharp', 'balanced', 'small']
