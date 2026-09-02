@@ -122,12 +122,18 @@ One checklist on the main screen: how many images will shrink, which fonts are
 ready, and exactly which text layers would stay as outlines and why — with a
 link to the layer. Fix it, or export anyway. No surprises after the fact.
 
+🪶 FIGMA SLIDES TOO
+Run it in a deck and every slide becomes a page, in deck order — with real
+fonts and downscaled images, where Slides' own PDF export outlines the text
+and keeps every image at full size.
+
 Together these make a real difference: a 12-page portfolio went from 22.7MB
 to 4.0MB with the same pages and the same look.
 
 HOW IT WORKS
 
-1. Select frames and run Featherweight
+1. Select frames and run Featherweight — in Figma Slides, run it with nothing
+   selected to export the whole deck
 2. Pick a preset — or Target, and type the size you need
 3. Read the checklist; follow a warning to arrange pages, add a font, or find
    the layer
@@ -198,7 +204,7 @@ README.md under "한국어 안내".
 
 Categories (max 2): **Import & export** (primary) + **Design tools**
 
-Tags: `pdf` `export` `fonts` `compress` `resume` `portfolio` `korean` `ats`
+Tags: `pdf` `export` `fonts` `compress` `slides` `resume` `portfolio` `korean` `ats`
 
 ### Media
 
@@ -293,3 +299,4 @@ Match the existing version history — one line, leading with the change type:
 - "Windows: correct font folder paths and shortcuts. Locale-aware number formatting."
 - "Feature: Fit to Size — name a target file size and Featherweight finds the best image quality that fits."
 - 2.0: "New: one-screen redesign with a pre-flight checklist — see what shrinks, what's ready and what would be outlined before you export. Find missing fonts in a folder. Presets as tiles; HD/FHD/QHD/4K caps."
+- 2.1: "New: works in Figma Slides — every slide a page, with real fonts and smaller images. Selecting a section exports its frames. Selecting many frames no longer freezes the canvas; image-heavy exports are faster."
