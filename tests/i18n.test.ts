@@ -90,6 +90,7 @@ describe('사전 무결성', () => {
     count: 2,
     missing: 1,
     total: 3,
+    done: 1,
     kinds: 2,
     pages: 2,
     page: 1,
@@ -140,7 +141,10 @@ describe('사전 무결성', () => {
     auto: 2,
     version: '2.0.0',
     wanted: 2880,
-    effective: 1920
+    effective: 1920,
+    unit: 'frame',
+    units: 'frames',
+    Unit: 'Frame'
   }
 
   it('모든 키가 양 언어에서 비지 않은 문장을 준다', () => {

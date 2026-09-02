@@ -56,8 +56,7 @@ export async function exportFrame(
   const clone = node.clone() as ExportableNode
   try {
     clone.name = TMP_NODE_NAME
-    figma.currentPage.appendChild(clone)
-    clone.x = OFFSCREEN_X + index * OFFSCREEN_STEP
+    parkOffscreen(clone, index)
 
     const images = await shrinkImages(
       clone,
@@ -90,6 +89,7 @@ export async function exportFrame(
         text: text.sources,
         stats: {
           imagesProcessed: images.processed,
+          imageHashes: images.seen,
           bytesBefore: images.bytesBefore,
           bytesAfter: images.bytesAfter,
           bytesUntouched: images.bytesUntouched,
@@ -112,6 +112,22 @@ export async function exportFrame(
     }
   } finally {
     clone.remove()
+  }
+}
+
+/**
+ * 클론을 원본·다른 레이어와 안 겹치게 치운다.
+ *
+ * Slides 에서는 슬라이드가 격자(SLIDE_GRID → SLIDE_ROW) 밖으로 못 나간다 — 페이지에
+ * 붙이면 던진다. 그때는 clone() 이 넣어 준 자리(원본 옆)에 그대로 두고 내보낸 뒤
+ * 지운다. 잠깐 격자에 슬라이드가 하나 더 보일 수 있다. (Slides 스파이크 — 실측 대상)
+ */
+function parkOffscreen(clone: ExportableNode, index: number): void {
+  try {
+    figma.currentPage.appendChild(clone)
+    clone.x = OFFSCREEN_X + index * OFFSCREEN_STEP
+  } catch {
+    // 격자 밖으로 못 꺼내는 편집기 — 제자리에 둔다
   }
 }
 

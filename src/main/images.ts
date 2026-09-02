@@ -18,6 +18,7 @@ import {
   Settings
 } from '../lib/types'
 import { withTimeout } from '../lib/withTimeout'
+import { knownEdge, persistEdgeCache, readEdge, rememberEdge } from './imageSize'
 import { awaitResponse, nextRequestId } from './bridge'
 
 export type ImageStats = {
@@ -27,6 +28,8 @@ export type ImageStats = {
   /** 손대지 않고 통과시킨 이미지의 바이트 합 — 목표 용량 예측용 */
   bytesUntouched: number
   warnings: Reason[]
+  /** 이 프레임의 서로 다른 이미지 해시 — 결과 카드가 체크리스트와 같은 수를 말하려고 */
+  seen: string[]
 }
 
 /** 원본 바이트를 UI 캐시로 흘려보내는 통로. Fit to Size 일 때만 준다. */
@@ -131,14 +134,15 @@ export async function shrinkImages(
   isCancelled: () => boolean,
   keepOriginal?: OriginalSink
 ): Promise<ImageStats> {
+  const usages = collectImageUsages(root)
   const stats: ImageStats = {
     processed: 0,
     bytesBefore: 0,
     bytesAfter: 0,
     bytesUntouched: 0,
-    warnings: []
+    warnings: [],
+    seen: [...new Set(usages.map((usage) => usage.imageHash))]
   }
-  const usages = collectImageUsages(root)
   const plans = planImageTargets(usages, settings)
   if (plans.length === 0) return stats
 
@@ -173,6 +177,7 @@ export async function shrinkImages(
     // 여기서 안 기다리면 방금 꽂은 이미지가 export 에서 통째로 빠진다 (settleDelayMs 참고)
     await new Promise((resolve) => setTimeout(resolve, settleDelayMs(replacement.size)))
   }
+  void persistEdgeCache() // 선택 때 못 읽은 크기를 여기서 새로 읽었을 수 있다
   return stats
 }
 
@@ -191,16 +196,23 @@ async function shrinkOne(
   }
 
   // 픽셀 수만 먼저 본다 — 기준선 이하면 바이트를 UI 로 보낼 필요조차 없다.
+  // 크기는 선택 때 읽어 둔 것이 거의 다 있다. 없으면 바이트 머리에서 읽는다 — 그 바이트는
+  // 어차피 곧 필요하니 두 번 받지 않는다. 통째로 디코드하는 getSizeAsync 는 마지막 수단.
   // 단 목표 용량 탐색 중이면 통과시킨 이미지의 바이트도 알아야 예측이 맞는다.
-  const size = await image.getSizeAsync()
-  const belowFloor = Math.max(size.width, size.height) <= floor
+  let original: Uint8Array | null = null
+  let longEdge = knownEdge(plan.imageHash)
+  if (longEdge === undefined) {
+    original = await image.getBytesAsync()
+    const read = await readEdge(image, original)
+    if (read === null) throw new Error('cannot read image size')
+    rememberEdge(plan.imageHash, read)
+    longEdge = read
+  }
+  const belowFloor = longEdge <= floor
   if (belowFloor && keepOriginal === undefined) return null
 
-  const original = await image.getBytesAsync()
-  seenImages.set(plan.imageHash, {
-    longEdge: Math.max(size.width, size.height),
-    bytes: original.length
-  })
+  original ??= await image.getBytesAsync()
+  seenImages.set(plan.imageHash, { longEdge, bytes: original.length })
 
   // 이미 가벼운 파일은 픽셀이 커도 그대로 둔다 — 절감의 본질은 바이트다
   if (belowFloor || original.length <= KEEP_BYTES_FLOOR) {

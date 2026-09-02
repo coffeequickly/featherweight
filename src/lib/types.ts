@@ -111,6 +111,8 @@ export type StoredFont = FontRef & {
 
 export type PartStats = {
   imagesProcessed: number
+  /** 이 쪽의 서로 다른 이미지 해시. 쪽마다 합쳐 "이미지 N장" 을 체크리스트와 같은 기준으로 센다 */
+  imageHashes: string[]
   bytesBefore: number
   bytesAfter: number
   /** 손대지 않고 통과시킨 이미지의 바이트 합. 목표 용량 예측에만 쓴다. */
@@ -126,6 +128,14 @@ export interface UiReadyHandler extends EventHandler {
   name: 'ui:ready'
   /** UI 만 언어를 안다 (navigator.language) — 메인은 이 값으로 사전을 맞춘다 */
   handler: (locale: string) => void
+}
+
+/** 어느 편집기에서 돌고 있나 — 화면 문구가 "프레임" 과 "슬라이드" 를 가른다 */
+export type EditorKind = 'figma' | 'slides'
+
+export interface EditorHandler extends EventHandler {
+  name: 'editor'
+  handler: (editor: EditorKind) => void
 }
 
 export interface SettingsHandler extends EventHandler {
@@ -155,6 +165,21 @@ export interface FontsHandler extends EventHandler {
 export interface FrameThumbsHandler extends EventHandler {
   name: 'frames:thumbs'
   handler: (thumbs: Array<{ id: string; thumb: Uint8Array }>) => void
+}
+
+/** 썸네일은 정렬 화면을 열 때만 만든다 — 31장 렌더가 캔버스를 버벅이게 했다 */
+export interface FrameThumbsRequestHandler extends EventHandler {
+  name: 'frames:thumbs:request'
+  handler: () => void
+}
+
+/**
+ * 프레임별 이미지·텍스트 수. 목록(selection)은 이름·크기만으로 즉시 나가고, 트리를
+ * 걷는 집계는 몇 장씩 끊어 편집기에 숨을 돌려 주며 뒤따라 온다.
+ */
+export interface FrameMetaHandler extends EventHandler {
+  name: 'frames:meta'
+  handler: (meta: Array<{ id: string; imageCount: number; textCount: number }>) => void
 }
 
 /** 이미지 fill 을 쓰는 노드 하나 — 표시 크기는 부모 배율까지 곱한 렌더 기준이다 */
@@ -188,6 +213,8 @@ export type Preflight = {
   /** 이미지 해시 → 원본 긴 변(px). 크기를 못 읽은 이미지는 빠진다. */
   imageEdges: Record<string, number>
   textRejects: TextReject[]
+  /** 원본 크기를 아직 읽는 중 — imageEdges 에 빠진 것이 "못 읽음" 이 아니라 "아직" 이다 */
+  sizing?: boolean
 }
 
 export interface PreflightHandler extends EventHandler {
@@ -265,7 +292,8 @@ export interface StoredFontsHandler extends EventHandler {
 
 export interface FontSaveHandler extends EventHandler {
   name: 'font:save'
-  handler: (payload: { font: StoredFont; bytes: Uint8Array }) => void
+  /** quiet — 묶음 저장(폴더 스캔)은 건마다 토스트를 띄우지 않는다. 요약은 보낸 쪽이 낸다. */
+  handler: (payload: { font: StoredFont; bytes: Uint8Array; quiet?: boolean }) => void
 }
 
 export interface FontDeleteHandler extends EventHandler {

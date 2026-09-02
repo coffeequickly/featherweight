@@ -8,12 +8,12 @@ import {
 } from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Component, ComponentChildren, JSX } from 'preact'
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { suggestFileName } from '../lib/fileName'
 import { MessageKey, t } from '../lib/i18n'
 import { outlinedTexts } from '../lib/preflight'
-import { DEFAULT_SETTINGS, ResizeWindowHandler } from '../lib/types'
+import { DEFAULT_SETTINGS, FrameThumbsRequestHandler, ResizeWindowHandler } from '../lib/types'
 import { PLUGIN_VERSION } from './buildInfo'
 import { ExportFooter } from './ExportFooter'
 import { FontPanel } from './FontPanel'
@@ -99,6 +99,14 @@ function AppBody(): JSX.Element {
 
   const goMain = (): void => setScreen('main')
 
+  // 썸네일은 정렬 화면을 열 때 한 번만 — 선택이 바뀌면 다시
+  const thumbsFor = useRef(-1)
+  useEffect(() => {
+    if (screen !== 'frames' || thumbsFor.current === main.selectionSerial) return
+    thumbsFor.current = main.selectionSerial
+    emit<FrameThumbsRequestHandler>('frames:thumbs:request')
+  }, [screen, main.selectionSerial])
+
   // 크기 그림에 그릴 장표 — 가장 긴 변을 가진 프레임과 그 짧은 변
   const widest = items.reduce(
     (best, item) => {
@@ -154,6 +162,7 @@ function AppBody(): JSX.Element {
             fonts={fonts}
             storedFonts={storedFonts}
             settings={settings}
+            editor={main.editor}
             disabled={exporter.busy}
             report={exporter.report}
             onChangeSettings={main.applySettings}
@@ -170,6 +179,7 @@ function AppBody(): JSX.Element {
             frameLongEdge={widest.long}
             frameShortEdge={widest.short}
             version={PLUGIN_VERSION}
+            editor={main.editor}
           />
         ) : null}
 
