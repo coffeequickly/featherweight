@@ -42,21 +42,28 @@ const MESSAGES = {
   'settings.reset': { en: 'Reset', ko: '기본값으로' },
   'fonts.none': { en: 'No text in this document', ko: '문서에 쓰인 폰트가 없습니다' },
   // 아무것도 선택하지 않았을 때만 보이는 약속 — 프레임을 고르면 체크리스트가 대신 말한다
+  // 디자인 파일에서는 프레임, Slides 에서는 슬라이드 — 문장에 {unit}/{units} 로 끼운다
+  'unit.frame': { en: 'frame', ko: '프레임' },
+  'unit.frames': { en: 'frames', ko: '프레임' },
+  'unit.slide': { en: 'slide', ko: '슬라이드' },
+  'unit.slides': { en: 'slides', ko: '슬라이드' },
   'app.promise': {
-    en: 'Images in the selected frames are downscaled to the size they are shown at, and text is embedded with real fonts.',
-    ko: '선택한 프레임의 이미지는 보이는 크기에 맞춰 줄이고, 텍스트는 진짜 폰트로 넣습니다.'
+    en: 'Images in the selected {units} are downscaled to the size they are shown at, and text is embedded with real fonts.',
+    ko: '선택한 {unit}의 이미지는 보이는 크기에 맞춰 줄이고, 텍스트는 진짜 폰트로 넣습니다.'
   },
 
   // ── 내보내기 전 체크리스트 ───────────────────────────────
   // 네 줄: 프레임 · 이미지 · 폰트 · 텍스트. 문제가 있으면 그 줄이 경고가 되고 갈 곳을 단다.
   'preflight.title': { en: 'Before you export', ko: '내보내기 전에' },
   'preflight.checking': { en: 'Checking…', ko: '확인 중…' },
+  'preflight.scanning': { en: 'Reading the selection', ko: '선택한 프레임을 읽는 중' },
   'preflight.frames': {
-    en: (p) => `${n(Number(p.count), 'frame', 'frames')} · ${p.size}`,
-    ko: '프레임 {count}장 · {size}'
+    en: (p) => `${n(Number(p.count), String(p.unit), String(p.units))} · ${p.size}`,
+    ko: '{unit} {count}장 · {size}'
   },
   'preflight.framesMixed': { en: 'mixed sizes', ko: '크기 여러 가지' },
   'preflight.framesAsIs': { en: 'As selected on the canvas', ko: '캔버스에서 선택한 그대로' },
+  'preflight.slidesAsIs': { en: 'In deck order', ko: '덱 순서 그대로' },
   'preflight.framesReordered': { en: 'Custom order', ko: '순서 직접 정함' },
   'preflight.framesExcluded': {
     en: (p) => `${p.count} excluded`,
@@ -74,8 +81,8 @@ const MESSAGES = {
     ko: '화질은 {target}에 맞춰 정합니다'
   },
   'preflight.noTextDetail': {
-    en: 'No text layers in the selection',
-    ko: '선택한 프레임에 텍스트가 없습니다'
+    en: 'No text layers in the selected {units}',
+    ko: '선택한 {unit}에 텍스트가 없습니다'
   },
   'preflight.textOffDetail': {
     en: 'No search, copy or ATS parsing',
@@ -84,6 +91,10 @@ const MESSAGES = {
   'preflight.images': {
     en: (p) => n(Number(p.count), 'image', 'images'),
     ko: '이미지 {count}장'
+  },
+  'preflight.imagesSizing': {
+    en: 'Reading sizes · {done}/{total}',
+    ko: '원본 크기 읽는 중 · {done}/{total}'
   },
   'preflight.imagesShrink': {
     en: (p) => `${p.shrink} of ${p.total} images will be downscaled`,
@@ -190,9 +201,11 @@ const MESSAGES = {
     en: 'Select frames on the canvas to export',
     ko: '내보낼 프레임을 캔버스에서 선택하세요'
   },
+  // Slides 는 아무것도 안 고르면 덱 전체라, 빈 화면은 덱에 슬라이드가 없을 때뿐이다
+  'frames.emptySlides': { en: 'This deck has no slides yet', ko: '이 덱에 슬라이드가 없습니다' },
   'frames.emptyHint': {
-    en: 'Top-level frames · multi-select supported',
-    ko: '최상위 프레임 선택 · 여러 개 선택 가능'
+    en: 'Frames, or a section holding them · multi-select supported',
+    ko: '프레임이나 프레임을 묶은 섹션 · 여러 개 선택 가능'
   },
   'frames.focus': {
     en: 'Click to show on canvas · drag to reorder',
@@ -245,8 +258,8 @@ const MESSAGES = {
   'images.multiplier': { en: 'Scale', ko: '배율' },
   'images.maxEdge': { en: 'Max edge', ko: '상한' },
   // ── 크기 그림 (SizeDiagram) ─────────────────────────────
-  'diagram.frame': { en: 'Frame long edge {frame}pt', ko: '장표 긴 변 {frame}pt' },
-  'diagram.frameSample': { en: 'e.g. a {frame}pt frame', ko: '예: {frame}pt 장표' },
+  'diagram.frame': { en: '{Unit} long edge {frame}pt', ko: '{unit} 긴 변 {frame}pt' },
+  'diagram.frameSample': { en: 'e.g. a {frame}pt {unit}', ko: '예: {frame}pt {unit}' },
   'diagram.wanted': {
     en: '× scale {multiplier} = {wanted}px',
     ko: '× 배율 {multiplier} = {wanted}px'
@@ -345,8 +358,12 @@ const MESSAGES = {
     ko: '폰트 읽는 중… {current}/{total}'
   },
   'fonts.scanResult': {
-    en: (p) => `Added ${p.found} of ${p.missing} missing fonts`,
-    ko: '없는 폰트 {missing}종 중 {found}종을 넣었습니다'
+    en: (p) => `Added ${n(Number(p.found), 'font', 'fonts')}`,
+    ko: '폰트 {found}종을 추가했습니다'
+  },
+  'fonts.scanRest': {
+    en: (p) => ` · ${p.count} not in this folder`,
+    ko: ' · {count}종은 폴더에 없습니다'
   },
   'fonts.scanNone': {
     en: 'No matching .ttf in that folder',

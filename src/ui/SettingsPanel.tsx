@@ -13,7 +13,7 @@ import { ComponentChildren, Fragment, JSX } from 'preact'
 
 import { t } from '../lib/i18n'
 import { edgeTag, MAX_EDGES, MIN_EDGES, MULTIPLIERS } from '../lib/settingsOptions'
-import { Settings } from '../lib/types'
+import { EditorKind, Settings } from '../lib/types'
 import { ChoiceRow } from './ChoiceRow'
 import { EdgeGlyph, ImageGlyph, ScaleGlyph } from './glyphs'
 import { SizeDiagram } from './SizeDiagram'
@@ -27,6 +27,7 @@ type Props = {
   frameShortEdge: number
   /** 메인에서 헤더를 뺐으니 버전은 여기 맨 아래에 */
   version: string
+  editor: EditorKind
 }
 
 /**
@@ -42,7 +43,8 @@ export function SettingsPanel({
   onChange,
   frameLongEdge,
   frameShortEdge,
-  version
+  version,
+  editor
 }: Props): JSX.Element {
   return (
     <Fragment>
@@ -59,6 +61,7 @@ export function SettingsPanel({
             frameShortEdge={frameShortEdge}
             multiplier={settings.multiplier}
             maxEdge={settings.maxEdge}
+            editor={editor}
           />
           <VerticalSpace space="small" />
 

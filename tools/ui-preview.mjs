@@ -197,6 +197,7 @@ const FIXTURE = {
     cancelled: false,
     skipped: [],
     imagesProcessed: 5,
+    imageHashes: [],
     textDrawn: 127,
     fallbacks: [
       { nodeId: 't1', reason: { code: 'reject.stroked' } },
@@ -255,6 +256,8 @@ function page(uiScript, query) {
   const withReport = query.get('report') === '1'
   // ?wide=1 — 1920×1080 장표. 상한이 배율을 누르는 경우(크기 그림)를 본다
   const wide = query.get('wide') === '1'
+  // ?editor=slides — Slides 문구(슬라이드 N장)로 본다. wide 도 같이 켠다
+  const editor = query.get('editor') === 'slides' ? 'slides' : 'figma'
   const edge = Number(query.get('edge') ?? 0) || null
   const width = Number(query.get('w') ?? 400)
   const height = Number(query.get('h') ?? 560)
@@ -282,7 +285,8 @@ const VARS = ${JSON.stringify(dark ? FIGMA_VARS_DARK : FIGMA_VARS)}\nconst FRAME
 const ALL_FONTS_READY = ${allFontsReady}
 const FIT_TO_SIZE = ${fitToSize}
 const TEXT_CLEAN = ${textClean}
-const WIDE = ${wide}
+const WIDE = ${wide} || ${editor === 'slides' ? 'true' : 'false'}
+const EDITOR = ${JSON.stringify(editor)}
 const EDGE = ${edge === null ? 'null' : edge}
 
 const iframe = document.getElementById('ui')
@@ -322,7 +326,12 @@ window.addEventListener('message', (event) => {
     const selection = WIDE
       ? baseSelection.map((frame) => ({ ...frame, width: 1920, height: 1080 }))
       : baseSelection
+    send('editor', EDITOR)
     send('selection', selection)
+    send(
+      'frames:meta',
+      selection.map((f) => ({ id: f.id, imageCount: f.imageCount, textCount: f.textCount }))
+    )
     // ?fonts=ready — 카탈로그 밖 서체를 빼고 전부 준비된 상태로 (마케팅 캡처용)
     send('fonts', ALL_FONTS_READY ? FIXTURE.fonts.filter((f) => f.family !== 'Nexa') : FIXTURE.fonts)
     send('fonts:stored', FIXTURE.storedFonts)

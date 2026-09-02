@@ -15,7 +15,8 @@ import { fontReadiness } from '../lib/fontStatus'
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
 import { forecastImages, groupReasons, outlinedTexts, uniformSize } from '../lib/preflight'
-import { FontUsage, FrameItem, Preflight, Settings, StoredFont } from '../lib/types'
+import { EditorKind, FontUsage, FrameItem, Preflight, Settings, StoredFont } from '../lib/types'
+import { unitWords } from './units'
 
 export type SubScreen = 'frames' | 'fonts' | 'text'
 
@@ -28,6 +29,7 @@ type Props = {
   fonts: FontUsage[]
   storedFonts: StoredFont[]
   settings: Settings
+  editor: EditorKind
   onOpen: (screen: SubScreen) => void
   /** "텍스트 임베딩 꺼짐" 줄의 [켜기] — 설정 화면까지 갈 일이 아니다 */
   onEnableText: () => void
@@ -75,39 +77,48 @@ export function PreFlight(props: Props): JSX.Element {
   )
 }
 
-function framesRow({ items, visibleCount, excludedCount, reordered, onOpen }: Props): Row {
+function framesRow({ items, visibleCount, excludedCount, reordered, editor, onOpen }: Props): Row {
   const size = uniformSize(items)
   const details: string[] = []
   if (reordered) details.push(t('preflight.framesReordered'))
   if (excludedCount > 0) details.push(t('preflight.framesExcluded', { count: excludedCount }))
+  const asIs = t(editor === 'slides' ? 'preflight.slidesAsIs' : 'preflight.framesAsIs')
 
   return {
     tone: 'ok',
     head: t('preflight.frames', {
       count: visibleCount,
-      size: size === null ? t('preflight.framesMixed') : `${size.width}×${size.height}`
+      size: size === null ? t('preflight.framesMixed') : `${size.width}×${size.height}`,
+      ...unitWords(editor)
     }),
-    detail: details.length === 0 ? t('preflight.framesAsIs') : details.join(' · '),
+    detail: details.length === 0 ? asIs : details.join(' · '),
     action:
       items.length < 2 ? undefined : { label: t('screen.frames'), onClick: () => onOpen('frames') }
   }
 }
 
 function imagesRow({ items, preflight, settings }: Props): Row {
-  // 재료가 오기 전에는 프레임별 수의 합으로 말한다 — 같은 그림이 여러 장에 있으면 조금 많다
+  // 재료가 오기 전에는 아직 모른다 — 0 이라고 말하면 거짓말이다
+  if (preflight === null) {
+    return { tone: 'ok', head: t('preflight.scanning'), detail: t('preflight.checking') }
+  }
   const roughTotal = items.reduce((sum, item) => sum + item.imageCount, 0)
   if (roughTotal === 0) {
     return { tone: 'ok', head: t('preflight.imagesNone'), detail: t('preflight.imagesNoneDetail') }
   }
-  if (preflight === null) {
-    return {
-      tone: 'ok',
-      head: t('preflight.images', { count: roughTotal }),
-      detail: t('preflight.checking')
-    }
-  }
 
   const forecast = forecastImages(preflight, settings)
+  // 크기를 아직 읽는 중이면 "줄임 예정 0장" 은 거짓말이다 — 몇 장 읽었는지만
+  if (preflight.sizing === true && forecast.unsized > 0) {
+    return {
+      tone: 'ok',
+      head: t('preflight.images', { count: forecast.total }),
+      detail: t('preflight.imagesSizing', {
+        done: forecast.total - forecast.unsized,
+        total: forecast.total
+      })
+    }
+  }
   const tiny =
     forecast.tiny > 0
       ? t('preflight.imagesKeptTiny', { count: forecast.tiny, minEdge: settings.minEdge })
@@ -142,10 +153,17 @@ function imagesRow({ items, preflight, settings }: Props): Row {
   }
 }
 
-function fontsRow({ fonts, storedFonts, onOpen }: Props): Row {
+function fontsRow({ preflight, fonts, storedFonts, editor, onOpen }: Props): Row {
+  if (preflight === null) {
+    return { tone: 'ok', head: t('preflight.scanning'), detail: t('preflight.checking') }
+  }
   const readiness = fontReadiness(fonts, storedFonts)
   if (readiness.total === 0) {
-    return { tone: 'ok', head: t('preflight.fontsNone'), detail: t('preflight.noTextDetail') }
+    return {
+      tone: 'ok',
+      head: t('preflight.fontsNone'),
+      detail: t('preflight.noTextDetail', unitWords(editor))
+    }
   }
 
   const open = { label: t('screen.fonts'), onClick: () => onOpen('fonts') }
@@ -184,6 +202,7 @@ function textRow({
   fonts,
   storedFonts,
   settings,
+  editor,
   onOpen,
   onEnableText
 }: Props): Row {
@@ -196,21 +215,20 @@ function textRow({
     }
   }
 
+  if (preflight === null) {
+    return { tone: 'ok', head: t('preflight.scanning'), detail: t('preflight.checking') }
+  }
+
   const total = items.reduce((sum, item) => sum + item.textCount, 0)
   if (total === 0) {
-    return { tone: 'ok', head: t('preflight.textNone'), detail: t('preflight.noTextDetail') }
-  }
-
-  // 폰트가 없어 아웃라인이 될 노드는 폰트 목록만으로 안다 — 구조 검사 결과보다 먼저 말할 수 있다
-  const outlined = outlinedTexts(preflight?.textRejects ?? [], fonts, storedFonts)
-
-  if (preflight === null && outlined.length === 0) {
     return {
       tone: 'ok',
-      head: t('preflight.textAll', { count: total }),
-      detail: t('preflight.checking')
+      head: t('preflight.textNone'),
+      detail: t('preflight.noTextDetail', unitWords(editor))
     }
   }
+
+  const outlined = outlinedTexts(preflight.textRejects, fonts, storedFonts)
 
   if (outlined.length === 0) {
     return {

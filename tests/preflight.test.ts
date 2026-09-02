@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { forecastImages, groupReasons, uniformSize } from '../src/lib/preflight'
+import { forecastImages, groupReasons, unifyMissingGlyphs, uniformSize } from '../src/lib/preflight'
 import { DEFAULT_SETTINGS, FrameItem, ImageUsage, Preflight } from '../src/lib/types'
 
 function usage(
@@ -24,7 +24,11 @@ describe('forecastImages', () => {
       imageEdges: { big: 3000, logo: 400 },
       textRejects: []
     }
-    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toEqual({ total: 2, shrink: 1, tiny: 1 })
+    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toMatchObject({
+      total: 2,
+      shrink: 1,
+      tiny: 1
+    })
   })
 
   it('같은 이미지를 여러 프레임이 써도 하나로 센다', () => {
@@ -36,7 +40,11 @@ describe('forecastImages', () => {
       imageEdges: { big: 3000 },
       textRejects: []
     }
-    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toEqual({ total: 1, shrink: 1, tiny: 0 })
+    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toMatchObject({
+      total: 1,
+      shrink: 1,
+      tiny: 0
+    })
   })
 
   it('크기를 모르는 이미지는 줄임으로 세지 않는다 — 셀 근거가 없다', () => {
@@ -45,7 +53,12 @@ describe('forecastImages', () => {
       imageEdges: {},
       textRejects: []
     }
-    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toEqual({ total: 1, shrink: 0, tiny: 0 })
+    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toEqual({
+      total: 1,
+      shrink: 0,
+      tiny: 0,
+      unsized: 1
+    })
   })
 
   it('TILE 은 줄이지 않지만 이미지로는 센다', () => {
@@ -54,7 +67,11 @@ describe('forecastImages', () => {
       imageEdges: { pattern: 3000 },
       textRejects: []
     }
-    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toEqual({ total: 1, shrink: 0, tiny: 0 })
+    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toMatchObject({
+      total: 1,
+      shrink: 0,
+      tiny: 0
+    })
   })
 
   it('하한(minEdge)을 올리면 그 아래 이미지는 어떤 프레임에서도 그대로다', () => {
@@ -68,13 +85,18 @@ describe('forecastImages', () => {
     expect(forecastImages(preflight, { ...DEFAULT_SETTINGS, minEdge: 1024 })).toEqual({
       total: 1,
       shrink: 0,
-      tiny: 1
+      tiny: 1,
+      unsized: 0
     })
   })
 
   it('이미지가 없으면 전부 0', () => {
     const preflight: Preflight = { frames: [frame('f1', 842, [])], imageEdges: {}, textRejects: [] }
-    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toEqual({ total: 0, shrink: 0, tiny: 0 })
+    expect(forecastImages(preflight, DEFAULT_SETTINGS)).toMatchObject({
+      total: 0,
+      shrink: 0,
+      tiny: 0
+    })
   })
 })
 
@@ -103,6 +125,38 @@ describe('uniformSize', () => {
 
   it('비어 있으면 null', () => {
     expect(uniformSize([])).toBeNull()
+  })
+})
+
+describe('unifyMissingGlyphs', () => {
+  it('글자만 다른 "폰트에 없는 글자" 를 한 사유로 모은다', () => {
+    const unified = unifyMissingGlyphs([
+      { nodeId: 'a', reason: { code: 'font.missingGlyphs', params: { count: 1, sample: '–' } } },
+      { nodeId: 'b', reason: { code: 'reject.stroked' } },
+      { nodeId: 'c', reason: { code: 'font.missingGlyphs', params: { count: 1, sample: '—' } } }
+    ])
+    expect(unified[0].reason).toEqual({
+      code: 'font.missingGlyphs',
+      params: { count: 2, sample: '–—' }
+    })
+    expect(unified[2].reason).toBe(unified[0].reason)
+    expect(unified[1].reason).toEqual({ code: 'reject.stroked' })
+  })
+
+  it('견본이 잘린 노드가 있으면 개수를 더해 어림한다', () => {
+    const unified = unifyMissingGlyphs([
+      {
+        nodeId: 'a',
+        reason: { code: 'font.missingGlyphs', params: { count: 9, sample: 'abcdef' } }
+      },
+      { nodeId: 'b', reason: { code: 'font.missingGlyphs', params: { count: 1, sample: 'g' } } }
+    ])
+    expect(unified[0].reason.params).toEqual({ count: 10, sample: 'abcdef' })
+  })
+
+  it('없으면 그대로', () => {
+    const items = [{ nodeId: 'a', reason: { code: 'reject.stroked' as const } }]
+    expect(unifyMissingGlyphs(items)).toEqual(items)
   })
 })
 

@@ -4,7 +4,8 @@ import { Muted, Text, VerticalSpace } from '@create-figma-plugin/ui'
 import { Fragment, JSX } from 'preact'
 
 import { t } from '../lib/i18n'
-import { FontUsage, FrameItem, Preflight, Settings, StoredFont } from '../lib/types'
+import { EditorKind, FontUsage, FrameItem, Preflight, Settings, StoredFont } from '../lib/types'
+import { unitWords } from './units'
 import { PreFlight, SubScreen } from './PreFlight'
 import { PresetBar } from './PresetBar'
 import { ReportCard } from './ReportCard'
@@ -18,6 +19,7 @@ type Props = {
   fonts: FontUsage[]
   storedFonts: StoredFont[]
   settings: Settings
+  editor: EditorKind
   disabled: boolean
   report: ExportReport | null
   onChangeSettings: (next: Settings) => void
@@ -32,6 +34,7 @@ export function MainScreen({
   fonts,
   storedFonts,
   settings,
+  editor,
   disabled,
   report,
   onChangeSettings,
@@ -52,16 +55,22 @@ export function MainScreen({
       {items.length === 0 ? (
         <Fragment>
           <div class="emptyCard">
-            <Text>{t('frames.empty')}</Text>
-            <VerticalSpace space="extraSmall" />
-            <Text>
-              <Muted>{t('frames.emptyHint')}</Muted>
-            </Text>
+            {editor === 'slides' ? (
+              <Text>{t('frames.emptySlides')}</Text>
+            ) : (
+              <Fragment>
+                <Text>{t('frames.empty')}</Text>
+                <VerticalSpace space="extraSmall" />
+                <Text>
+                  <Muted>{t('frames.emptyHint')}</Muted>
+                </Text>
+              </Fragment>
+            )}
           </div>
           {/* 아무것도 선택하지 않았을 때만 — 프레임을 고르면 체크리스트가 대신 말한다 */}
           <VerticalSpace space="small" />
           <Text>
-            <Muted>{t('app.promise')}</Muted>
+            <Muted>{t('app.promise', unitWords(editor))}</Muted>
           </Text>
         </Fragment>
       ) : (
@@ -74,6 +83,7 @@ export function MainScreen({
           fonts={fonts}
           storedFonts={storedFonts}
           settings={settings}
+          editor={editor}
           onOpen={onOpen}
           onEnableText={() => onChangeSettings({ ...settings, embedText: true })}
         />

@@ -11,10 +11,13 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import {
   DEFAULT_SETTINGS,
   DocNameHandler,
+  EditorHandler,
+  EditorKind,
   FontBytesResultHandler,
   FontsHandler,
   FontUsage,
   FrameItem,
+  FrameMetaHandler,
   FrameThumbsHandler,
   ImageCacheHandler,
   ImageProbeHandler,
@@ -32,6 +35,7 @@ import {
   StoredFontsHandler,
   TextValidateHandler,
   TextValidateResultHandler,
+  ToastHandler,
   UiReadyHandler
 } from '../lib/types'
 import { settleResponse } from './bridge'
@@ -53,13 +57,16 @@ export type MainState = {
   preflight: Preflight | null
   fonts: FontUsage[]
   storedFonts: StoredFont[]
+  /** 디자인 파일인지 Slides 인지 — 문구의 프레임/슬라이드가 갈린다 */
+  editor: EditorKind
   notice: Notice
   settings: Settings
   docName: string
   /** 설정을 바꾸고 clientStorage 에도 저장한다 */
   applySettings: (next: Settings) => void
   /**
-   * UI 안에서 생긴 알림을 띄운다.
+   * 알림을 띄운다. 잘 된 일은 캔버스 토스트로, 문제는 패널 띠로 — 띠에는 경고 아이콘이
+   * 붙어서 "저장 완료" 같은 문구가 문제처럼 읽힌다.
    *
    * emit('notice') 로 보내면 안 된다 — notice 는 메인→UI 단방향이라 메인에 핸들러가
    * 없고, "No event handler with name `notice`" 로 죽는다. UI 에서 난 일은 UI 가 띄운다.
@@ -76,9 +83,15 @@ export function useMainState(): MainState {
   const [notice, setNotice] = useState<Notice>(null)
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [docName, setDocName] = useState('')
+  const [editor, setEditor] = useState<EditorKind>('figma')
 
   const storedFontsRef = useRef<StoredFont[]>(storedFonts)
   storedFontsRef.current = storedFonts
+
+  const showNotice = useCallback((next: Notice): void => {
+    if (next !== null && !next.error) emit<ToastHandler>('toast', next.message)
+    else setNotice(next)
+  }, [])
 
   useEffect(() => {
     const offSelection = on<SelectionHandler>('selection', (next) => {
@@ -87,6 +100,18 @@ export function useMainState(): MainState {
       setSelectionSerial((serial) => serial + 1)
     })
     const offPreflight = on<PreflightHandler>('preflight', setPreflight)
+    // 이미지·텍스트 수는 목록 뒤에 온다 — 있는 행에만 얹는다
+    const offMeta = on<FrameMetaHandler>('frames:meta', (meta) => {
+      const byId = new Map(meta.map((entry) => [entry.id, entry]))
+      setItems((previous) =>
+        previous.map((item) => {
+          const found = byId.get(item.id)
+          return found === undefined
+            ? item
+            : { ...item, imageCount: found.imageCount, textCount: found.textCount }
+        })
+      )
+    })
     // 썸네일은 목록 뒤에 따로 온다 — 있는 행에만 얹는다
     const offThumbs = on<FrameThumbsHandler>('frames:thumbs', (thumbs) => {
       const byId = new Map(thumbs.map((entry) => [entry.id, entry.thumb]))
@@ -98,12 +123,13 @@ export function useMainState(): MainState {
       )
     })
     const offDocName = on<DocNameHandler>('doc:name', setDocName)
+    const offEditor = on<EditorHandler>('editor', setEditor)
     const offFonts = on<FontsHandler>('fonts', setFonts)
     const offStored = on<StoredFontsHandler>('fonts:stored', (next) => {
       resetFontCache() // 폰트가 바뀌면 캐시된 바이트·글리프 정보를 버린다
       setStoredFonts(next)
     })
-    const offNotice = on<NoticeHandler>('notice', setNotice)
+    const offNotice = on<NoticeHandler>('notice', showNotice)
     const offSettings = on<SettingsHandler>('settings', setSettings)
 
     const offFontBytes = on<FontBytesResultHandler>('font:bytes:result', (payload) => {
@@ -148,8 +174,10 @@ export function useMainState(): MainState {
     return () => {
       offSelection()
       offPreflight()
+      offMeta()
       offThumbs()
       offDocName()
+      offEditor()
       offFonts()
       offStored()
       offNotice()
@@ -179,10 +207,11 @@ export function useMainState(): MainState {
     preflight,
     fonts,
     storedFonts,
+    editor,
     notice,
     settings,
     docName,
     applySettings,
-    showNotice: setNotice
+    showNotice
   }
 }

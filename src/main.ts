@@ -19,6 +19,7 @@ import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
 import { exportFrame, removeLeftoverClones } from './main/exporter'
 import { forgetSeenImages, OriginalSink, planFor, seenImageInfo } from './main/images'
+import { loadEdgeCache } from './main/imageSize'
 import { deleteFont, listFonts, pruneOrphanFonts, readFontBytes, saveFont } from './main/fontStore'
 import {
   CancelHandler,
@@ -41,6 +42,7 @@ import {
   ResizeResultPayload,
   PdfPartHandler,
   DocNameHandler,
+  EditorHandler,
   FitMeasuredHandler,
   FitReport,
   ImageProbeResultHandler,
@@ -48,7 +50,9 @@ import {
   ImageProbeHandler,
   ImageProbeItem,
   FrameFocusHandler,
+  FrameMetaHandler,
   FrameThumbsHandler,
+  FrameThumbsRequestHandler,
   NodesFocusHandler,
   PreflightHandler,
   ProgressHandler,
@@ -69,7 +73,14 @@ import {
   UiReadyHandler
 } from './lib/types'
 import { detectLocale, setLocale, t } from './lib/i18n'
-import { exportableSelection, imageEdges, renderThumbs, scanSelection } from './main/selection'
+import {
+  ExportableNode,
+  exportableSelection,
+  imageEdges,
+  listItems,
+  renderThumbs,
+  scanSelection
+} from './main/selection'
 
 export default async function main(): Promise<void> {
   await cleanupLeftovers()
@@ -78,8 +89,10 @@ export default async function main(): Promise<void> {
   on<UiReadyHandler>('ui:ready', (locale) => {
     setLocale(detectLocale(locale))
     emit<DocNameHandler>('doc:name', figma.root.name)
+    emit<EditorHandler>('editor', figma.editorType === 'slides' ? 'slides' : 'figma')
     void sendSettings()
-    void sendSelection()
+    // 지난번에 읽은 이미지 크기를 먼저 깨워야 첫 선택이 빨리 채워진다
+    void loadEdgeCache().then(() => sendSelection(true))
     void sendStoredFonts()
   })
 
@@ -122,11 +135,15 @@ export default async function main(): Promise<void> {
   // 폴더에서 여러 개를 한꺼번에 넣으면 인덱스 읽기-수정-쓰기가 겹쳐 앞의 것이 사라진다 — 줄 세운다
   let fontOps: Promise<void> = Promise.resolve()
   on<FontSaveHandler>('font:save', (payload) => {
-    fontOps = fontOps.then(() => storeFont(payload.font, payload.bytes))
+    fontOps = fontOps.then(() => storeFont(payload.font, payload.bytes, payload.quiet === true))
   })
 
   on<FontDeleteHandler>('font:delete', (ref) => {
     void dropFont(ref)
+  })
+
+  on<FrameThumbsRequestHandler>('frames:thumbs:request', () => {
+    void sendThumbs()
   })
 
   on<FrameFocusHandler>('frame:focus', (id) => {
@@ -515,6 +532,9 @@ async function focusNodes(ids: string[]): Promise<void> {
 const SELECTION_DEBOUNCE_MS = 60
 let selectionTimer: ReturnType<typeof setTimeout> | null = null
 let selectionGeneration = 0
+/** 마지막으로 보낸 집합 — 같으면 다시 걷지 않는다 */
+let selectionSignature = ''
+let selectionNodes: ExportableNode[] = []
 
 function scheduleSelection(): void {
   if (selectionTimer !== null) clearTimeout(selectionTimer)
@@ -525,30 +545,60 @@ function scheduleSelection(): void {
 }
 
 /**
- * 목록은 즉시, 이미지 크기와 썸네일은 뒤따라 보낸다.
- * 도중에 선택이 또 바뀌면(세대가 넘어가면) 늦게 끝난 것은 버린다 — 옛 선택의 그림이
+ * 목록은 즉시, 집계·이미지 크기는 몇 장씩 끊어 뒤따라 보낸다.
+ * 도중에 선택이 또 바뀌면(세대가 넘어가면) 늦게 끝난 것은 버린다 — 옛 선택의 값이
  * 새 목록 위에 얹히는 일이 없어야 한다.
+ *
+ * 내보낼 집합이 그대로면 아무것도 안 한다. Slides 에서 슬라이드 안 글자를 클릭하면
+ * "덱 전체" 가 다시 잡히는데, 그때마다 31장을 걷다가 캔버스가 멈췄다.
  */
-async function sendSelection(): Promise<void> {
+async function sendSelection(force = false): Promise<void> {
+  const nodes = exportableSelection()
+  const signature = nodes.map((node) => node.id).join('\n')
+  if (!force && signature === selectionSignature) return
+  selectionSignature = signature
+  selectionNodes = nodes
+
   selectionGeneration += 1
   const generation = selectionGeneration
   const isStale = (): boolean => generation !== selectionGeneration
 
-  const nodes = exportableSelection()
-  const scan = scanSelection(nodes)
-  emit<SelectionHandler>('selection', scan.items)
+  emit<SelectionHandler>('selection', listItems(nodes))
+
+  const scan = await scanSelection(nodes, isStale)
+  if (scan === null) return
+  emit<FrameMetaHandler>(
+    'frames:meta',
+    scan.items.map((item) => ({
+      id: item.id,
+      imageCount: item.imageCount,
+      textCount: item.textCount
+    }))
+  )
   emit<FontsHandler>('fonts', scan.fonts)
 
   const hashes = scan.frames.flatMap((frame) => frame.images.map((usage) => usage.imageHash))
-  const edges = await imageEdges(hashes)
-  if (isStale()) return
-  emit<PreflightHandler>('preflight', {
-    frames: scan.frames,
-    imageEdges: edges,
-    textRejects: scan.textRejects
+  const preflightWith = (edges: Record<string, number>, sizing: boolean): void => {
+    emit<PreflightHandler>('preflight', {
+      frames: scan.frames,
+      imageEdges: edges,
+      textRejects: scan.textRejects,
+      sizing
+    })
+  }
+  // 아는 것부터 먼저 보여 주고, 원본 크기는 오는 대로 채운다
+  const edges = await imageEdges(hashes, isStale, (partial) => {
+    if (!isStale()) preflightWith(partial, true)
   })
+  if (isStale()) return
+  preflightWith(edges, false)
+}
 
-  const thumbs = await renderThumbs(nodes, isStale)
+/** 정렬 화면이 열릴 때만 — 그때의 집합으로 그린다 */
+async function sendThumbs(): Promise<void> {
+  const generation = selectionGeneration
+  const isStale = (): boolean => generation !== selectionGeneration
+  const thumbs = await renderThumbs(selectionNodes, isStale)
   if (isStale() || thumbs.length === 0) return
   emit<FrameThumbsHandler>('frames:thumbs', thumbs)
 }
@@ -569,13 +619,12 @@ async function sendStoredFonts(): Promise<void> {
   emit<StoredFontsHandler>('fonts:stored', await listFonts())
 }
 
-async function storeFont(font: StoredFont, bytes: Uint8Array): Promise<void> {
+async function storeFont(font: StoredFont, bytes: Uint8Array, quiet: boolean): Promise<void> {
   try {
     emit<StoredFontsHandler>('fonts:stored', await saveFont(font, bytes))
-    emit<NoticeHandler>('notice', {
-      message: t('main.fontSaved', { family: font.family, style: font.style }),
-      error: false
-    })
+    // 잘 된 일은 캔버스 토스트 — 패널 띠는 경고 아이콘이 붙어 문제로 읽힌다.
+    // 묶음 저장은 조용히 — 보낸 쪽이 한 번에 요약한다.
+    if (!quiet) figma.notify(t('main.fontSaved', { family: font.family, style: font.style }))
   } catch (error) {
     // 5MB 한도를 넘기면 setAsync 가 reject 한다.
     emit<NoticeHandler>('notice', {

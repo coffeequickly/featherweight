@@ -48,7 +48,8 @@
   },
   "figma-plugin": {
     "editorType": [
-      "figma"
+      "figma",
+      "slides"
     ],
     "id": "1672509720278498323",
     "name": "Featherweight",

@@ -9,7 +9,8 @@ import { JSX } from 'preact'
 
 import { t } from '../lib/i18n'
 import { edgeTag, MAX_EDGES } from '../lib/settingsOptions'
-import { Settings } from '../lib/types'
+import { EditorKind, Settings } from '../lib/types'
+import { unitWords } from './units'
 
 type Props = {
   /** 선택한 프레임 중 가장 긴 변(pt)과 짧은 변. 긴 변이 0 이면 보기용 장표를 그린다. */
@@ -17,6 +18,7 @@ type Props = {
   frameShortEdge: number
   multiplier: Settings['multiplier']
   maxEdge: Settings['maxEdge']
+  editor: EditorKind
 }
 
 const WIDTH = 368
@@ -36,8 +38,10 @@ export function SizeDiagram({
   frameLongEdge,
   frameShortEdge,
   multiplier,
-  maxEdge
+  maxEdge,
+  editor
 }: Props): JSX.Element {
+  const words = unitWords(editor)
   const sample = frameLongEdge <= 0
   const long = Math.round(sample ? SAMPLE_LONG : frameLongEdge)
   const short = Math.round(sample ? SAMPLE_SHORT : Math.max(1, frameShortEdge))
@@ -137,7 +141,9 @@ export function SizeDiagram({
       <VerticalSpace space="extraSmall" />
       <Text>
         <Muted>
-          {sample ? t('diagram.frameSample', { frame: long }) : t('diagram.frame', { frame: long })}{' '}
+          {sample
+            ? t('diagram.frameSample', { frame: long, ...words })
+            : t('diagram.frame', { frame: long, ...words })}{' '}
           {t('diagram.wanted', { multiplier, wanted })}
         </Muted>
       </Text>

@@ -9,6 +9,7 @@ import {
   TMP_NODE_NAME
 } from '../lib/types'
 import { imageUsagesOf } from './images'
+import { knownEdge, persistEdgeCache, readEdge, rememberEdge } from './imageSize'
 import { screenTextNode } from './text'
 
 const EXPORTABLE_TYPES = [
@@ -17,7 +18,9 @@ const EXPORTABLE_TYPES = [
   'COMPONENT_SET',
   'INSTANCE',
   'SECTION',
-  'GROUP'
+  'GROUP',
+  // Figma Slides 의 슬라이드 하나. 크기·자식·exportAsync 가 프레임과 같다.
+  'SLIDE'
 ] as const
 
 type ExportableType = (typeof EXPORTABLE_TYPES)[number]
@@ -32,11 +35,51 @@ export function isExportable(node: BaseNode): node is ExportableNode {
   return (EXPORTABLE_TYPES as readonly string[]).includes(node.type)
 }
 
-/** 현재 선택에서 export 가능한 최상위 노드만 추린다. 임시 클론은 제외한다. */
+/** 안에 든 것이 페이지가 되는 상자 — 섹션은 프레임을, 슬라이드 행은 슬라이드를 묶는다 */
+const CONTAINER_TYPES: readonly string[] = ['SECTION', 'SLIDE_ROW']
+
+/**
+ * 상자를 고르면 그 안의 페이지들이 고른 것이다.
+ *
+ * 섹션은 보통 "1장·2장·3장" 을 묶는 용도라, 섹션 하나를 고르고 내보내면 안의 프레임이
+ * 각각 한 쪽이 되기를 기대한다. 상자 안에 페이지가 될 만한 게 하나도 없으면(도형만 있는
+ * 섹션) 상자 자체를 한 쪽으로 낸다. 상자 속 상자는 그대로 따라 들어간다.
+ * 같은 노드가 두 번 잡히면(섹션과 그 안의 프레임을 같이 고름) 한 번만 센다.
+ */
+export function expandContainers(nodes: readonly SceneNode[]): ExportableNode[] {
+  const out: ExportableNode[] = []
+  const seen = new Set<string>()
+
+  const push = (node: SceneNode): void => {
+    if (node.name === TMP_NODE_NAME || seen.has(node.id)) return
+    if (CONTAINER_TYPES.includes(node.type) && 'children' in node) {
+      const before = out.length
+      for (const child of node.children) push(child)
+      if (out.length > before) return // 안의 것들이 페이지가 됐다
+    }
+    if (isExportable(node)) {
+      seen.add(node.id)
+      out.push(node)
+    }
+  }
+
+  for (const node of nodes) push(node)
+  return out
+}
+
+/** 현재 선택에서 export 가능한 노드를 추린다. 상자는 안의 것으로 풀고, 임시 클론은 뺀다. */
 export function exportableSelection(): ExportableNode[] {
-  return figma.currentPage.selection.filter(
-    (node): node is ExportableNode => isExportable(node) && node.name !== TMP_NODE_NAME
-  )
+  const picked = expandContainers(figma.currentPage.selection)
+  if (picked.length > 0) return picked
+
+  // Slides 에서 아무것도 안 골랐으면 덱 전체 — 발표 자료는 통째로 내보내는 게 기본이다.
+  // 문서 순서가 격자 순서(행 → 슬라이드)와 같다.
+  if (figma.editorType === 'slides') {
+    return figma.currentPage
+      .findAllWithCriteria({ types: ['SLIDE'] })
+      .filter((node) => node.name !== TMP_NODE_NAME) as ExportableNode[]
+  }
+  return []
 }
 
 export type SelectionScan = {
@@ -47,18 +90,54 @@ export type SelectionScan = {
   textRejects: TextReject[]
 }
 
+/** 트리를 안 걷고도 아는 것만 — 목록이 곧바로 떠야 한다. 이미지·텍스트 수는 뒤에 온다. */
+export function listItems(nodes: readonly ExportableNode[]): FrameItem[] {
+  return nodes.map((node) => ({
+    id: node.id,
+    name: node.name,
+    width: Math.round(node.width),
+    height: Math.round(node.height),
+    x: node.x,
+    y: node.y,
+    imageCount: 0,
+    textCount: 0
+  }))
+}
+
 /**
- * 선택 → 목록·폰트·체크리스트 재료. 동기다 — 목록이 곧바로 떠야 한다.
- * 트리는 프레임당 한 번만 걷고, 그 한 번에 텍스트·폰트·이미지를 다 본다. (PRD FR-1)
+ * 한 번에 이만큼(ms)만 읽고 편집기에 차례를 넘긴다 — 프레임 경계와 무관하게.
+ * 노드 수로 끊으면 텍스트 위주 슬라이드(노드당 읽기 6~7번)와 도형 위주 슬라이드가
+ * 같은 수에 다른 시간을 쓴다. 시간으로 끊어야 한 조각이 화면 한 프레임(16ms) 안에 든다.
  */
-export function scanSelection(nodes: readonly ExportableNode[]): SelectionScan {
+const SLICE_MS = 8
+
+/** 플러그인 메인은 편집기와 같은 스레드다 — 타이머로 한 번 넘겨야 캔버스가 그려진다 */
+function yieldToEditor(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+/**
+ * 선택 → 폰트·체크리스트 재료·프레임별 집계. 트리는 프레임당 한 번만 걷고, 그 한 번에
+ * 텍스트·폰트·이미지를 다 본다.
+ *
+ * 노드 하나를 읽는 것도 전부 엔진 왕복이라(fills·strokes·effects·absoluteTransform…)
+ * 31장 × 수백 노드를 한 번에 걸으면 캔버스가 초 단위로 멈춘다. 그래서 프레임 단위가
+ * 아니라 **노드 수 단위**로 끊는다 — 큰 슬라이드 한 장도 여러 번에 나눠 걷는다.
+ * 도중에 선택이 바뀌면(isStale) null — 이어 봐야 버려진다. (PRD FR-1)
+ */
+export async function scanSelection(
+  nodes: readonly ExportableNode[],
+  isStale: () => boolean
+): Promise<SelectionScan | null> {
   const items: FrameItem[] = []
   const frames: PreflightFrame[] = []
   const segments: RawFontSegment[] = []
   const textRejects: TextReject[] = []
+  const slice = { since: Date.now() }
 
   for (const node of nodes) {
-    const scan = scanNode(node)
+    const scan = await scanNode(node, slice, isStale)
+    if (scan === null) return null
     segments.push(...scan.fontSegments)
     textRejects.push(...scan.textRejects)
 
@@ -93,12 +172,28 @@ type Scan = {
   textRejects: TextReject[]
 }
 
-/** PDF export 는 숨겨진 노드를 빼므로 여기서도 visible=false 는 세지 않는다. */
-function scanNode(root: ExportableNode): Scan {
+/**
+ * PDF export 는 숨겨진 노드를 빼므로 여기서도 visible=false 는 세지 않는다.
+ * 재귀 대신 스택으로 걷는다 — 조각 시간이 다하면 그 자리에서 멈춰 편집기에 차례를 넘기고
+ * 이어 간다. slice 는 프레임을 넘어 이어지는 시계라 호출자가 들고 있는다.
+ */
+async function scanNode(
+  root: ExportableNode,
+  slice: { since: number },
+  isStale: () => boolean
+): Promise<Scan | null> {
   const scan: Scan = { images: [], textCount: 0, fontSegments: [], textRejects: [] }
+  const stack: SceneNode[] = [root]
 
-  const visit = (current: SceneNode): void => {
-    if (current.visible === false) return
+  while (stack.length > 0) {
+    if (Date.now() - slice.since >= SLICE_MS) {
+      await yieldToEditor()
+      if (isStale()) return null
+      slice.since = Date.now()
+    }
+
+    const current = stack.pop() as SceneNode
+    if (current.visible === false) continue
 
     if (current.type === 'TEXT' && current.characters !== '') {
       scan.textCount += 1
@@ -113,11 +208,13 @@ function scanNode(root: ExportableNode): Scan {
     scan.images.push(...imageUsagesOf(current))
 
     if ('children' in current) {
-      for (const child of current.children) visit(child)
+      // 스택이라 뒤집어 넣어야 문서 순서대로 나온다 (children 도 한 번의 엔진 읽기다)
+      for (let index = current.children.length - 1; index >= 0; index -= 1) {
+        stack.push(current.children[index])
+      }
     }
   }
 
-  visit(root)
   return scan
 }
 
@@ -137,40 +234,53 @@ function collectFonts(node: TextNode, out: RawFontSegment[]): void {
   }
 }
 
-/** 해시는 내용 주소라 한 번 읽은 크기는 영원히 맞다 — 플러그인이 살아 있는 동안 들고 있는다 */
-const edgeCache = new Map<string, number>()
+/** 이만큼 읽을 때마다 화면에 중간 결과를 준다 */
+const EDGE_PROGRESS_EVERY = 6
 
 /**
  * 이미지 해시 → 원본 긴 변(px). 크기를 못 읽은 것은 빠진다.
- * getSizeAsync 는 메타데이터라 바이트를 읽지 않는다 — 선택할 때마다 불러도 된다.
+ *
+ * 한 장씩 읽고 사이마다 편집기에 차례를 넘기며, 몇 장마다 onProgress 로 그때까지의 답을
+ * 준다 — 캐시에 있던 것은 시작하자마자 한 번 준다. 도중에 선택이 바뀌면 그만둔다.
+ * 읽는 방법은 imageSize.ts — 디코드 없이 파일 머리에서.
  */
-export async function imageEdges(hashes: Iterable<string>): Promise<Record<string, number>> {
+export async function imageEdges(
+  hashes: Iterable<string>,
+  isStale: () => boolean,
+  onProgress?: (edges: Record<string, number>) => void
+): Promise<Record<string, number>> {
   const out: Record<string, number> = {}
-  const pending: Promise<void>[] = []
+  const missing: string[] = []
 
   for (const hash of new Set(hashes)) {
-    const cached = edgeCache.get(hash)
-    if (cached !== undefined) {
-      out[hash] = cached
-      continue
-    }
-    const image = figma.getImageByHash(hash)
-    if (image === null) continue
-    pending.push(
-      image
-        .getSizeAsync()
-        .then((size) => {
-          const edge = Math.max(size.width, size.height)
-          edgeCache.set(hash, edge)
-          out[hash] = edge
-        })
-        .catch(() => {
-          // 못 읽으면 예고에서 빠질 뿐이다 — export 는 자기 눈으로 다시 본다
-        })
-    )
+    const cached = knownEdge(hash)
+    if (cached !== undefined) out[hash] = cached
+    else missing.push(hash)
   }
 
-  await Promise.all(pending)
+  if (missing.length === 0) return out
+  onProgress?.({ ...out })
+
+  let sinceProgress = 0
+  for (const hash of missing) {
+    if (isStale()) break
+    const image = figma.getImageByHash(hash)
+    if (image !== null) {
+      const edge = await readEdge(image)
+      if (edge !== null) {
+        rememberEdge(hash, edge)
+        out[hash] = edge
+        sinceProgress += 1
+        if (sinceProgress >= EDGE_PROGRESS_EVERY) {
+          sinceProgress = 0
+          onProgress?.({ ...out })
+        }
+      }
+    }
+    await yieldToEditor()
+  }
+
+  void persistEdgeCache()
   return out
 }
 
