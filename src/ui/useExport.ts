@@ -216,6 +216,9 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
             fallbacks: [] as Array<{ nodeId: string; reason: Reason }>
           }
         )
+        // 장수는 서로 다른 원본으로 센다 — PDF 안의 이미지 객체 수(쪽마다 한 벌씩)로 세면
+        // 체크리스트의 "54장" 이 결과에서 "66장" 이 돼 뭘 놓쳤나 싶어진다. 바이트는 파일 그대로.
+        const distinctImages = new Set(collected.flatMap((part) => part.stats.imageHashes))
 
         setReport({
           fileName: done.fileName,
@@ -229,7 +232,7 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
           fit: done.fit ?? null,
           outlines: merged.outlines,
-          images: merged.images,
+          images: { count: distinctImages.size, bytes: merged.images.bytes },
           extractable: extractableText(collected)
         })
         setError(null)

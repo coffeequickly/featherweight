@@ -157,7 +157,8 @@ function FolderScan({
           skipped += 1
           continue
         }
-        emit<FontSaveHandler>('font:save', verdict.save)
+        // 건마다 토스트가 줄줄이 뜨지 않게 — 아래에서 한 번에 "6종 중 6종" 으로 알린다
+        emit<FontSaveHandler>('font:save', { ...verdict.save, quiet: true })
         have = upsertFont(have, verdict.save.font)
         saved += 1
       }
@@ -166,9 +167,12 @@ function FolderScan({
         onNotice({ message: t('fonts.scanNone'), error: true })
         return
       }
+      // "6종 중 6종" 은 셈을 시키는 문장이다 — 넣은 수를 말하고, 못 넣은 이유만 뒤에 붙인다
+      const notInFolder = missing.length - found.size
       onNotice({
         message:
-          t('fonts.scanResult', { found: saved, missing: missing.length }) +
+          t('fonts.scanResult', { found: saved }) +
+          (notInFolder > 0 ? t('fonts.scanRest', { count: notInFolder }) : '') +
           (skipped > 0 ? t('fonts.scanSkipped', { count: skipped }) : ''),
         error: saved === 0
       })
@@ -250,7 +254,8 @@ function screenUpload(
           fileStyle: `${mismatch.fileWeight}${mismatch.fileItalic ? ' Italic' : ''}`,
           slotStyle: font.style
         }),
-        error: false
+        // 주의 문구는 패널 띠에 — 토스트로 흘려보내면 굵기가 다른 채로 넣은 걸 놓친다
+        error: true
       }
     : undefined
 
