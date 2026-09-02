@@ -107,9 +107,10 @@ describe('storedFileProblem', () => {
 
   it('가변 폰트 파일은 못 쓰는 것 — 굵기가 기본값으로 나간다', () => {
     const font = { ...stored('SUIT', 'Regular'), facts: ttf(100, ['wght']) }
-    expect(storedFileProblem(font)).toEqual({
-      kind: 'unusable',
-      reason: { code: 'fontFile.variable', params: {} }
+    expect(storedFileProblem(font)).toEqual({ kind: 'variable', defaultWeight: undefined })
+    expect(storedFileProblem({ ...font, facts: { ...font.facts, defaultWeight: 100 } })).toEqual({
+      kind: 'variable',
+      defaultWeight: 100
     })
   })
 
@@ -148,6 +149,6 @@ describe('uploadedProblems', () => {
       [usage('SUIT', 'Regular'), usage('SUIT', 'Heavy')],
       [bad, unused, good]
     )
-    expect(problems.map((p) => `${p.font.style}:${p.problem.kind}`)).toEqual(['Regular:unusable'])
+    expect(problems.map((p) => `${p.font.style}:${p.problem.kind}`)).toEqual(['Regular:variable'])
   })
 })

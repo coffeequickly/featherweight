@@ -194,7 +194,12 @@ function fontsRow({ preflight, fonts, storedFonts, editor, onOpen }: Props): Row
     const [first] = problems
     return {
       tone: 'warn',
-      head: t('preflight.fontsFileProblem', { count: problems.length }),
+      head: t(
+        first.problem.kind === 'mismatch'
+          ? 'preflight.fontsFileMismatch'
+          : 'preflight.fontsFileUnusable',
+        { count: problems.length }
+      ),
       detail:
         `${first.font.family} ${first.font.style} · ${describeFileProblem(first.font) ?? ''}` +
         (problems.length > 1

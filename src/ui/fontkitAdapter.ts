@@ -50,13 +50,16 @@ export function factsOf(font: FontProbe): FontFacts {
   const inner = font as unknown as {
     directory?: { tables?: Record<string, unknown> }
     variationAxes?: Record<string, unknown>
+    fvar?: { axis?: Array<{ axisTag?: string; defaultValue?: number }> } | null
     'OS/2'?: { usWeightClass?: number; fsSelection?: { italic?: boolean } } | null
   }
+  const wght = inner.fvar?.axis?.find((axis) => axis.axisTag === 'wght')
   return {
     tables: Object.keys(inner.directory?.tables ?? {}),
     axes: Object.keys(inner.variationAxes ?? {}),
     weightClass: inner['OS/2']?.usWeightClass,
-    italic: inner['OS/2']?.fsSelection?.italic
+    italic: inner['OS/2']?.fsSelection?.italic,
+    defaultWeight: wght?.defaultValue
   }
 }
 

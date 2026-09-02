@@ -19,6 +19,7 @@ export function availabilityOf(font: FontUsage, stored: readonly StoredFont[]): 
 
 /** 넣어 둔 파일이 그 자리에 맞지 않는 경우 — 내보내면 굵기가 틀리거나 글자가 깨진다 */
 export type StoredFileProblem =
+  | { kind: 'variable'; defaultWeight?: number }
   | { kind: 'unusable'; reason: Reason }
   | { kind: 'mismatch'; fileWeight: number; fileItalic: boolean }
 
@@ -30,7 +31,11 @@ export type StoredFileProblem =
 export function storedFileProblem(font: StoredFont): StoredFileProblem | null {
   if (font.facts === undefined) return null
   const verdict = screenFontFile(font.facts)
-  if (!verdict.ok) return { kind: 'unusable', reason: verdict.reason }
+  if (!verdict.ok) {
+    return verdict.reason.code === 'fontFile.variable'
+      ? { kind: 'variable', defaultWeight: font.facts.defaultWeight }
+      : { kind: 'unusable', reason: verdict.reason }
+  }
   const mismatch = weightMismatch(font.facts, { weight: font.weight, italic: font.italic })
   if (mismatch.differs) {
     return { kind: 'mismatch', fileWeight: mismatch.fileWeight, fileItalic: mismatch.fileItalic }

@@ -351,7 +351,13 @@ window.addEventListener('message', (event) => {
               numGlyphs: 3000,
               codePoints: 2000,
               fileName: 'Nexa-Variable.ttf',
-              facts: { tables: ['glyf', 'fvar'], axes: ['wght'], weightClass: 100, italic: false }
+              facts: {
+                tables: ['glyf', 'fvar'],
+                axes: ['wght'],
+                weightClass: 100,
+                italic: false,
+                defaultWeight: 100
+              }
             }
           ]
         : FIXTURE.storedFonts
