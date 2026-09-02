@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  weightName,
   aggregateFontUsage,
   fontsJsonDraft,
   guessWeight,
@@ -183,5 +184,17 @@ describe('summarizeMissing', () => {
   it('자른 자리에 공백을 남기지 않는다', () => {
     // 자르는 자리가 공백이면 그 공백까지 떼고 … 를 붙인다
     expect(summarizeMissing(['Some Very Long Name Here'], 11).first).toBe('Some Very…')
+  })
+})
+
+describe('weightName', () => {
+  it('굵기 숫자를 이름으로 — 옛 GDI 값 250/275 는 Thin/ExtraLight', () => {
+    expect(weightName(600)).toBe('SemiBold')
+    expect(weightName(100)).toBe('Thin')
+    expect(weightName(250)).toBe('Thin')
+    expect(weightName(275)).toBe('ExtraLight')
+    expect(weightName(350)).toBe('Regular')
+    expect(weightName(700, true)).toBe('Bold Italic')
+    expect(weightName(950)).toBe('Black')
   })
 })

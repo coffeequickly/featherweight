@@ -4,6 +4,25 @@
 import { FontRef, FontUsage, RawFontSegment } from './types'
 
 /** style 문자열 → CSS weight 추정. 못 알아보면 400. */
+/** 굵기 숫자 → 사람이 부르는 이름. 250/275 같은 옛 값은 가장 가까운 백 단위로 */
+export function weightName(weight: number, italic = false): string {
+  const names: Record<number, string> = {
+    100: 'Thin',
+    200: 'ExtraLight',
+    300: 'Light',
+    400: 'Regular',
+    500: 'Medium',
+    600: 'SemiBold',
+    700: 'Bold',
+    800: 'ExtraBold',
+    900: 'Black'
+  }
+  // 250/275 는 옛 GDI 가 250 미만을 못 다뤄 Thin/ExtraLight 를 눌러 적던 값 (fontFile.ts 의 표와 같다)
+  const legacy: Record<number, number> = { 250: 100, 275: 200 }
+  const rounded = legacy[weight] ?? Math.min(900, Math.max(100, Math.round(weight / 100) * 100))
+  return `${names[rounded]}${italic ? ' Italic' : ''}`
+}
+
 export function guessWeight(style: string): number {
   const normalized = style.toLowerCase().replace(/[\s_-]/g, '')
 

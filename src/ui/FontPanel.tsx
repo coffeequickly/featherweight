@@ -13,7 +13,7 @@ import { useRef, useState } from 'preact/hooks'
 
 import { formatNumber, formatReason, t } from '../lib/i18n'
 import { FontFacts, screenFontFile, weightMismatch } from '../lib/fontFile'
-import { fontKey } from '../lib/fontInventory'
+import { fontKey, weightName } from '../lib/fontInventory'
 import { describeFileProblem } from './fontProblem'
 import { availabilityOf, FontAvailability, missingFonts } from '../lib/fontStatus'
 import { fitsWithin, formatBytes, upsertFont } from '../lib/fontStore'
@@ -252,8 +252,8 @@ function screenUpload(
   const notice: Notice | undefined = mismatch.differs
     ? {
         message: t('fontFile.weightMismatch', {
-          fileStyle: `${mismatch.fileWeight}${mismatch.fileItalic ? ' Italic' : ''}`,
-          slotStyle: font.style
+          fileStyle: weightName(mismatch.fileWeight, mismatch.fileItalic),
+          slotStyle: `${font.family} ${font.style}`
         }),
         // 주의 문구는 패널 띠에 — 토스트로 흘려보내면 굵기가 다른 채로 넣은 걸 놓친다
         error: true

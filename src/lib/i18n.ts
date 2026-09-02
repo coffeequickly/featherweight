@@ -126,12 +126,19 @@ const MESSAGES = {
     ko: '{names} · 일부는 직접 넣은 파일'
   },
   // 폰트 줄은 원인만 말한다 — "아웃라인" 이라는 결말은 텍스트 줄 하나가 맡는다
-  'preflight.fontsFileProblem': {
+  'preflight.fontsFileMismatch': {
     en: (p) =>
       Number(p.count) === 1
-        ? "1 added file doesn't match its slot"
-        : `${p.count} added files don't match their slots`,
-    ko: '직접 넣은 파일 {count}종이 자리와 맞지 않습니다'
+        ? 'An added font file has a different weight'
+        : `${p.count} added font files have a different weight`,
+    ko: '직접 넣은 폰트 파일 {count}개의 굵기가 다릅니다'
+  },
+  'preflight.fontsFileUnusable': {
+    en: (p) =>
+      Number(p.count) === 1
+        ? "An added font file can't be used"
+        : `${p.count} added font files can't be used`,
+    ko: '직접 넣은 폰트 파일 {count}개를 쓸 수 없습니다'
   },
   'preflight.fontsFileProblemMore': {
     en: (p) => ` and ${p.count} more`,
@@ -595,20 +602,24 @@ const MESSAGES = {
     ko: '이 파일에서 쓸 수 있는 글자 모양을 찾지 못했습니다. .ttf 파일을 올려 주세요.'
   },
   'fonts.fileVariable': {
-    en: 'Variable font file · exports in the wrong weight · replace with the static .ttf for this weight',
-    ko: '가변 폰트 파일 · 굵기가 틀리게 나갑니다 · 이 굵기의 static .ttf 로 교체하세요'
+    en: 'Variable font file · {slotStyle} text will export in a different weight · replace with the {slotStyle} .ttf',
+    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 다른 굵기로 나갑니다 · {slotStyle} .ttf 로 교체하세요'
+  },
+  'fonts.fileVariableAs': {
+    en: 'Variable font file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} .ttf',
+    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다 · {slotStyle} .ttf 로 교체하세요'
   },
   'fonts.fileUnusable': {
-    en: 'This file cannot be embedded · replace with a .ttf',
-    ko: '넣을 수 없는 파일 · .ttf 로 교체하세요'
+    en: 'This file cannot be embedded · replace with the {slotStyle} .ttf',
+    ko: '넣을 수 없는 파일 · {slotStyle} .ttf 로 교체하세요'
   },
   'fonts.fileMismatch': {
-    en: "File is {fileStyle}, slot is {slotStyle} · exports in the file's weight",
-    ko: '파일은 {fileStyle}, 자리는 {slotStyle} · 파일 굵기로 나갑니다'
+    en: '{fileStyle} file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} file',
+    ko: '{fileStyle} 파일 · {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다 · {slotStyle} 파일로 교체하세요'
   },
   'fontFile.weightMismatch': {
-    en: 'Saved, but this file looks like {fileStyle} while the slot is {slotStyle}. Check the exported PDF.',
-    ko: '저장했지만 파일은 {fileStyle} 로 보이고 자리는 {slotStyle} 입니다. 내보낸 PDF 를 확인해 주세요.'
+    en: 'Saved — but this file is {fileStyle}, so {slotStyle} text will export as {fileStyle}.',
+    ko: '저장했습니다. 다만 이 파일은 {fileStyle} 굵기라, {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다.'
   },
   'fonts.uploadHint': {
     en: 'Upload a .ttf — one file per weight, not a variable font.',

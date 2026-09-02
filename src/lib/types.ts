@@ -113,6 +113,8 @@ export type FontFileFacts = {
   weightClass?: number
   /** 이탤릭 플래그 (OS/2 fsSelection) */
   italic?: boolean
+  /** 가변 폰트의 굵기 축 기본값 — 인스턴스를 안 뽑으면 이 굵기로 나간다 */
+  defaultWeight?: number
 }
 
 export type StoredFont = FontRef & {
