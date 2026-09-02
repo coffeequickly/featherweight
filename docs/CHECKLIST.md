@@ -60,6 +60,11 @@ in the header is the build you mean to ship.
       the Size and Compression sections are replaced by a note; "Export all
       text as outlines" is **off** by default and turning it on makes the Text
       row orange with a "Turn off" action; the version is shown at the bottom
+- [ ] A font file added by an old version that today's screen would refuse (a
+      variable .ttf, or a file whose weight differs from its slot) is flagged on
+      open: the Fonts row turns orange with "1 added file doesn't match its
+      slot", and the row on the Fonts screen shows why in orange under the file
+      name; replacing the file clears both
 - [ ] Fonts: the font list and Add button work; "Find in a font folder…" opens
       a folder picker, reads the .ttf files and adds the matching ones (one
       canvas toast says how many fonts were added — not one per font; adding a
