@@ -39,6 +39,7 @@ import {
   UiReadyHandler
 } from '../lib/types'
 import { settleResponse } from './bridge'
+import { backfillFontFacts } from './fontFacts'
 import { resetFontCache } from './fontSource'
 import { forgetOriginals, probeImageBytes, rememberOriginal } from './imageCache'
 import { resizeImage } from './resize'
@@ -128,6 +129,7 @@ export function useMainState(): MainState {
     const offStored = on<StoredFontsHandler>('fonts:stored', (next) => {
       resetFontCache() // 폰트가 바뀌면 캐시된 바이트·글리프 정보를 버린다
       setStoredFonts(next)
+      void backfillFontFacts(next) // 옛 항목의 파일 사실을 채운다 — 있으면 아무 일도 없다
     })
     const offNotice = on<NoticeHandler>('notice', showNotice)
     const offSettings = on<SettingsHandler>('settings', setSettings)

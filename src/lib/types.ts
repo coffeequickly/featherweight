@@ -100,13 +100,31 @@ export type TextRunSource = {
 }
 
 /** clientStorage 에 보관 중인 폰트 1개의 메타데이터. 바이트는 별도 키에 둔다. */
+/**
+ * 파일 자체가 말하는 것 — 자리(style)와는 별개다. 넣을 때 적어 두고, 옛 버전이 넣어
+ * 이 정보가 없는 항목은 플러그인이 뜰 때 한 번 읽어 채운다 (ui/fontFacts.ts).
+ */
+export type FontFileFacts = {
+  /** 폰트가 들고 있는 테이블 이름들 — glyf/CFF 구분용 */
+  tables: readonly string[]
+  /** 가변 축 이름들. 비어 있으면 static. */
+  axes: readonly string[]
+  /** OS/2 의 usWeightClass */
+  weightClass?: number
+  /** 이탤릭 플래그 (OS/2 fsSelection) */
+  italic?: boolean
+}
+
 export type StoredFont = FontRef & {
+  /** 자리(Figma 스타일)에서 추정한 굵기·기울기 — 파일 것이 아니다 */
   weight: number
   italic: boolean
   byteLength: number
   numGlyphs: number
   codePoints: number
   fileName: string
+  /** 파일의 실제 사실. 없으면 옛 버전이 넣은 것 — 아직 검사 전 */
+  facts?: FontFileFacts
 }
 
 export type PartStats = {
@@ -288,6 +306,12 @@ export interface DoneHandler extends EventHandler {
 export interface StoredFontsHandler extends EventHandler {
   name: 'fonts:stored'
   handler: (fonts: StoredFont[]) => void
+}
+
+/** UI 가 옛 항목의 파일 사실을 읽어 보내면 인덱스에 적는다 → fonts:stored 로 되돌려 준다 */
+export interface FontFactsHandler extends EventHandler {
+  name: 'font:facts'
+  handler: (payload: { ref: FontRef; facts: FontFileFacts }) => void
 }
 
 export interface FontSaveHandler extends EventHandler {

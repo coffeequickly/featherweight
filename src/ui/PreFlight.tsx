@@ -11,11 +11,12 @@ import { JSX } from 'preact'
 
 import { mbToBytes } from '../lib/fitToSize'
 import { summarizeMissing } from '../lib/fontInventory'
-import { fontReadiness } from '../lib/fontStatus'
+import { fontReadiness, uploadedProblems } from '../lib/fontStatus'
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
 import { forecastImages, groupReasons, outlinedTexts, uniformSize } from '../lib/preflight'
 import { EditorKind, FontUsage, FrameItem, Preflight, Settings, StoredFont } from '../lib/types'
+import { describeFileProblem } from './fontProblem'
 import { unitWords } from './units'
 
 export type SubScreen = 'frames' | 'fonts' | 'text'
@@ -184,6 +185,22 @@ function fontsRow({ preflight, fonts, storedFonts, editor, onOpen }: Props): Row
         auto: readiness.total - readiness.missing.length
       }),
       action: { ...open, label: t('preflight.fontsAction') }
+    }
+  }
+
+  // 파일은 있는데 자리에 맞지 않는 것 — "준비됨" 이라고 하면 굵기가 틀린 채 나간다
+  const problems = uploadedProblems(fonts, storedFonts)
+  if (problems.length > 0) {
+    const [first] = problems
+    return {
+      tone: 'warn',
+      head: t('preflight.fontsFileProblem', { count: problems.length }),
+      detail:
+        `${first.font.family} ${first.font.style} · ${describeFileProblem(first.font) ?? ''}` +
+        (problems.length > 1
+          ? t('preflight.fontsFileProblemMore', { count: problems.length - 1 })
+          : ''),
+      action: open
     }
   }
 

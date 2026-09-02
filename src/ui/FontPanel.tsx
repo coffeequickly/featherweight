@@ -14,6 +14,7 @@ import { useRef, useState } from 'preact/hooks'
 import { formatNumber, formatReason, t } from '../lib/i18n'
 import { FontFacts, screenFontFile, weightMismatch } from '../lib/fontFile'
 import { fontKey } from '../lib/fontInventory'
+import { describeFileProblem } from './fontProblem'
 import { availabilityOf, FontAvailability, missingFonts } from '../lib/fontStatus'
 import { fitsWithin, formatBytes, upsertFont } from '../lib/fontStore'
 import {
@@ -271,7 +272,8 @@ function screenUpload(
         byteLength: bytes.length,
         numGlyphs: probe.numGlyphs,
         codePoints: probe.characterSet.length,
-        fileName
+        fileName,
+        facts
       },
       bytes
     }
@@ -380,6 +382,7 @@ function FontRow({
     emit<FontSaveHandler>('font:save', verdict.save)
   }
 
+  const problem = state.kind === 'uploaded' ? describeFileProblem(state.font) : null
   const detail =
     state.kind === 'catalog'
       ? t('fonts.detailCatalog', { count: font.nodeCount })
@@ -408,6 +411,7 @@ function FontRow({
             <Muted>{detail}</Muted>
           </Text>
         </div>
+        {problem === null ? null : <div class="fontRowWarn">{problem}</div>}
       </div>
       <div class="fontRowActions">
         {state.kind === 'catalog' ? null : (
