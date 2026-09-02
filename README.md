@@ -24,6 +24,12 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 
 The plugin UI follows your Figma app language (English / Korean). 한국어 안내는 [아래](#한국어-안내)에 있습니다.
 
+**New in 2.1** — works in **Figma Slides**: run it in a deck and every slide
+is a page, in deck order, with real fonts and downscaled images (Slides' own
+PDF export outlines the text and keeps every image at full size). Selecting a
+section exports the frames inside it. Selecting thirty frames no longer
+freezes the canvas, and image-heavy exports are faster.
+
 **New in 2.0** — one screen instead of tabs. Presets are tiles that show the
 numbers they set; a *Before you export* checklist says how many images will
 shrink, which fonts are ready and exactly which text layers would stay as
@@ -33,7 +39,8 @@ what your images become.
 
 ## How it works
 
-1. Select frames on the canvas and run Featherweight
+1. Select frames on the canvas and run Featherweight — in Figma Slides, run it
+   with nothing selected to export the whole deck
 2. Pick a preset at the top — Sharp / Balanced / Smallest, or **Target** to name
    a file size. The chips underneath show exactly what changes
 3. Read the **Before you export** checklist: frames, images, fonts, text. A
@@ -128,7 +135,8 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
 
 ### 사용법
 
-1. 프레임을 선택하고 Featherweight를 실행합니다
+1. 프레임을 선택하고 Featherweight를 실행합니다. Figma Slides에서는 아무것도
+   고르지 않으면 덱 전체가 대상입니다
 2. 프리셋을 고릅니다. 목표 용량이면 원하는 크기를 적습니다
 3. 체크리스트를 읽습니다. 경고가 있으면 따라가서 페이지를 정렬하거나, 폰트를
    넣거나, 레이어를 찾습니다

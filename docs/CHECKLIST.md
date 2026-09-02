@@ -35,8 +35,15 @@ in the header is the build you mean to ship.
       the font's name and "Add fonts ›" (the Fonts row states the cause only);
       the Text row alone states the outcome, counting stroked/gradient/effect
       texts and texts in missing fonts together, with "Show layers ›"
-- [ ] Selecting frames shows the list immediately; thumbnails fill in afterwards
-      without resetting a custom order
+- [ ] Selecting 30 frames shows the list at once and the canvas keeps
+      responding while the counts and checklist fill in; thumbnails appear only
+      after opening Arrange; clicking around inside the same frames (or inside a
+      slide in Slides) does not re-run the scan or reset a custom order
+- [ ] Selecting a section lists the frames inside it, not the section itself
+- [ ] Figma Slides: with nothing selected the whole deck is listed in grid
+      order and the rows say "slides"; selecting a slide row lists its slides;
+      the exported PDF embeds real fonts (`pdffonts` shows CIDFontType2, no
+      Type 3) and no temporary slide flashes or is left behind
 - [ ] Arrange: clicking a row reveals that frame on the canvas
       (selection unchanged); dragging reorders; ↑↓ still work; ✕ excludes and
       the excluded list restores individually; the Frames row then says
@@ -54,8 +61,9 @@ in the header is the build you mean to ship.
       text as outlines" is **off** by default and turning it on makes the Text
       row orange with a "Turn off" action; the version is shown at the bottom
 - [ ] Fonts: the font list and Add button work; "Find in a font folder…" opens
-      a folder picker, reads the .ttf files and adds the matching ones (the
-      notice says how many of the missing fonts were added); clicking a path
+      a folder picker, reads the .ttf files and adds the matching ones (one
+      canvas toast says how many fonts were added — not one per font; adding a
+      single file toasts that font; problems stay in the in-panel banner); clicking a path
       copies it (toast confirms)
 - [ ] Empty state: the card asks for a selection, the promise line is shown, no
       "(0 pages)" in the button
