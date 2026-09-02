@@ -80,11 +80,12 @@ brand name (the leading competitor does the same with "(PDF, PNG, JPG, WebP)").
 **Hard limit: 100 characters.** The form counts and truncates silently — check
 the counter before saving.
 
-> Name a size — say 5MB — and it hits it. Text stays selectable, searchable, ATS-ready.
+> See what changes before you export. Real fonts, images sized to what you see, one checklist.
 
-85 characters. It deliberately does not repeat "compressed PDF export with real
-fonts" — the plugin *name* already says that, so the tagline spends its budget
-on what the name can't carry: the new target-size feature and a concrete number.
+91 characters (2.0). The 1.x line was "Name a size — say 5MB — and it hits it.
+Text stays selectable, searchable, ATS-ready." (85). Neither repeats
+"compressed PDF export with real fonts" — the plugin *name* already says that,
+so the tagline spends its budget on what the name can't carry.
 
 ### Description
 
@@ -93,7 +94,8 @@ can't be selected, searched, or read by résumé scanners (ATS) — and text-hea
 documents balloon to 10–20MB that no compressor can shrink, because there are no
 images to compress.
 
-Featherweight fixes the text itself — then gets the file down to the size you need:
+Featherweight fixes the text itself, gets the file down to the size you need —
+and tells you what will happen before you export:
 
 🪶 REAL FONTS, NOT OUTLINES
 Text is re-embedded as real subset fonts — italics included. It stays
@@ -103,9 +105,10 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 
 🪶 SMART IMAGE COMPRESSION
 Images are downscaled to the size they are actually displayed at, then
-re-encoded. Pick a preset — Sharp / Balanced / Smallest — or fine-tune quality,
-scale and resolution caps. Logos and already-small images pass through
-untouched, so nothing that was sharp gets muddy.
+re-encoded. Pick a preset — Sharp / Balanced / Smallest — and see the exact
+numbers it sets, or open Advanced settings for scale, an HD-to-4K cap and
+quality. Logos and already-small images pass through untouched, so nothing
+that was sharp gets muddy.
 
 🪶 FIT TO A TARGET SIZE
 Have a 5MB upload limit? Type the number. Featherweight exports once to measure,
@@ -114,56 +117,82 @@ setting. Quality never drops below a floor — if your target is out of reach it
 gives you the smallest possible file and tells you what that floor is, instead
 of quietly wrecking your images.
 
+🪶 KNOW BEFORE YOU EXPORT
+One checklist on the main screen: how many images will shrink, which fonts are
+ready, and exactly which text layers would stay as outlines and why — with a
+link to the layer. Fix it, or export anyway. No surprises after the fact.
+
 Together these make a real difference: a 12-page portfolio went from 22.7MB
 to 4.0MB with the same pages and the same look.
 
 HOW IT WORKS
+
 1. Select frames and run Featherweight
-2. Drag to reorder pages, exclude what you don't need
-3. Pick an image preset — or Target, and type the size you need
+2. Pick a preset — or Target, and type the size you need
+3. Read the checklist; follow a warning to arrange pages, add a font, or find
+   the layer
 4. Export — the save dialog is pre-filled with a timestamped file name
 
 WHAT MAKES IT DIFFERENT
-• 60 open-license font families embed automatically, starting with Inter —
-  Figma's own default — then Roboto, Open Sans, Montserrat, Lato, Poppins and
-  37 more Latin faces, plus 17 Korean ones (Pretendard, Noto Sans KR, Nanum,
-  Gothic A1, Spoqa…). Every weight, roman and italic. Add your own TTF/OTF
-  once for anything else.
-• Never substitutes fonts. Anything it can't embed keeps its original
-  outlines — identical look, honestly reported with a reason you can click
-  to locate the exact layer on canvas.
-• 100% local. Your document never leaves your machine — network access is
-  used only to download open-license fonts (cdn.jsdelivr.net). No telemetry,
-  no account, no upload.
-• Free and open source (MIT): github.com/coffeequickly/featherweight
+
+1. 60 open-license font families embed automatically, starting with Inter —
+   Figma's own default — then Roboto, Open Sans, Montserrat, Lato, Poppins and
+   37 more Latin faces, plus 17 Korean ones (Pretendard, Noto Sans KR, Nanum,
+   Gothic A1, Spoqa…). Every weight, roman and italic. For anything else,
+   point it at your font folder once — the matching TTFs are picked out for
+   you.
+2. Never substitutes fonts. Anything it can't embed keeps its original
+   outlines — identical look, honestly reported with a reason you can click
+   to locate the exact layer on canvas.
+3. 100% local. Your document never leaves your machine — network access is
+   used only to download open-license fonts (cdn.jsdelivr.net). No telemetry,
+   no account, no upload.
+4. Free and open source (MIT): github.com/coffeequickly/featherweight
 
 GOOD TO KNOW
-• Always proofread the exported PDF before submitting it anywhere. Text is
-  redrawn with real fonts and may differ subtly from Figma's rendering. You
-  are responsible for the files you produce.
-• Fonts you upload yourself are embedded as-is — confirming that your font's
-  license permits document embedding is your responsibility. All
-  auto-downloaded fonts are SIL OFL and permit embedding.
-• Rotated text, gradient/stroke/effect text and underlines keep their
-  original outlines (by design — never silently altered).
-• Text is embedded in an extractable form, but no specific ATS parsing
-  result is guaranteed. Not affiliated with Figma, Inc.
+
+1. Always proofread the exported PDF before submitting it anywhere. Text is
+   redrawn with real fonts and may differ subtly from Figma's rendering. You
+   are responsible for the files you produce.
+2. Fonts you add yourself are embedded as-is — static TTF only, one file per
+   weight (no variable fonts, no OTF). Confirming that your font's license
+   permits document embedding is your responsibility. All auto-downloaded
+   fonts are SIL OFL and permit embedding.
+3. Rotated text, gradient/stroke/effect text and underlines keep their
+   original outlines (by design — never silently altered). The checklist
+   names them before you export.
+4. Text is embedded in an extractable form, but no specific ATS parsing
+   result is guaranteed. Not affiliated with Figma, Inc.
 
 FONT SOURCES & CREDITS
-Every auto-downloaded font is licensed under the SIL Open Font License 1.1,
-which permits embedding in documents. The files are the upstream originals —
-Featherweight does not modify, host or redistribute them; your machine fetches
-them at export time over the jsDelivr CDN (cdn.jsdelivr.net).
 
-• Google Fonts — github.com/google/fonts
-• Expo Google Fonts — github.com/expo/google-fonts (static builds of families
-  Google now ships variable-only, such as Inter and Noto Sans KR)
-• Pretendard — github.com/orioncactus/pretendard
-• Spoqa Han Sans Neo — github.com/spoqa/spoqa-han-sans
+1. Every auto-downloaded font is licensed under the SIL Open Font License 1.1,
+   which permits embedding in documents. The files are the upstream originals —
+   Featherweight does not modify, host or redistribute them; your machine
+   fetches them at export time over the jsDelivr CDN (cdn.jsdelivr.net).
+2. Google Fonts — github.com/google/fonts
+3. Expo Google Fonts — github.com/expo/google-fonts (static builds of families
+   Google now ships variable-only, such as Inter and Noto Sans KR)
+4. Pretendard — github.com/orioncactus/pretendard
+5. Spoqa Han Sans Neo — github.com/spoqa/spoqa-han-sans
 
 Every URL is pinned to a commit or a package version, and verified weekly
 against the real files. Featherweight is not affiliated with, or endorsed by,
 any of these projects. Font names are trademarks of their respective owners.
+
+─────
+한국어 안내
+Figma 기본 PDF 내보내기는 글자를 아웃라인으로 바꿔 선택·검색이 안 되고, 글 위주
+문서는 10~20MB로 불어납니다. Featherweight는 텍스트를 진짜 폰트로 다시 넣고
+(Pretendard·Noto Sans KR·나눔 등 한글 17종 포함 60종 자동), 이미지는 보이는 크기에
+맞춰 줄이고, 목표 용량(예: 5MB)에 맞춰 줍니다. 내보내기 전 체크리스트가 무엇이
+바뀌고 어떤 텍스트가 아웃라인으로 남는지 먼저 알려 줍니다. 문서는 컴퓨터 밖으로
+나가지 않습니다. 무료·오픈소스. 플러그인 화면은 Figma 언어 설정에 따라 한국어로
+나옵니다. 자세한 한국어 안내: github.com/coffeequickly/featherweight#한국어-안내
+
+The Community listing takes one language; this footer is what makes Korean
+searches ("이력서 PDF 용량") hit the page. The full Korean write-up lives in
+README.md under "한국어 안내".
 
 ### Categories & tags
 
@@ -185,27 +214,38 @@ Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 
 | File | Use |
 |---|---|
-| `icon-128.png` | Plugin icon — minimal two-tone feather (split barbs read as a feather, not a leaf) |
 | `icon-128.png` | Plugin icon — the crystal feather, cropped from `src/feather-source.png` |
 | `cover-1920x960.png` | Cover — 22.7MB → 4.0MB with the feather as hero, three feature lines |
-| `media-1.png` | Editorial: "Real fonts. Smaller PDFs. Better documents." |
-| `media-2.png` | Brand board: "Keep text real. Keep files light." |
-| `media-3.png` | UI: export tab — "Reorder." |
-| `media-4.png` | UI: image presets — "Name a size. It hits it." |
-| `media-5.png` | UI: fonts tab |
+| `media-1.png` | BEFORE YOU EXPORT — "Know before you export." (board-checklist.html, ui-main.png) — first, because it is what changed in 2.0 |
+| `media-2.png` | REAL FONTS — "Real fonts, not outlines." (board-fonts.html, ui-fonts.png) |
+| `media-3.png` | TARGET SIZE — "Name a size. It hits it." (board-target.html, ui-target.png) |
+| `media-4.png` | IMAGE SIZE — "See what your images become." (board-chart.html, ui-settings.png) |
+
+All four boards share one grid: brand row, warm-gradient eyebrow, two-line
+headline, gradient bar, one paragraph — and a 470×599 card on the right holding
+a UI capture taken at exactly 400×510 (2×). Keep every capture at that size or
+the cards stop lining up across the carousel.
+
+The 1.x brand board ("Keep text real. Keep files light.") and the editorial
+board with the mock résumé were dropped in 2.0 — they repeated the cover
+without showing the product.
 
 Everything is rendered from source in `docs/brand/src/` (plain HTML + `tokens.css`),
 so any of it can be regenerated or restyled:
 
 ```bash
-# 1. UI screenshots → docs/brand/src/ui-{export,images,fonts}.png
+# 1. UI screenshots → docs/brand/src/ui-{main,target,settings,fonts}.png
 npm run ui:preview
-#    capture ?bare=1&w=400&h=480&lang=en-US&fonts=ready&theme=dark&tab=export  (etc.)
+#    all four at w=400&h=510, 2× device scale, lang=en-US&theme=dark:
+#    ui-main:     &fonts=ready
+#    ui-fonts:    &screen=fonts
+#    ui-target:   &fit=1&fonts=ready&text=clean
+#    ui-settings: &screen=settings&wide=1&edge=3840
 #    w=400 matters — the preview defaults to 380 and hides overflow
 #    theme=dark matters — the boards are dark, a light capture glares
 
 # 2. render each src/*.html at 1920×960 with headless Chrome
-#    cover.html → cover-1920x960.png, m2…m6.html → media-1…5.png
+#    cover.html → cover-1920x960.png, board-*.html → media-1…4.png (order above)
 #    icon.html at 128×128 → icon-128.png
 ```
 
@@ -214,8 +254,8 @@ When you replace the cover, bump the `?v=` on the README's image link
 them by URL, so same-name replacements keep serving the old bytes — the file on
 `raw.githubusercontent.com` updates immediately, the rendered README does not.
 
-`m3.html` carries the version number, so it needs a bump every release. The UI
-captures also carry the version in the corner — re-shoot them, don't reuse.
+No board carries the version number any more (the 1.x brand board did), so a
+release only needs new UI captures when the UI changed.
 
 ### The feather
 
@@ -252,3 +292,4 @@ Match the existing version history — one line, leading with the change type:
 - "Fix: logos and small images now pass through untouched. UI polish across all tabs."
 - "Windows: correct font folder paths and shortcuts. Locale-aware number formatting."
 - "Feature: Fit to Size — name a target file size and Featherweight finds the best image quality that fits."
+- 2.0: "New: one-screen redesign with a pre-flight checklist — see what shrinks, what's ready and what would be outlined before you export. Find missing fonts in a folder. Presets as tiles; HD/FHD/QHD/4K caps."

@@ -1,6 +1,6 @@
 # Featherweight – Compressed PDF Export with Real Fonts
 
-![Featherweight — compressed PDF export with real fonts](docs/brand/cover-1920x960.png?v=4)
+![Featherweight — compressed PDF export with real fonts](docs/brand/cover-1920x960.png?v=5)
 
 A Figma plugin that exports frames as **light PDFs with real embedded fonts**.
 
@@ -22,15 +22,24 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 
 **[Install from the Figma Community →](https://www.figma.com/community/plugin/1672509720278498323/featherweight-compressed-pdf-export-with-real-fonts)**
 
-The plugin UI follows your Figma app language (English / Korean).
+The plugin UI follows your Figma app language (English / Korean). 한국어 안내는 [아래](#한국어-안내)에 있습니다.
+
+**New in 2.0** — one screen instead of tabs. Presets are tiles that show the
+numbers they set; a *Before you export* checklist says how many images will
+shrink, which fonts are ready and exactly which text layers would stay as
+outlines (and why), with a link to the layer. Missing fonts can be picked out
+of your font folder in one go. Advanced settings open with an HD-to-4K chart of
+what your images become.
 
 ## How it works
 
 1. Select frames on the canvas and run Featherweight
-2. Drag rows (or use ↑↓) to reorder pages, ✕ to exclude — your layers are never
-   modified. Click a row to reveal that frame on the canvas
-3. Pick an image preset in the **Images** tab — Sharp / Balanced / Smallest, or
-   **Target** to name a file size; check font readiness in **Fonts**
+2. Pick a preset at the top — Sharp / Balanced / Smallest, or **Target** to name
+   a file size. The chips underneath show exactly what changes
+3. Read the **Before you export** checklist: frames, images, fonts, text. A
+   warning row tells you what will be outlined and takes you straight to the fix
+   (**Order & exclude**, **Add fonts**, **Show layers**) — your layers are never
+   modified
 4. **Export PDF** — the save dialog is pre-filled with a timestamped file name.
    In the report, click a reason to select the affected layers on canvas
 
@@ -40,12 +49,12 @@ The plugin UI follows your Figma app language (English / Korean).
 Open Sans, Montserrat, Lato, Poppins, IBM Plex, JetBrains Mono…) and 17 Korean
 (Pretendard, Noto Sans KR, Nanum, Gothic A1, Spoqa…), italics included.
 
-The Fonts tab lists every font your document uses, in one of three states:
+The Fonts screen lists every font your document uses, in one of three states:
 
 | State | What happens |
 |---|---|
 | In catalog | Downloaded from a CDN (jsDelivr) at export time and embedded. Nothing to do |
-| Added by you | Add a TTF/OTF once — it is stored and embedded from then on |
+| Added by you | Add a static TTF once — or pick your font folder and the matching files are found for you. Stored and embedded from then on |
 | No file | **Kept as outlines** — identical look, you just don't get the size and search benefits |
 
 **Fonts are never substituted.** If a font can't be embedded, the original
@@ -86,6 +95,72 @@ and why, and clicking a reason selects them on canvas:
 - Text is embedded in an extractable form, but no specific ATS parsing result is
   guaranteed.
 
+## 한국어 안내
+
+Figma 기본 PDF 내보내기는 글자를 전부 벡터 아웃라인으로 바꿉니다. 텍스트를 선택할
+수도, 검색할 수도, 채용 시스템(ATS)이 읽을 수도 없습니다. 게다가 글 위주 문서가
+10~20MB로 불어나는데, 이미지가 없으니 어떤 압축 도구로도 줄지 않습니다.
+
+Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 맞추고, 내보내기 전에
+무슨 일이 일어날지 먼저 알려 줍니다. 플러그인 화면은 Figma 앱 언어 설정에 따라
+한국어로 나옵니다.
+
+**[Figma Community에서 설치 →](https://www.figma.com/community/plugin/1672509720278498323/featherweight-compressed-pdf-export-with-real-fonts)**
+
+### 하는 일
+
+- **아웃라인 대신 진짜 폰트** — 텍스트를 서브셋 폰트로 다시 넣습니다. 이탤릭까지요.
+  선택·검색·복사가 되고 ATS가 읽습니다. Inter(Figma 기본 서체), Roboto, Pretendard
+  등 60종은 자동으로 받아 넣습니다. 글 위주 이력서가 10MB에서 1MB 아래로 내려갑니다.
+- **보이는 크기에 맞춘 이미지 압축** — 이미지는 실제로 표시되는 크기에 맞춰 줄이고
+  다시 인코딩합니다. 선명하게 / 균형 / 최소 용량 중 하나를 고르면 어떤 숫자가
+  적용되는지 바로 보이고, 고급 설정에서 배율·상한(HD~4K)·품질을 직접 정할 수도
+  있습니다. 로고와 작은 이미지는 손대지 않으니 선명하던 것이 뭉개지지 않습니다.
+- **목표 용량 맞추기** — 업로드 한도가 5MB라면 숫자만 적으세요. 한 번 내보내 크기를
+  재고, 그 안에 드는 가장 좋은 화질을 찾아 다시 내보냅니다. 화질에는 하한이 있어서
+  목표가 무리면 가능한 가장 작은 파일과 함께 그 하한을 알려 드립니다.
+- **내보내기 전에 미리 확인** — 메인 화면의 체크리스트 한 장이 말해 줍니다. 이미지
+  몇 장이 줄어드는지, 폰트는 준비됐는지, 어떤 텍스트가 왜 아웃라인으로 남는지 — 그
+  레이어로 바로 가는 링크와 함께. 내보낸 뒤에 놀랄 일이 없습니다.
+
+이 넷이 합쳐지면 차이가 큽니다. 12쪽 포트폴리오가 같은 페이지, 같은 모습으로
+22.7MB에서 4.0MB가 됐습니다.
+
+### 사용법
+
+1. 프레임을 선택하고 Featherweight를 실행합니다
+2. 프리셋을 고릅니다. 목표 용량이면 원하는 크기를 적습니다
+3. 체크리스트를 읽습니다. 경고가 있으면 따라가서 페이지를 정렬하거나, 폰트를
+   넣거나, 레이어를 찾습니다
+4. 내보내기 — 저장 창에 날짜가 붙은 파일명이 미리 채워져 있습니다
+
+### 다른 점
+
+- 오픈 라이선스 폰트 60종이 자동으로 들어갑니다. Figma 기본 서체 Inter부터 Roboto,
+  Open Sans, Montserrat, Lato, Poppins 등 라틴 43종, Pretendard, Noto Sans KR,
+  나눔, Gothic A1, Spoqa 등 한글 17종. 모든 굵기, 정체와 이탤릭 전부. 그 밖의
+  폰트는 폰트 폴더를 한 번 고르면 맞는 TTF를 찾아 넣습니다.
+- 폰트를 절대 바꿔치기하지 않습니다. 넣지 못한 텍스트는 원래 아웃라인 그대로
+  남깁니다. 보기엔 똑같고, 사유를 클릭하면 캔버스에서 그 레이어를 찾아 줍니다.
+- 전부 내 컴퓨터 안에서 처리됩니다. 문서는 어디로도 나가지 않고, 네트워크는 오픈
+  라이선스 폰트를 받는 데(cdn.jsdelivr.net)만 씁니다. 텔레메트리도, 계정도,
+  업로드도 없습니다.
+- 무료, 오픈소스(MIT).
+
+### 알아 두실 것
+
+- 내보낸 PDF는 제출 전에 꼭 확인하세요. 텍스트를 진짜 폰트로 다시 그리기 때문에
+  Figma 렌더링과 미세하게 다를 수 있습니다. 만든 파일의 책임은 사용자에게 있습니다.
+- 직접 넣은 폰트는 그대로 임베드됩니다. 정적 TTF만, 굵기마다 한 파일씩(가변
+  폰트·OTF 불가). 그 폰트의 라이선스가 문서 임베딩을 허용하는지는 직접 확인하셔야
+  합니다. 자동으로 받는 폰트는 전부 SIL OFL이라 임베딩이 허용됩니다.
+- 회전된 텍스트, 그라데이션·선·효과가 있는 텍스트, 밑줄 텍스트는 원래 아웃라인을
+  유지합니다(의도한 동작이고, 조용히 바꾸지 않습니다). 체크리스트가 내보내기 전에
+  어느 것인지 알려 줍니다.
+- 텍스트는 추출 가능한 형태로 들어가지만 특정 ATS의 파싱 결과를 보장하지는
+  않습니다. Figma, Inc.와 무관합니다.
+- 폰트 출처와 라이선스는 아래 [Credits](#credits)에 있습니다.
+
 ## Development
 
 ```
@@ -106,9 +181,9 @@ pick `~/figma-plugins/sheaf/manifest.json`. After that, re-running
 `install:local` is enough — no re-import needed.
 
 `ui:preview` accepts query flags for reviewing states without Figma:
-`?tab=fonts&theme=dark&lang=en-US&platform=win&frames=12&fit=1&bare=1`.
-Pass `w=400` to match the real plugin window — the default (380) is narrower and
-hides horizontal overflow.
+`?screen=fonts&theme=dark&lang=en-US&platform=win&frames=12&fit=1&text=clean&bare=1`.
+`screen` is one of `settings` / `frames` / `fonts` / `text` / `preview`; omit it
+for the main screen. `report=1` shows the result card as it looks after an export.
 
 ### Repo layout
 
