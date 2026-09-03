@@ -25,6 +25,8 @@ export type ImageStats = {
   processed: number
   bytesBefore: number
   bytesAfter: number
+  /** bytesAfter 중 우리가 만든 JPEG — PDF 에 그대로 실린다 (목표 용량 예측의 보정 제외분) */
+  bytesJpeg: number
   /** 손대지 않고 통과시킨 이미지의 바이트 합 — 목표 용량 예측용 */
   bytesUntouched: number
   warnings: Reason[]
@@ -139,6 +141,7 @@ export async function shrinkImages(
     processed: 0,
     bytesBefore: 0,
     bytesAfter: 0,
+    bytesJpeg: 0,
     bytesUntouched: 0,
     warnings: [],
     seen: [...new Set(usages.map((usage) => usage.imageHash))]
@@ -266,6 +269,7 @@ async function shrinkOne(
     await withTimeout(created.getBytesAsync(), READY_TIMEOUT_MS, plan.imageHash.slice(0, 8))
 
     stats.bytesAfter += result.bytes.length
+    if (result.mime === 'image/jpeg') stats.bytesJpeg += result.bytes.length
     stats.processed += 1
     return created.hash
   } catch (error) {

@@ -22,6 +22,8 @@ export type CompressionProfile = {
 
 /** 최소 품질 가드 — 목표를 맞추려고 이 아래로 내려가지 않는다 */
 export const MIN_QUALITY = 0.6
+/** 칸 사이를 메울 때 올라가는 품질의 천장. 그 위는 바이트만 늘고 눈에는 같다. */
+export const MAX_QUALITY = 0.98
 export const MIN_MULTIPLIER = 1
 export const MIN_MAX_EDGE = 1024
 
@@ -62,17 +64,60 @@ export function applyProfile(settings: Settings, profile: CompressionProfile): S
   }
 }
 
-/** 후보 하나를 재본 결과 */
+/**
+ * 이미지 바이트를 두 갈래로 센다. 우리가 만든 JPEG 는 PDF 에 그대로(DCT) 실리고,
+ * 나머지(손대지 않은 원본, PNG 로 남긴 출력)는 Figma 가 다시 인코딩해 넣어서 크기가 달라진다.
+ * 숫자 하나만 주면 전부 "나머지" 로 본다.
+ */
+export type ImageBytes = { total: number; jpeg: number }
+
+export function asImageBytes(value: number | ImageBytes): ImageBytes {
+  return typeof value === 'number' ? { total: value, jpeg: 0 } : value
+}
+
+/** 후보 하나를 재본 결과. 사다리 칸일 수도, 칸 사이를 메운 변형일 수도 있다. */
 export type Probe = {
-  profileIndex: number
-  /** 이 프로필로 인코딩했을 때의 이미지 바이트 합계 */
-  imageBytes: number
+  profile: CompressionProfile
+  /** 이 프로필로 인코딩했을 때의 이미지 바이트 */
+  bytes: ImageBytes
 }
 
 export type FitOutcome =
   | { kind: 'already-small'; predicted: number }
-  | { kind: 'fits'; profileIndex: number; predicted: number }
-  | { kind: 'unreachable'; profileIndex: number; predicted: number }
+  | { kind: 'fits'; profile: CompressionProfile; predicted: number }
+  | { kind: 'unreachable'; profile: CompressionProfile; predicted: number }
+
+/**
+ * 좋음 → 작음 한 줄 세우기. 사다리는 배율·상한·품질이 함께 내려가고 PNG 재인코딩은
+ * 맨 위 칸만 끄므로, 이 순서로 비교하면 칸도 칸 사이 변형도 한 줄에 선다.
+ * 음수면 a 가 더 선명하다.
+ */
+export function sharpnessOrder(a: CompressionProfile, b: CompressionProfile): number {
+  return (
+    b.multiplier - a.multiplier ||
+    b.maxEdge - a.maxEdge ||
+    Number(a.reencodeOpaquePng) - Number(b.reencodeOpaquePng) ||
+    b.quality - a.quality
+  )
+}
+
+export function sameProfile(a: CompressionProfile, b: CompressionProfile): boolean {
+  return sharpnessOrder(a, b) === 0
+}
+
+/**
+ * 맞는 칸을 찾은 뒤 그 칸과 위 칸 사이를 메우는 변형들 — 품질만 올린다, 선명한 것부터.
+ *
+ * 사다리 칸은 넓다. 특히 맨 위 칸만 PNG 를 그대로 두므로 스크린샷이 많은 문서는 한 칸
+ * 차이가 14MB 와 3.5MB 다(실측). 9.5MB 를 적었는데 3.5MB 가 나오면 예산 6MB 를 버린 것.
+ * JPEG 품질 0.88 과 0.96 은 스크린샷의 글자 주변에서 눈에 띄게 다르다.
+ */
+export function sharperVariants(base: CompressionProfile): CompressionProfile[] {
+  const qualities = [0.08, 0.04]
+    .map((step) => Math.min(MAX_QUALITY, Math.round((base.quality + step) * 100) / 100))
+    .filter((quality) => quality > base.quality + 0.005)
+  return [...new Set(qualities)].sort((a, b) => b - a).map((quality) => ({ ...base, quality }))
+}
 
 /**
  * 고정분 = 기준 export 의 PDF 크기 − 그때의 이미지 바이트 합계.
@@ -82,58 +127,98 @@ export function fixedBytes(baselinePdfBytes: number, baselineImageBytes: number)
   return Math.max(0, baselinePdfBytes - baselineImageBytes)
 }
 
-export function predictSize(fixed: number, imageBytes: number): number {
-  return fixed + imageBytes
+/**
+ * 예측 = 고정분 + 우리 JPEG + 보정비 × 나머지.
+ *
+ * Figma 는 PDF 를 만들 때 손대지 않은 원본을 자기 방식으로 다시 인코딩해 넣는다 — 31장 덱
+ * 실측: 우리 셈 48MB 가 PDF 안에서는 8.9MB. 그대로 더하면 고정분이 0 으로 잘리고 압축을
+ * 세게 한 후보가 기준보다 크게 예측된다. 반면 우리가 만든 JPEG 는 그대로(DCT) 실린다
+ * (pdfimages 로 확인). 그래서 JPEG 는 그대로 더하고 나머지에만 기준 패스에서 잰 비율을
+ * 곱한다. 비율 하나를 전부에 곱하면 우리 JPEG 가 많은 후보일수록 작게 예측돼 목표를 넘긴다
+ * (실측: 예측 5.8MB → 실제 8.0MB).
+ */
+export function predictSize(fixed: number, imageBytes: number | ImageBytes, ratio = 1): number {
+  const bytes = asImageBytes(imageBytes)
+  return fixed + bytes.jpeg + Math.max(0, bytes.total - bytes.jpeg) * ratio
+}
+
+/**
+ * 나머지 몫의 보정비 = (PDF 안의 실제 이미지 바이트 − 우리 JPEG) / (우리 셈 − 우리 JPEG).
+ * 잴 수 없으면 1, 터무니없으면 잘라 낸다.
+ */
+export function calibrationRatio(pdfImageBytes: number, baseline: number | ImageBytes): number {
+  const bytes = asImageBytes(baseline)
+  const rest = bytes.total - bytes.jpeg
+  if (rest <= 0 || pdfImageBytes <= 0) return 1
+  return Math.min(2, Math.max(0.05, (pdfImageBytes - bytes.jpeg) / rest))
 }
 
 /**
  * 목표를 만족하는 후보 중 **가장 화질이 좋은 것**을 고른다.
  *
- * - 기준 결과가 이미 목표 아래면 그대로 둔다 (AC5 — 공짜로 화질을 버리지 않는다)
+ * - 기준 결과가 목표 아래면 더 압축하지 않는다 (AC5). 대신 더 선명한 후보(사다리 위쪽,
+ *   칸 사이 변형 포함) 중 목표 안에 드는 것이 있으면 그것을 고른다 — 목표는 한도가
+ *   아니라 예산이다. 천장은 사다리 맨 위(선명하게와 같은 자리)라 부풀림에 놀랄 일은 없다.
  * - 아무 후보도 목표를 못 넘기면 최소 품질 결과를 주고 불가능이라고 말한다 (AC4)
  *
- * probes 는 profileIndex 오름차순(좋음 → 작음)일 필요가 없다. 여기서 정렬해 쓴다.
+ * probes 는 정렬돼 있을 필요가 없다. 여기서 좋음 → 작음으로 세워 쓴다.
  */
 export function chooseProfile(
   probes: readonly Probe[],
   fixed: number,
   targetBytes: number,
-  baselineImageBytes: number
+  baselineImageBytes: number | ImageBytes,
+  ratio = 1
 ): FitOutcome {
-  const baselinePredicted = predictSize(fixed, baselineImageBytes)
+  const baselinePredicted = predictSize(fixed, baselineImageBytes, ratio)
+  const baseline = PROFILE_LADDER[BASELINE_INDEX]
+  const sorted = [...probes].sort((a, b) => sharpnessOrder(a.profile, b.profile))
+
   if (baselinePredicted <= targetBytes) {
+    for (const probe of sorted) {
+      if (sharpnessOrder(probe.profile, baseline) >= 0) break // 기준보다 선명한 것만
+      const predicted = predictSize(fixed, probe.bytes, ratio)
+      if (predicted <= targetBytes) return { kind: 'fits', profile: probe.profile, predicted }
+    }
     return { kind: 'already-small', predicted: baselinePredicted }
   }
 
-  const sorted = [...probes].sort((a, b) => a.profileIndex - b.profileIndex)
-
   for (const probe of sorted) {
-    const predicted = predictSize(fixed, probe.imageBytes)
-    if (predicted <= targetBytes) {
-      return { kind: 'fits', profileIndex: probe.profileIndex, predicted }
-    }
+    const predicted = predictSize(fixed, probe.bytes, ratio)
+    if (predicted <= targetBytes) return { kind: 'fits', profile: probe.profile, predicted }
   }
 
   // 아무것도 못 맞췄다 — 가장 작은 것(사다리 끝)을 주고 하한을 알린다
   const smallest = sorted[sorted.length - 1]
   if (smallest === undefined) {
-    return { kind: 'unreachable', profileIndex: BASELINE_INDEX, predicted: baselinePredicted }
+    return { kind: 'unreachable', profile: baseline, predicted: baselinePredicted }
   }
   return {
     kind: 'unreachable',
-    profileIndex: smallest.profileIndex,
-    predicted: predictSize(fixed, smallest.imageBytes)
+    profile: smallest.profile,
+    predicted: predictSize(fixed, smallest.bytes, ratio)
   }
 }
 
 /**
- * 재볼 후보를 고른다. 사다리 전부를 재도 UI 인코딩이라 싸지만, 큰 문서에서는
- * 인코딩 자체가 부담이 되므로 기준보다 압축이 센 쪽만 본다 — 목표를 못 맞춘
- * 상황에서 기준보다 화질 좋은 후보를 재는 건 의미가 없다.
+ * 재볼 후보를 좋음 → 작음 순서로. 사다리 전부를 재도 UI 인코딩이라 싸지만, 큰 문서에서는
+ * 인코딩 자체가 부담이라 한쪽만 본다.
+ *
+ * - 기준이 목표를 넘으면 더 센 쪽('smaller') — 더 좋은 화질은 볼 이유가 없다
+ * - 기준이 목표 안이면 더 선명한 쪽('sharper') — 남은 예산을 화질로 쓴다
+ *
+ * 두 경우 다 좋은 쪽부터 재고, 처음 목표 안에 드는 것에서 멈추면 된다.
  */
-export function candidateIndices(baselineIndex: number): number[] {
+export function candidateIndices(
+  baselineIndex: number,
+  direction: 'sharper' | 'smaller'
+): number[] {
   const out: number[] = []
-  for (let index = baselineIndex + 1; index < PROFILE_LADDER.length; index += 1) out.push(index)
+  if (direction === 'sharper') {
+    for (let index = 0; index < baselineIndex; index += 1) out.push(index)
+  } else {
+    for (let index = baselineIndex + 1; index < PROFILE_LADDER.length; index += 1) out.push(index)
+  }
   return out
 }
 

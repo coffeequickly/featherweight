@@ -4,15 +4,19 @@ import { pdfFileName } from './lib/fileName'
 import {
   applyProfile,
   BASELINE_INDEX,
+  calibrationRatio,
   candidateIndices,
   chooseProfile,
   clampTargetMb,
   CompressionProfile,
   fixedBytes,
+  ImageBytes,
   mbToBytes,
   predictSize,
   Probe,
-  PROFILE_LADDER
+  PROFILE_LADDER,
+  sameProfile,
+  sharperVariants
 } from './lib/fitToSize'
 import { skipFloor, transformScale } from './lib/imageTarget'
 import { snapSettings } from './lib/settingsOptions'
@@ -346,10 +350,14 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     return
   }
 
-  const fixed = fixedBytes(measured.pdfBytes, measured.imageBytes)
+  // 고정분은 PDF 안에 실제로 든 이미지를 뺀 나머지. 우리가 센 바이트는 Figma 가 다시
+  // 압축해 넣는 몫만큼 부풀어 있어서 그 비율로 후보 예측을 보정한다 (fitToSize.predictSize)
+  const fixed = fixedBytes(measured.pdfBytes, measured.pdfImageBytes)
+  const baselineBytes: ImageBytes = { total: measured.imageBytes, jpeg: measured.imageJpegBytes }
+  const ratio = calibrationRatio(measured.pdfImageBytes, baselineBytes)
 
-  const probes = await runProbes(order, fixed, targetBytes, measured.imageBytes, settings.minEdge)
-  const outcome = chooseProfile(probes, fixed, targetBytes, measured.imageBytes)
+  const probes = await runProbes(order, fixed, targetBytes, baselineBytes, settings.minEdge, ratio)
+  const outcome = chooseProfile(probes, fixed, targetBytes, baselineBytes, ratio)
   const fit: FitReport = {
     targetBytes,
     outcome: outcome.kind,
@@ -358,18 +366,20 @@ async function runFitExport(order: string[], settings: Settings, outName: string
 
   // 기준 그대로가 답이면 다시 뽑지 않는다 — 부분을 안 보내면 UI 가 방금 머지해 둔 것을
   // 그대로 저장한다. 세 경우가 여기로 온다:
-  //   · 이미 목표 아래 (AC5 — 공짜로 화질을 버리지 않는다)
+  //   · 이미 목표 아래이고 더 선명한 후보는 전부 넘친다 (AC5)
   //   · 잴 이미지가 없어 후보가 하나도 없었다 (텍스트 위주 문서)
   //   · 취소
   const keepBaseline =
-    outcome.kind === 'already-small' || outcome.profileIndex === BASELINE_INDEX || cancelled
+    outcome.kind === 'already-small' ||
+    sameProfile(outcome.profile, PROFILE_LADDER[BASELINE_INDEX]) ||
+    cancelled
   if (keepBaseline) {
     emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: first.skipped, fit })
     return
   }
 
   reportProgress(t('progress.refine'), 0, FIT_FINAL)
-  const chosen = applyProfile(settings, PROFILE_LADDER[outcome.profileIndex])
+  const chosen = applyProfile(settings, outcome.profile)
   const second = await runPass(order, chosen, FIT_FINAL)
   emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: second.skipped, fit })
 }
@@ -377,34 +387,37 @@ async function runFitExport(order: string[], settings: Settings, outName: string
 /**
  * 후보를 좋은 쪽부터 재본다. 목표를 만족하는 것이 나오면 멈춘다 — 사다리가 정렬돼
  * 있으므로 그보다 센 후보는 화질만 더 버릴 뿐이다.
+ * 기준이 이미 목표 안이면 반대로 더 선명한 쪽을 잰다 — 남은 예산을 화질로 쓴다.
+ * 맞는 칸을 찾으면 그 칸과 위 칸 사이(품질만 올린 변형)를 두 번 더 재서 목표에 붙인다.
  */
 async function runProbes(
   order: string[],
   fixed: number,
   targetBytes: number,
-  baselineImageBytes: number,
-  minEdge: Settings['minEdge']
+  baselineBytes: ImageBytes,
+  minEdge: Settings['minEdge'],
+  ratio: number
 ): Promise<Probe[]> {
   const probes: Probe[] = []
-  if (predictSize(fixed, baselineImageBytes) <= targetBytes) return probes
+  const baselineFits = predictSize(fixed, baselineBytes, ratio) <= targetBytes
+  const rungs = candidateIndices(BASELINE_INDEX, baselineFits ? 'sharper' : 'smaller').map(
+    (index) => PROFILE_LADDER[index]
+  )
+  // 진행 표시용 — 칸 사이 변형은 최대 둘
+  const total = rungs.length + 2
+  let step = 0
 
-  const candidates = candidateIndices(BASELINE_INDEX)
-  for (let step = 0; step < candidates.length; step += 1) {
-    if (cancelled) break
-
-    const profileIndex = candidates[step]
-    const profile = PROFILE_LADDER[profileIndex]
-    reportProgress(
-      t('progress.probe', { current: step + 1, total: candidates.length }),
-      (step + 1) / candidates.length,
-      FIT_PROBE
-    )
-
+  const probe = async (profile: CompressionProfile): Promise<boolean | null> => {
+    step += 1
+    reportProgress(t('progress.probe', { current: step, total }), step / total, FIT_PROBE)
     const items = await probeItemsFor(order, profile, minEdge)
-    if (items.length === 0) break // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
+    if (items.length === 0) return null // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
 
     const reqId = nextRequestId('probe')
-    const promise = awaitResponse<{ totalBytes: number; failed: number }>(reqId, PROBE_TIMEOUT_MS)
+    const promise = awaitResponse<{ totalBytes: number; jpegBytes: number; failed: number }>(
+      reqId,
+      PROBE_TIMEOUT_MS
+    )
     emit<ImageProbeHandler>('image:probe', {
       reqId,
       items,
@@ -412,15 +425,33 @@ async function runProbes(
       reencodeOpaquePng: profile.reencodeOpaquePng
     })
     const result = await promise
+    const bytes: ImageBytes = { total: result.totalBytes, jpeg: result.jpegBytes }
+    probes.push({ profile, bytes })
+    return predictSize(fixed, bytes, ratio) <= targetBytes
+  }
 
-    probes.push({ profileIndex, imageBytes: result.totalBytes })
-    if (predictSize(fixed, result.totalBytes) <= targetBytes) break
+  let fitted: CompressionProfile | undefined
+  for (const rung of rungs) {
+    if (cancelled) return probes
+    const fits = await probe(rung)
+    if (fits === null) return probes
+    if (fits) {
+      fitted = rung
+      break
+    }
+  }
+  if (fitted === undefined && baselineFits) fitted = PROFILE_LADDER[BASELINE_INDEX]
+  if (fitted === undefined) return probes
+
+  for (const variant of sharperVariants(fitted)) {
+    if (cancelled) break
+    const fits = await probe(variant)
+    if (fits === null || fits) break
   }
 
   return probes
 }
 
-/** 이 프로필로 처리한다면 각 이미지가 몇 바이트가 될지 UI 가 재볼 목록. */
 async function probeItemsFor(
   order: string[],
   profile: CompressionProfile,
@@ -469,11 +500,16 @@ async function probeItemsFor(
  * UI 에 "지금까지 보낸 부분들을 머지해서 크기만 재 달라"고 한다.
  * 큰 문서는 폰트 임베드까지 시간이 걸리므로 기본 타임아웃보다 넉넉히 준다.
  */
-async function requestMeasurement(
-  outName: string
-): Promise<{ pdfBytes: number; imageBytes: number }> {
+type Measured = {
+  pdfBytes: number
+  imageBytes: number
+  imageJpegBytes: number
+  pdfImageBytes: number
+}
+
+async function requestMeasurement(outName: string): Promise<Measured> {
   const reqId = nextRequestId('fit')
-  const promise = awaitResponse<{ pdfBytes: number; imageBytes: number }>(reqId, MEASURE_TIMEOUT_MS)
+  const promise = awaitResponse<Measured>(reqId, MEASURE_TIMEOUT_MS)
   emit<DoneHandler>('done', {
     reqId,
     measureOnly: true,

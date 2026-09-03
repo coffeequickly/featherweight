@@ -131,6 +131,8 @@ export type StoredFont = FontRef & {
 
 export type PartStats = {
   imagesProcessed: number
+  /** 우리가 만든 JPEG 출력 바이트 — PDF 에 그대로(DCT) 실린다. 나머지는 Figma 가 다시 넣는다 */
+  bytesJpeg: number
   /** 이 쪽의 서로 다른 이미지 해시. 쪽마다 합쳐 "이미지 N장" 을 체크리스트와 같은 기준으로 센다 */
   imageHashes: string[]
   bytesBefore: number
@@ -278,7 +280,15 @@ export interface PdfPartHandler extends EventHandler {
 /** 측정 패스 결과 — UI 가 머지한 실제 PDF 크기를 메인에 돌려준다 */
 export interface FitMeasuredHandler extends EventHandler {
   name: 'fit:measured'
-  handler: (payload: { reqId: string; pdfBytes: number; imageBytes: number }) => void
+  /** imageBytes 는 우리가 넣은 바이트 합, pdfImageBytes 는 PDF 안에 실제로 든 이미지 바이트 */
+  handler: (payload: {
+    reqId: string
+    pdfBytes: number
+    imageBytes: number
+    /** imageBytes 중 우리가 만든 JPEG 몫 */
+    imageJpegBytes: number
+    pdfImageBytes: number
+  }) => void
 }
 
 /** Fit to Size 결과 — 리포트에 그대로 보여준다 */
@@ -427,7 +437,13 @@ export interface ImageProbeHandler extends EventHandler {
 
 export interface ImageProbeResultHandler extends EventHandler {
   name: 'image:probe:result'
-  handler: (payload: { reqId: string; totalBytes: number; failed: number }) => void
+  handler: (payload: {
+    reqId: string
+    totalBytes: number
+    /** totalBytes 중 우리가 만든 JPEG 몫 — 보정하지 않는다 */
+    jpegBytes: number
+    failed: number
+  }) => void
 }
 
 /** 문서 이름 — UI 가 파일명 기본값을 제안할 때 쓴다. */

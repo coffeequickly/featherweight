@@ -502,8 +502,8 @@ const MESSAGES = {
     ko: '{target} 안에 맞췄습니다 — 이 안에서 가장 좋은 화질입니다'
   },
   'report.fitAlready': {
-    en: 'Already under {target} — quality left untouched',
-    ko: '이미 {target} 이하 — 화질을 그대로 두었습니다'
+    en: 'Already under {target} — kept at the best quality that fits',
+    ko: '이미 {target} 이하입니다 — 이 안에서 가장 좋은 화질로 두었습니다'
   },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",
