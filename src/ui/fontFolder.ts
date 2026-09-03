@@ -21,8 +21,9 @@ export type ParsedFontFile = FontFileNames & {
 /** 이름으로 못 거른 나머지를 읽을 상한 — 그 이상은 시간만 먹는다 */
 const SCAN_CAP = 400
 
-function isTtf(file: File): boolean {
-  return /\.ttf$/i.test(file.name)
+/** static TTF·OTF. OTF(CFF)는 2.3 부터 받는다 — fontkitAdapter 참고 */
+function isFontFile(file: File): boolean {
+  return /\.(ttf|otf)$/i.test(file.name)
 }
 
 async function parseFile(file: File): Promise<ParsedFontFile | null> {
@@ -54,7 +55,7 @@ export async function findFontFiles(
   missing: readonly FontUsage[],
   onProgress: (done: number, total: number) => void
 ): Promise<Map<string, ParsedFontFile>> {
-  const ttfs = files.filter(isTtf)
+  const ttfs = files.filter(isFontFile)
   const likely = ttfs.filter((file) =>
     missing.some((font) => looksLikeFamily(file.name, font.family))
   )
