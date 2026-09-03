@@ -14,6 +14,7 @@ import { suggestFileName } from '../lib/fileName'
 import { MessageKey, t } from '../lib/i18n'
 import { outlinedTexts } from '../lib/preflight'
 import { DEFAULT_SETTINGS, FrameThumbsRequestHandler, ResizeWindowHandler } from '../lib/types'
+import { usedBytes } from '../lib/fontStore'
 import { PLUGIN_VERSION } from './buildInfo'
 import { ExportFooter } from './ExportFooter'
 import { FontPanel } from './FontPanel'
@@ -180,6 +181,8 @@ function AppBody(): JSX.Element {
             frameShortEdge={widest.short}
             version={PLUGIN_VERSION}
             editor={main.editor}
+            storedBytes={usedBytes(storedFonts)}
+            onOpenFonts={() => setScreen('fonts')}
           />
         ) : null}
 

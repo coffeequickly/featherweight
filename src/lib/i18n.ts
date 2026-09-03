@@ -313,6 +313,12 @@ const MESSAGES = {
   'images.quality': { en: 'Quality', ko: '품질' },
   'images.reencode': { en: 'Re-encode opaque PNGs as JPEG', ko: '투명 없는 PNG는 JPEG로' },
   'settings.sectionText': { en: 'Text', ko: '텍스트' },
+  'settings.sectionFonts': { en: 'Fonts', ko: '폰트' },
+  'settings.manageFonts': { en: 'Manage stored fonts…', ko: '저장된 폰트 관리…' },
+  'settings.manageFontsSays': {
+    en: 'Fonts you added, from every file — {used} of {limit} used.',
+    ko: '모든 파일에서 직접 넣은 폰트 — {used} / {limit} 사용 중.'
+  },
   // 진짜 폰트로 넣는 건 기본 기능이다 — 옵션은 그 반대(전부 아웃라인)를 켜는 쪽이다
   'settings.outlineAll': {
     en: 'Export all text as outlines',
@@ -385,6 +391,8 @@ const MESSAGES = {
     en: 'Not enough storage for this file ({size}). Delete fonts you no longer use under "Stored fonts" below.',
     ko: '이 파일을 넣을 공간이 없습니다 ({size}). 아래 "저장된 폰트" 에서 안 쓰는 것을 지워 주세요.'
   },
+  'fonts.sectionThisFile': { en: 'Fonts in this file', ko: '이 파일의 폰트' },
+  'fonts.sectionAdd': { en: 'Add missing fonts', ko: '없는 폰트 넣기' },
   'fonts.storedTitle': { en: 'Stored fonts', ko: '저장된 폰트' },
   'fonts.storageUsage': { en: '{used} of {limit}', ko: '{used} / {limit}' },
   'fonts.storedHint': {

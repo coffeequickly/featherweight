@@ -8,14 +8,16 @@
 // 고르는 부품은 전부 ChoiceRow — 메인의 타일과 같은 문법이라 화면이 바뀌어도
 // "고른다" 는 동작이 같은 모양으로 보인다.
 
-import { Checkbox, Muted, RangeSlider, Text, VerticalSpace } from '@create-figma-plugin/ui'
+import { Button, Checkbox, Muted, RangeSlider, Text, VerticalSpace } from '@create-figma-plugin/ui'
 import { ComponentChildren, Fragment, JSX } from 'preact'
 
+import { formatBytes } from '../lib/fontStore'
 import { t } from '../lib/i18n'
 import { edgeTag, MAX_EDGES, MIN_EDGES, MULTIPLIERS } from '../lib/settingsOptions'
-import { EditorKind, Settings } from '../lib/types'
+import { CLIENT_STORAGE_LIMIT, EditorKind, Settings } from '../lib/types'
 import { ChoiceRow } from './ChoiceRow'
 import { EdgeGlyph, ImageGlyph, ScaleGlyph } from './glyphs'
+import { Section } from './Section'
 import { SizeDiagram } from './SizeDiagram'
 
 type Props = {
@@ -28,6 +30,9 @@ type Props = {
   /** 메인에서 헤더를 뺐으니 버전은 여기 맨 아래에 */
   version: string
   editor: EditorKind
+  /** 플러그인에 넣어 둔 폰트 바이트 합 — 폰트 화면의 "저장된 폰트" 로 가는 문에 적는다 */
+  storedBytes: number
+  onOpenFonts: () => void
 }
 
 /**
@@ -44,7 +49,9 @@ export function SettingsPanel({
   frameLongEdge,
   frameShortEdge,
   version,
-  editor
+  editor,
+  storedBytes,
+  onOpenFonts
 }: Props): JSX.Element {
   return (
     <Fragment>
@@ -157,23 +164,26 @@ export function SettingsPanel({
         <Says text={t('settings.keepLinksSays')} />
       </Section>
 
+      {/* 폰트 화면은 체크리스트에서만 열렸다 — 선택이 없거나 텍스트가 없으면 넣어 둔 폰트를
+          관리할 길이 없었다. 설정에서도 간다. */}
+      <Section title={t('settings.sectionFonts')}>
+        <Button disabled={disabled} onClick={onOpenFonts} secondary>
+          {t('settings.manageFonts')}
+        </Button>
+        <Says
+          text={t('settings.manageFontsSays', {
+            used: formatBytes(storedBytes),
+            limit: formatBytes(CLIENT_STORAGE_LIMIT)
+          })}
+        />
+      </Section>
+
       <div class="aboutLine">
         <Text>
           <Muted>Featherweight v{version}</Muted>
         </Text>
       </div>
     </Fragment>
-  )
-}
-
-function Section({ title, children }: { title: string; children: ComponentChildren }): JSX.Element {
-  return (
-    <div class="section">
-      <div class="sectionTitle">
-        <Text>{title}</Text>
-      </div>
-      {children}
-    </div>
   )
 }
 

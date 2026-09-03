@@ -1,5 +1,4 @@
 import {
-  Bold,
   Button,
   FileUploadButton,
   IconButton,
@@ -28,6 +27,7 @@ import {
 } from '../lib/types'
 import { findFontFiles } from './fontFolder'
 import { packFont } from './fontPack'
+import { Section } from './Section'
 import { createProbe, factsOf, FontProbe } from './fontkitAdapter'
 
 type Notice = { message: string; error: boolean }
@@ -54,45 +54,31 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
 
   return (
     <Fragment>
-      <VerticalSpace space="small" />
-      {fonts.length === 0 ? (
+      <Section title={t('fonts.sectionThisFile')}>
         <Text>
-          <Muted>{t('fonts.none')}</Muted>
+          <Muted>{fonts.length === 0 ? t('fonts.none') : t('fonts.help')}</Muted>
         </Text>
-      ) : (
-        <Fragment>
-          <Text>
-            <Muted>{t('fonts.help')}</Muted>
-          </Text>
+        {fonts.length === 0 ? null : <VerticalSpace space="small" />}
+        {fonts.map((font, index) => (
+          <FontRow
+            key={fontKey(font)}
+            font={font}
+            state={states[index]}
+            all={stored}
+            disabled={disabled}
+            onNotice={onNotice}
+          />
+        ))}
+      </Section>
+
+      {missing.length === 0 ? null : (
+        <Section title={t('fonts.sectionAdd')}>
+          <FolderScan missing={missing} stored={stored} disabled={disabled} onNotice={onNotice} />
           <VerticalSpace space="small" />
-
-          {fonts.map((font, index) => (
-            <FontRow
-              key={fontKey(font)}
-              font={font}
-              state={states[index]}
-              all={stored}
-              disabled={disabled}
-              onNotice={onNotice}
-            />
-          ))}
-
-          {missing.length === 0 ? null : (
-            <Fragment>
-              <VerticalSpace space="medium" />
-              <FolderScan
-                missing={missing}
-                stored={stored}
-                disabled={disabled}
-                onNotice={onNotice}
-              />
-              <VerticalSpace space="medium" />
-              <Text>
-                <Muted>{t('fonts.uploadHint')}</Muted>
-              </Text>
-            </Fragment>
-          )}
-        </Fragment>
+          <Text>
+            <Muted>{t('fonts.uploadHint')}</Muted>
+          </Text>
+        </Section>
       )}
 
       <StoredFonts stored={stored} fonts={fonts} disabled={disabled} />
@@ -120,21 +106,17 @@ function StoredFonts({
   const inUse = new Set(fonts.map((font) => fontKey(font)))
 
   return (
-    <Fragment>
-      <VerticalSpace space="large" />
-      <div class="rowBetween">
-        <Text>
-          <Bold>{t('fonts.storedTitle')}</Bold>
-        </Text>
-        <Text>
-          <Muted>
-            {t('fonts.storageUsage', {
-              used: formatBytes(used),
-              limit: formatBytes(CLIENT_STORAGE_LIMIT)
-            })}
-          </Muted>
-        </Text>
-      </div>
+    <Section
+      title={t('fonts.storedTitle')}
+      aside={
+        <Muted>
+          {t('fonts.storageUsage', {
+            used: formatBytes(used),
+            limit: formatBytes(CLIENT_STORAGE_LIMIT)
+          })}
+        </Muted>
+      }
+    >
       <VerticalSpace space="extraSmall" />
       <div class="storageBar">
         <div
@@ -183,7 +165,7 @@ function StoredFonts({
           </div>
         ))
       )}
-    </Fragment>
+    </Section>
   )
 }
 
