@@ -27,6 +27,10 @@ in the header is the build you mean to ship.
 - [ ] After an export the result card appears under the checklist on the main
       screen (you are brought back there from any sub-screen); ✕ closes it;
       "Check what a parser reads" opens the Text check screen
+- [ ] Target on an image-heavy deck (the 31-slide Playground, 9.5 MB) lands
+      within about 1.5 MB under the target, never over it, and the report says
+      "Fits 9.5MB — the best quality that stays under it"; a text-only document
+      with a generous target keeps Balanced ("Already under…")
 - [ ] Target: typing "0.8" works, an emptied field falls back to the previous
       value (never silently 0.5), and −/+ step by 1 MB (0.5 ↔ 1 at the bottom)
 - [ ] Checklist matches reality: frame count and size; "N of M images will be

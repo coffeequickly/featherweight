@@ -24,6 +24,11 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 
 The plugin UI follows your Figma app language (English / Korean). 한국어 안내는 [아래](#한국어-안내)에 있습니다.
 
+**New in 2.2** — **Target** now spends the whole budget. If Balanced already
+fits, it climbs toward Sharp; between ladder steps it fine-tunes JPEG quality;
+and predictions are calibrated against what Figma actually puts in the PDF, so
+a 9.5 MB target lands at 8.0 MB instead of 3.5 MB.
+
 **New in 2.1** — works in **Figma Slides**: run it in a deck and every slide
 is a page, in deck order, with real fonts and downscaled images (Slides' own
 PDF export outlines the text and keeps every image at full size). Selecting a
