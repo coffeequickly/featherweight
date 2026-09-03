@@ -768,3 +768,19 @@
   gap: 4px;
   margin-left: -4px;
 }
+
+/* 저장 공간 게이지 — 5MB 중 얼마나 찼는지. 90% 넘으면 주황 */
+.storageBar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--figma-color-bg-secondary, #f0f0f0);
+  overflow: hidden;
+}
+.storageBarFill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--figma-color-bg-brand, #0d99ff);
+}
+.storageBarFill.warn {
+  background: var(--figma-color-icon-warning, #ffcd29);
+}

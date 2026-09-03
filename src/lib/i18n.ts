@@ -382,9 +382,17 @@ const MESSAGES = {
     ko: '{file} 파일을 폰트로 읽지 못했습니다. static TTF/OTF 파일이어야 합니다.'
   },
   'fonts.storageFull': {
-    en: 'Not enough storage ({size}). Delete fonts you no longer use.',
-    ko: '저장 공간이 부족합니다 ({size}). 사용하지 않는 폰트를 지워 주세요.'
+    en: 'Not enough storage for this file ({size}). Delete fonts you no longer use under "Stored fonts" below.',
+    ko: '이 파일을 넣을 공간이 없습니다 ({size}). 아래 "저장된 폰트" 에서 안 쓰는 것을 지워 주세요.'
   },
+  'fonts.storedTitle': { en: 'Stored fonts', ko: '저장된 폰트' },
+  'fonts.storageUsage': { en: '{used} of {limit}', ko: '{used} / {limit}' },
+  'fonts.storedHint': {
+    en: 'Kept by the plugin, not by the file — fonts added in other files show here too. Delete what you no longer use to free space (Figma allows 5 MB).',
+    ko: '파일이 아니라 플러그인에 저장됩니다 — 다른 파일에서 넣은 것도 여기 보입니다. 안 쓰는 것을 지우면 공간이 빕니다 (Figma 가 주는 한도는 5MB).'
+  },
+  'fonts.storedInUse': { en: ' · used in this file', ko: ' · 이 파일에서 사용 중' },
+  'fonts.storedNone': { en: 'Nothing stored yet', ko: '넣어 둔 폰트가 없습니다' },
 
   // ── 진행·결과 ───────────────────────────────────────────
   'progress.prepare': { en: 'Preparing…', ko: '준비 중…' },

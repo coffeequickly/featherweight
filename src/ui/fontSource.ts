@@ -7,6 +7,7 @@
 import { emit } from '@create-figma-plugin/utilities'
 
 import { catalogEntry } from '../lib/fontCatalog'
+import { unpackFont } from './fontPack'
 import { matchFont } from '../lib/fontMatch'
 import { FontBytesHandler, FontRef, Reason, StoredFont } from '../lib/types'
 import { awaitResponse, nextRequestId } from './bridge'
@@ -53,7 +54,8 @@ async function fetchFromStorage(ref: FontRef): Promise<Uint8Array | undefined> {
   const promise = awaitResponse<{ bytes: Uint8Array | null }>(reqId)
   emit<FontBytesHandler>('font:bytes', { reqId, ref })
   const response = await promise
-  return response === undefined || response.bytes === null ? undefined : response.bytes
+  if (response === undefined || response.bytes === null) return undefined
+  return unpackFont(response.bytes) // 압축해 둔 것은 풀고, 옛 원본은 그대로
 }
 
 export async function loadFontBytes(ref: FontRef): Promise<Uint8Array | undefined> {
