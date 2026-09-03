@@ -301,5 +301,6 @@ Match the existing version history — one line, leading with the change type:
 - 2.0: "New: one-screen redesign with a pre-flight checklist — see what shrinks, what's ready and what would be outlined before you export. Find missing fonts in a folder. Presets as tiles; HD/FHD/QHD/4K caps."
 - 2.1: "New: works in Figma Slides — every slide a page, with real fonts and smaller images. Selecting a section exports its frames. Selecting many frames no longer freezes the canvas; image-heavy exports are faster."
 - 2.1.1: "Fix: a font file added by an older version that doesn't match its slot (a variable font, or a different weight) is now flagged before export instead of silently changing the weight."
+- 2.3: "New: hyperlinks on text stay clickable in the PDF. OTF fonts can be added, not just TTF. Clearer font-folder picker."
 - 2.2: "Target size now uses the whole budget — climbs toward Sharp when Balanced already fits, fine-tunes quality between steps, and predicts from what Figma actually embeds. A 9.5 MB target lands near 8 MB, not 3.5."
 - 2.1.2: "Fix: says plainly what an added font file will do — \"Regular text will export as SemiBold\" — instead of weight numbers."

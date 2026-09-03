@@ -24,6 +24,10 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 
 The plugin UI follows your Figma app language (English / Korean). 한국어 안내는 [아래](#한국어-안내)에 있습니다.
 
+**New in 2.3** — hyperlinks on text stay clickable in the PDF (Advanced →
+Keep hyperlinks). **OTF fonts** can be added now, not just TTF. The font
+folder picker explains itself.
+
 **New in 2.2** — **Target** now spends the whole budget. If Balanced already
 fits, it climbs toward Sharp; between ladder steps it fine-tunes JPEG quality;
 and predictions are calibrated against what Figma actually puts in the PDF, so
@@ -66,7 +70,7 @@ The Fonts screen lists every font your document uses, in one of three states:
 | State | What happens |
 |---|---|
 | In catalog | Downloaded from a CDN (jsDelivr) at export time and embedded. Nothing to do |
-| Added by you | Add a static TTF once — or pick your font folder and the matching files are found for you. Stored and embedded from then on |
+| Added by you | Add a static TTF or OTF once — or pick your font folder and the matching files are found for you. Stored and embedded from then on |
 | No file | **Kept as outlines** — identical look, you just don't get the size and search benefits |
 
 **Fonts are never substituted.** If a font can't be embedded, the original
@@ -152,7 +156,7 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
 - 오픈 라이선스 폰트 60종이 자동으로 들어갑니다. Figma 기본 서체 Inter부터 Roboto,
   Open Sans, Montserrat, Lato, Poppins 등 라틴 43종, Pretendard, Noto Sans KR,
   나눔, Gothic A1, Spoqa 등 한글 17종. 모든 굵기, 정체와 이탤릭 전부. 그 밖의
-  폰트는 폰트 폴더를 한 번 고르면 맞는 TTF를 찾아 넣습니다.
+  폰트는 폰트 폴더를 한 번 고르면 맞는 TTF·OTF를 찾아 넣습니다.
 - 폰트를 절대 바꿔치기하지 않습니다. 넣지 못한 텍스트는 원래 아웃라인 그대로
   남깁니다. 보기엔 똑같고, 사유를 클릭하면 캔버스에서 그 레이어를 찾아 줍니다.
 - 전부 내 컴퓨터 안에서 처리됩니다. 문서는 어디로도 나가지 않고, 네트워크는 오픈
@@ -164,8 +168,8 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
 
 - 내보낸 PDF는 제출 전에 꼭 확인하세요. 텍스트를 진짜 폰트로 다시 그리기 때문에
   Figma 렌더링과 미세하게 다를 수 있습니다. 만든 파일의 책임은 사용자에게 있습니다.
-- 직접 넣은 폰트는 그대로 임베드됩니다. 정적 TTF만, 굵기마다 한 파일씩(가변
-  폰트·OTF 불가). 그 폰트의 라이선스가 문서 임베딩을 허용하는지는 직접 확인하셔야
+- 직접 넣은 폰트는 그대로 임베드됩니다. 정적 TTF·OTF, 굵기마다 한 파일씩(가변
+  폰트 불가). 그 폰트의 라이선스가 문서 임베딩을 허용하는지는 직접 확인하셔야
   합니다. 자동으로 받는 폰트는 전부 SIL OFL이라 임베딩이 허용됩니다.
 - 회전된 텍스트, 그라데이션·선·효과가 있는 텍스트, 밑줄 텍스트는 원래 아웃라인을
   유지합니다(의도한 동작이고, 조용히 바꾸지 않습니다). 체크리스트가 내보내기 전에
