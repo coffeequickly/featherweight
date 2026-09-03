@@ -76,6 +76,9 @@ in the header is the build you mean to ship.
 - [ ] An .otf (CFF) font file is accepted by Add and by the folder picker,
       `pdffonts` shows it as "CID Type 0C" with no "Mismatch" warning from
       `pdftotext`, and the text is selectable
+- [ ] Advanced settings → Fonts → "Manage stored fonts…" opens the Fonts screen
+      even with nothing selected; the screen is three sections (this file /
+      add missing / stored) with dividers
 - [ ] Stored fonts: the Fonts screen ends with "Stored fonts · X / 5.0MB", a
       meter, and every stored font (including ones added in another file) with
       a trash button; deleting one frees the meter at once; a newly added .ttf
