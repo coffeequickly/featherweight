@@ -539,16 +539,6 @@
   gap: 2px;
 }
 
-.pathChip {
-  /* create-figma-plugin 의 Text 컴포넌트는 자체적으로 pointer-events: none 이다 —
-     Text 안에 중첩된 클릭 요소는 이 속성이 상속돼 클릭이 그대로 통과해버린다.
-     명시적으로 되돌린다. (실측: 이 한 줄이 없으면 클릭이 조용히 아무 반응도 없다) */
-  pointer-events: auto;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  user-select: text;
-}
-
 /* ── 설정 ─────────────────────────────────── */
 
 /* 라벨 위, 컨트롤 아래. 라벨을 옆에 두면 5칸짜리 상한이 좁아진다 */
@@ -769,4 +759,12 @@
   font-size: 11px;
   line-height: 16px;
   color: var(--figma-color-text-warning, #b86200);
+}
+
+/* 버튼 안에 아이콘 + 글자 — 아이콘은 16px 이라 글자와 세로 중심을 맞춘다 */
+.buttonWithIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -4px;
 }

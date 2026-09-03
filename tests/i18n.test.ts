@@ -158,15 +158,6 @@ describe('사전 무결성', () => {
     }
   })
 
-  it('윈도우 안내에 mac 전용 단축키가 섞이지 않는다', () => {
-    for (const locale of ['en', 'ko'] as const) {
-      setLocale(locale)
-      expect(t('fonts.pathHelpWin')).not.toContain('⌘')
-      expect(t('fonts.pathCopiedWin')).not.toContain('⌘')
-      expect(t('fonts.pathHelpMac')).toContain('⌘')
-    }
-  })
-
   it('영어 문장에 한글이 남아 있지 않다', () => {
     setLocale('en')
     for (const key of MESSAGE_KEYS) {

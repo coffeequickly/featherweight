@@ -184,26 +184,6 @@ const MESSAGES = {
     en: (p) => ` · ${p.count} more`,
     ko: ' 외 {count}가지'
   },
-  'fonts.pathHelpMac': {
-    en: 'Installed fonts are in the folders below. Click a path to copy it, then press ⌘⇧G in the file dialog and paste.',
-    ko: '설치된 폰트는 아래 폴더에 있습니다. 경로를 클릭해 복사한 뒤, 파일 선택 창에서 ⌘⇧G 를 누르고 붙여넣으세요.'
-  },
-  'fonts.pathHelpWin': {
-    en: 'Installed fonts are in the folder below. Click the path to copy it, then paste it into the file name field.',
-    ko: '설치된 폰트는 아래 폴더에 있습니다. 경로를 클릭해 복사한 뒤, 파일 이름 칸에 붙여넣으세요.'
-  },
-  'fonts.pathCopyFailed': {
-    en: "Couldn't copy automatically — select the path text below and copy it manually",
-    ko: '자동으로 복사하지 못했습니다 — 아래 경로를 직접 드래그해 복사해 주세요'
-  },
-  'fonts.pathCopiedMac': {
-    en: 'Path copied — press ⌘⇧G in the file dialog and paste',
-    ko: '경로 복사됨 — 파일 선택창에서 ⌘⇧G 누르고 붙여넣으세요'
-  },
-  'fonts.pathCopiedWin': {
-    en: 'Path copied — paste it into the file name field',
-    ko: '경로 복사됨 — 파일 이름 칸에 붙여넣으세요'
-  },
   'app.errorGuide': {
     en: 'If it keeps failing, try exporting fewer frames at once.',
     ko: '계속 실패하면 프레임을 나눠서 내보내 보세요.'
@@ -338,6 +318,11 @@ const MESSAGES = {
     en: 'Export all text as outlines',
     ko: '모든 텍스트를 아웃라인으로 내보내기'
   },
+  'settings.keepLinks': { en: 'Keep hyperlinks', ko: '하이퍼링크 유지' },
+  'settings.keepLinksSays': {
+    en: 'URL links on text stay clickable in the PDF.',
+    ko: '텍스트에 건 URL 링크가 PDF 에서도 눌립니다.'
+  },
   'settings.outlineAllSays': {
     en: 'Only when the fonts cannot be had. Outlined text cannot be searched, copied or read by an ATS.',
     ko: '폰트를 구할 수 없을 때만 쓰세요. 아웃라인 텍스트는 검색·복사·ATS 파싱이 안 됩니다.'
@@ -368,8 +353,8 @@ const MESSAGES = {
   // ── 폰트 폴더에서 자동으로 찾기 ────────────────────────
   'fonts.scanFolder': { en: 'Find in a font folder…', ko: '폰트 폴더에서 찾기…' },
   'fonts.scanHint': {
-    en: 'Pick your font folder and the matching .ttf files are added for you. Nothing leaves this computer.',
-    ko: '폰트 폴더를 고르면 없는 폰트에 맞는 .ttf 를 찾아 넣습니다. 파일은 이 컴퓨터 밖으로 나가지 않습니다.'
+    en: "Pick your font folder. In the dialog the files inside look greyed out — that's normal: select the folder itself and click Upload (Open on Windows). The matching .ttf/.otf files are added for you. Nothing leaves this computer.",
+    ko: '폰트 폴더를 고르세요. 선택창에서 안의 파일들이 회색으로 보이는 게 정상입니다 — 폴더 자체를 고르고 업로드(윈도우는 열기)를 누르면 맞는 .ttf/.otf 를 찾아 넣습니다. 파일은 이 컴퓨터 밖으로 나가지 않습니다.'
   },
   'fonts.scanning': {
     en: 'Reading fonts… {current}/{total}',
@@ -384,12 +369,12 @@ const MESSAGES = {
     ko: ' · {count}종은 폴더에 없습니다'
   },
   'fonts.scanNone': {
-    en: 'No matching .ttf in that folder',
-    ko: '그 폴더에서 맞는 .ttf 를 찾지 못했습니다'
+    en: 'No matching .ttf/.otf in that folder',
+    ko: '그 폴더에서 맞는 .ttf/.otf 를 찾지 못했습니다'
   },
   'fonts.scanSkipped': {
-    en: (p) => ` · ${p.count} skipped (variable/OTF, or no storage left)`,
-    ko: ' · {count}종은 넣지 못함 (가변·OTF 이거나 저장 공간 부족)'
+    en: (p) => ` · ${p.count} skipped (variable font, or no storage left)`,
+    ko: ' · {count}종은 넣지 못함 (가변 폰트이거나 저장 공간 부족)'
   },
   'fonts.add': { en: 'Add', ko: '넣기' },
   'fonts.parseError': {
@@ -589,29 +574,25 @@ const MESSAGES = {
   'font.noFile': { en: 'no file for {family} {style}', ko: '{family} {style} 파일이 없습니다' },
   // ── 올린 폰트 파일 거절 ────────────────────────────────
   // 무엇이 잘못됐는지가 아니라 무엇을 올려야 하는지를 말한다
-  'fontFile.cff': {
-    en: 'This .otf uses PostScript outlines, which come out broken — the text becomes unselectable. Upload the .ttf version instead.',
-    ko: '이 .otf 는 PostScript 방식이라 넣으면 글자가 깨집니다 — 텍스트 선택이 안 됩니다. 같은 서체의 .ttf 파일을 올려 주세요.'
-  },
   'fontFile.variable': {
     en: 'This is a variable font — one file holding every weight. The weight cannot be picked, so it would embed the wrong one. Upload the single-weight (static) file for this style.',
     ko: '이 파일은 굵기를 한 파일에 다 담은 가변(Variable) 폰트입니다. 굵기를 고를 수 없어 엉뚱한 굵기가 들어갑니다. 이 스타일 하나짜리(static) 파일을 올려 주세요.'
   },
   'fontFile.noOutlines': {
-    en: 'No usable glyphs in this file. Upload a .ttf.',
-    ko: '이 파일에서 쓸 수 있는 글자 모양을 찾지 못했습니다. .ttf 파일을 올려 주세요.'
+    en: 'No usable glyphs in this file. Upload a .ttf or .otf.',
+    ko: '이 파일에서 쓸 수 있는 글자 모양을 찾지 못했습니다. .ttf 나 .otf 파일을 올려 주세요.'
   },
   'fonts.fileVariable': {
-    en: 'Variable font file · {slotStyle} text will export in a different weight · replace with the {slotStyle} .ttf',
-    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 다른 굵기로 나갑니다 · {slotStyle} .ttf 로 교체하세요'
+    en: 'Variable font file · {slotStyle} text will export in a different weight · replace with the {slotStyle} .ttf/.otf',
+    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 다른 굵기로 나갑니다 · {slotStyle} .ttf/.otf 로 교체하세요'
   },
   'fonts.fileVariableAs': {
-    en: 'Variable font file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} .ttf',
-    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다 · {slotStyle} .ttf 로 교체하세요'
+    en: 'Variable font file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} .ttf/.otf',
+    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다 · {slotStyle} .ttf/.otf 로 교체하세요'
   },
   'fonts.fileUnusable': {
-    en: 'This file cannot be embedded · replace with the {slotStyle} .ttf',
-    ko: '넣을 수 없는 파일 · {slotStyle} .ttf 로 교체하세요'
+    en: 'This file cannot be embedded · replace with the {slotStyle} .ttf/.otf',
+    ko: '넣을 수 없는 파일 · {slotStyle} .ttf/.otf 로 교체하세요'
   },
   'fonts.fileMismatch': {
     en: '{fileStyle} file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} file',
@@ -622,8 +603,8 @@ const MESSAGES = {
     ko: '저장했습니다. 다만 이 파일은 {fileStyle} 굵기라, {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다.'
   },
   'fonts.uploadHint': {
-    en: 'Upload a .ttf — one file per weight, not a variable font.',
-    ko: '.ttf 파일을 굵기마다 하나씩 올려 주세요. 가변(Variable) 폰트는 안 됩니다.'
+    en: 'Upload a .ttf or .otf — one file per weight. Variable fonts may not apply correctly.',
+    ko: '.ttf 나 .otf 파일을 굵기마다 하나씩 올려 주세요. 가변(Variable) 폰트는 정상적으로 적용되지 않을 수 있습니다.'
   },
   'font.ttc': {
     en: 'Font collections (TTC) are not supported. Add a single TTF/OTF.',

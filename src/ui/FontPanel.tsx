@@ -2,6 +2,7 @@ import {
   Button,
   FileUploadButton,
   IconButton,
+  IconFolder16,
   IconTrash24,
   Muted,
   Text,
@@ -17,13 +18,7 @@ import { fontKey, weightName } from '../lib/fontInventory'
 import { describeFileProblem } from './fontProblem'
 import { availabilityOf, FontAvailability, missingFonts } from '../lib/fontStatus'
 import { fitsWithin, formatBytes, upsertFont } from '../lib/fontStore'
-import {
-  FontDeleteHandler,
-  FontSaveHandler,
-  FontUsage,
-  StoredFont,
-  ToastHandler
-} from '../lib/types'
+import { FontDeleteHandler, FontSaveHandler, FontUsage, StoredFont } from '../lib/types'
 import { findFontFiles } from './fontFolder'
 import { createProbe, factsOf, FontProbe } from './fontkitAdapter'
 
@@ -86,25 +81,6 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
           <VerticalSpace space="medium" />
           <Text>
             <Muted>{t('fonts.uploadHint')}</Muted>
-          </Text>
-          <VerticalSpace space="extraSmall" />
-          {/* 파일 선택창은 보안상 시작 폴더를 지정할 수 없다 —
-              대신 경로를 복사해 주고 이동(⌘⇧G)으로 안내한다 */}
-          <Text>
-            <Muted>{t(IS_MAC ? 'fonts.pathHelpMac' : 'fonts.pathHelpWin')}</Muted>
-          </Text>
-          <VerticalSpace space="extraSmall" />
-          <Text>
-            <Muted>
-              {FONT_DIRS.map((dir, index) => (
-                <Fragment key={dir}>
-                  {index > 0 ? '  ·  ' : ''}
-                  <span class="clickable pathChip" onClick={() => void copyPath(dir)}>
-                    {dir}
-                  </span>
-                </Fragment>
-              ))}
-            </Muted>
           </Text>
         </Fragment>
       )}
@@ -188,10 +164,22 @@ function FolderScan({
       <div class="rowBetween">
         <Button
           disabled={disabled || progress !== null}
-          onClick={() => input.current?.click()}
+          onClick={() => {
+            const element = input.current
+            if (element === null) return
+            // Preact 는 `webkitdirectory` 를 프로퍼티로 넣는다 — JSX 의 '' 는 false 가 돼 폴더
+            // 모드가 안 켜지고 파일 여러 개 고르기 창이 떴다 (사용자 둘이 실측). 열기 직전에
+            // 속성으로 직접 켠다. 속성이 있으면 프로퍼티도 true 다.
+            element.setAttribute('webkitdirectory', '')
+            element.setAttribute('directory', '')
+            element.click()
+          }}
           secondary
         >
-          {t('fonts.scanFolder')}
+          <span class="buttonWithIcon">
+            <IconFolder16 />
+            {t('fonts.scanFolder')}
+          </span>
         </Button>
         {progress === null ? null : (
           <Text>
@@ -208,7 +196,6 @@ function FolderScan({
         type="file"
         multiple
         hidden
-        {...{ webkitdirectory: '' }}
         onChange={(event) => {
           const list = (event.currentTarget as HTMLInputElement).files
           if (list !== null && list.length > 0) void scan([...list])
@@ -278,72 +265,6 @@ function screenUpload(
       bytes
     }
   }
-}
-
-/**
- * navigator.platform 은 deprecated 라 브라우저가 값을 얼리거나 비울 수 있다.
- * userAgentData(신규) → userAgent(범용) → platform(구형) 순으로 본다.
- * 판정 실패 시 mac 이 아닌 쪽으로 두는 게 안전하다 — 윈도우 안내에는 mac 전용
- * 단축키(⌘⇧G)가 없으므로 틀려도 잘못된 키를 알려주지 않는다.
- */
-const IS_MAC = detectMac()
-
-function detectMac(): boolean {
-  const data = (navigator as { userAgentData?: { platform?: string } }).userAgentData
-  if (typeof data?.platform === 'string' && data.platform !== '') {
-    return data.platform.toUpperCase().includes('MAC')
-  }
-  const agent = navigator.userAgent ?? ''
-  if (agent !== '') return /Mac|iPhone|iPad|iPod/i.test(agent)
-  return (navigator.platform ?? '').toUpperCase().includes('MAC')
-}
-// 윈도우는 "모든 사용자"(C:\Windows\Fonts)와 "나만"(%LOCALAPPDATA%) 두 곳에 설치된다 —
-// 관리자 권한 없이 설치한 폰트는 후자에만 있어서 둘 다 안내해야 한다.
-const FONT_DIRS = IS_MAC
-  ? ['~/Library/Fonts', '/Library/Fonts']
-  : ['C:\\Windows\\Fonts', '%LOCALAPPDATA%\\Microsoft\\Windows\\Fonts']
-
-async function copyPath(path: string): Promise<void> {
-  // execCommand 를 먼저 쓴다 — 동기라 절대 멈추지 않는다. 실측 결과 Clipboard API
-  // (navigator.clipboard.writeText) 는 이 플러그인 iframe 에서 권한 프롬프트가
-  // 렌더링되지 못해 응답 없이 영원히 대기했다 — await 가 안 끝나 클릭이 "반응 없음"
-  // 으로 보였다. 그래서 비동기 경로는 타임아웃을 씌워 반드시 끝나게 한다.
-  const copied = trySyncCopy(path) || (await tryAsyncCopy(path))
-  emit<ToastHandler>(
-    'toast',
-    t(copied ? (IS_MAC ? 'fonts.pathCopiedMac' : 'fonts.pathCopiedWin') : 'fonts.pathCopyFailed')
-  )
-}
-
-function trySyncCopy(text: string): boolean {
-  try {
-    const area = document.createElement('textarea')
-    area.value = text
-    area.style.position = 'fixed'
-    area.style.opacity = '0'
-    document.body.appendChild(area)
-    area.focus()
-    area.select()
-    const ok = document.execCommand('copy')
-    area.remove()
-    return ok
-  } catch {
-    return false
-  }
-}
-
-const CLIPBOARD_TIMEOUT_MS = 400
-
-function tryAsyncCopy(text: string): Promise<boolean> {
-  if (navigator.clipboard?.writeText === undefined) return Promise.resolve(false)
-  const attempt = navigator.clipboard
-    .writeText(text)
-    .then(() => true)
-    .catch(() => false)
-  const timeout = new Promise<boolean>((resolve) =>
-    setTimeout(() => resolve(false), CLIPBOARD_TIMEOUT_MS)
-  )
-  return Promise.race([attempt, timeout])
 }
 
 function FontRow({
@@ -416,7 +337,7 @@ function FontRow({
       <div class="fontRowActions">
         {state.kind === 'catalog' ? null : (
           <FileUploadButton
-            acceptedFileTypes={['font/ttf', '.ttf']}
+            acceptedFileTypes={['font/ttf', 'font/otf', '.ttf', '.otf']}
             disabled={disabled}
             onSelectedFiles={(files: File[]) => {
               void handleFiles(files)
