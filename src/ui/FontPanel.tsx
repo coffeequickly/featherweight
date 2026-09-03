@@ -1,4 +1,5 @@
 import {
+  Bold,
   Button,
   FileUploadButton,
   IconButton,
@@ -17,9 +18,16 @@ import { FontFacts, screenFontFile, weightMismatch } from '../lib/fontFile'
 import { fontKey, weightName } from '../lib/fontInventory'
 import { describeFileProblem } from './fontProblem'
 import { availabilityOf, FontAvailability, missingFonts } from '../lib/fontStatus'
-import { fitsWithin, formatBytes, upsertFont } from '../lib/fontStore'
-import { FontDeleteHandler, FontSaveHandler, FontUsage, StoredFont } from '../lib/types'
+import { fitsWithin, formatBytes, upsertFont, usedBytes } from '../lib/fontStore'
+import {
+  CLIENT_STORAGE_LIMIT,
+  FontDeleteHandler,
+  FontSaveHandler,
+  FontUsage,
+  StoredFont
+} from '../lib/types'
 import { findFontFiles } from './fontFolder'
+import { packFont } from './fontPack'
 import { createProbe, factsOf, FontProbe } from './fontkitAdapter'
 
 type Notice = { message: string; error: boolean }
@@ -41,48 +49,139 @@ type Props = {
  * 인스턴스의 이름표가 Figma 가 부르는 이름과 어긋난다("Pretendard Variable SemiBold / Regular").
  */
 export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Element {
-  if (fonts.length === 0) {
-    return (
-      <Fragment>
-        <VerticalSpace space="small" />
-        <Text>
-          <Muted>{t('fonts.none')}</Muted>
-        </Text>
-      </Fragment>
-    )
-  }
-
   const states = fonts.map((font) => availabilityOf(font, stored))
   const missing = missingFonts(fonts, stored)
 
   return (
     <Fragment>
       <VerticalSpace space="small" />
+      {fonts.length === 0 ? (
+        <Text>
+          <Muted>{t('fonts.none')}</Muted>
+        </Text>
+      ) : (
+        <Fragment>
+          <Text>
+            <Muted>{t('fonts.help')}</Muted>
+          </Text>
+          <VerticalSpace space="small" />
+
+          {fonts.map((font, index) => (
+            <FontRow
+              key={fontKey(font)}
+              font={font}
+              state={states[index]}
+              all={stored}
+              disabled={disabled}
+              onNotice={onNotice}
+            />
+          ))}
+
+          {missing.length === 0 ? null : (
+            <Fragment>
+              <VerticalSpace space="medium" />
+              <FolderScan
+                missing={missing}
+                stored={stored}
+                disabled={disabled}
+                onNotice={onNotice}
+              />
+              <VerticalSpace space="medium" />
+              <Text>
+                <Muted>{t('fonts.uploadHint')}</Muted>
+              </Text>
+            </Fragment>
+          )}
+        </Fragment>
+      )}
+
+      <StoredFonts stored={stored} fonts={fonts} disabled={disabled} />
+    </Fragment>
+  )
+}
+
+/**
+ * 플러그인에 넣어 둔 폰트 전부 — 이 파일이 안 쓰는 것까지.
+ *
+ * 저장소는 파일별이 아니라 플러그인 하나에 5MB 다. 위 목록은 이 파일이 쓰는 폰트만 보여 주므로,
+ * 다른 파일에서 넣은 것은 공간을 차지하면서도 지울 길이 없었다. 여기서 보이고 지운다.
+ */
+function StoredFonts({
+  stored,
+  fonts,
+  disabled
+}: {
+  stored: readonly StoredFont[]
+  fonts: readonly FontUsage[]
+  disabled: boolean
+}): JSX.Element {
+  const used = usedBytes(stored)
+  const share = Math.min(1, used / CLIENT_STORAGE_LIMIT)
+  const inUse = new Set(fonts.map((font) => fontKey(font)))
+
+  return (
+    <Fragment>
+      <VerticalSpace space="large" />
+      <div class="rowBetween">
+        <Text>
+          <Bold>{t('fonts.storedTitle')}</Bold>
+        </Text>
+        <Text>
+          <Muted>
+            {t('fonts.storageUsage', {
+              used: formatBytes(used),
+              limit: formatBytes(CLIENT_STORAGE_LIMIT)
+            })}
+          </Muted>
+        </Text>
+      </div>
+      <VerticalSpace space="extraSmall" />
+      <div class="storageBar">
+        <div
+          class={share >= 0.9 ? 'storageBarFill warn' : 'storageBarFill'}
+          style={`width: ${share * 100}%`}
+        />
+      </div>
+      <VerticalSpace space="extraSmall" />
       <Text>
-        <Muted>{t('fonts.help')}</Muted>
+        <Muted>{t('fonts.storedHint')}</Muted>
       </Text>
       <VerticalSpace space="small" />
-
-      {fonts.map((font, index) => (
-        <FontRow
-          key={fontKey(font)}
-          font={font}
-          state={states[index]}
-          all={stored}
-          disabled={disabled}
-          onNotice={onNotice}
-        />
-      ))}
-
-      {missing.length === 0 ? null : (
-        <Fragment>
-          <VerticalSpace space="medium" />
-          <FolderScan missing={missing} stored={stored} disabled={disabled} onNotice={onNotice} />
-          <VerticalSpace space="medium" />
-          <Text>
-            <Muted>{t('fonts.uploadHint')}</Muted>
-          </Text>
-        </Fragment>
+      {stored.length === 0 ? (
+        <Text>
+          <Muted>{t('fonts.storedNone')}</Muted>
+        </Text>
+      ) : (
+        stored.map((font) => (
+          <div class="fontRow" key={fontKey(font)}>
+            <div class="fontRowMain">
+              <div class="ellipsis">
+                <Text>
+                  {font.family} {font.style}
+                </Text>
+              </div>
+              <VerticalSpace space="extraSmall" />
+              <div class="ellipsis">
+                <Text>
+                  <Muted>
+                    {font.fileName} · {formatBytes(font.byteLength)}
+                    {inUse.has(fontKey(font)) ? t('fonts.storedInUse') : ''}
+                  </Muted>
+                </Text>
+              </div>
+            </div>
+            <div class="fontRowActions">
+              <IconButton
+                disabled={disabled}
+                onClick={() =>
+                  emit<FontDeleteHandler>('font:delete', { family: font.family, style: font.style })
+                }
+              >
+                <IconTrash24 />
+              </IconButton>
+            </div>
+          </div>
+        ))
       )}
     </Fragment>
   )
@@ -123,7 +222,7 @@ function FolderScan({
         const match = found.get(fontKey(font))
         if (match === undefined) continue
         const verdict = screenUpload(
-          match.bytes,
+          await packFont(match.bytes),
           match.fileName,
           match.probe,
           match.facts,
@@ -217,7 +316,8 @@ type UploadVerdict =
  * 파일 이름표가 틀린 경우가 있다. 대신 알려 준다.
  */
 function screenUpload(
-  bytes: Uint8Array,
+  /** 실제로 저장되는 형태(압축) — 한도는 이걸로 센다 */
+  packed: Uint8Array,
   fileName: string,
   probe: FontProbe,
   facts: FontFacts,
@@ -228,10 +328,10 @@ function screenUpload(
   if (!verdict.ok)
     return { ok: false, notice: { message: formatReason(verdict.reason), error: true } }
 
-  if (!fitsWithin(all, font, bytes.length)) {
+  if (!fitsWithin(all, font, packed.length)) {
     return {
       ok: false,
-      notice: { message: t('fonts.storageFull', { size: formatBytes(bytes.length) }), error: true }
+      notice: { message: t('fonts.storageFull', { size: formatBytes(packed.length) }), error: true }
     }
   }
 
@@ -256,13 +356,13 @@ function screenUpload(
         style: font.style,
         weight: font.weight,
         italic: font.italic,
-        byteLength: bytes.length,
+        byteLength: packed.length,
         numGlyphs: probe.numGlyphs,
         codePoints: probe.characterSet.length,
         fileName,
         facts
       },
-      bytes
+      bytes: packed
     }
   }
 }
@@ -294,7 +394,7 @@ function FontRow({
       return
     }
 
-    const verdict = screenUpload(bytes, file.name, probe, factsOf(probe), font, all)
+    const verdict = screenUpload(await packFont(bytes), file.name, probe, factsOf(probe), font, all)
     if (!verdict.ok) {
       onNotice(verdict.notice)
       return

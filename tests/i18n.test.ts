@@ -96,6 +96,8 @@ describe('사전 무결성', () => {
     page: 1,
     seconds: '1.0',
     size: '1MB',
+    used: '1MB',
+    limit: '5MB',
     before: '2MB',
     after: '1MB',
     width: 100,
