@@ -51,8 +51,9 @@ export async function probeImageBytes(
   items: readonly ProbeItem[],
   quality: number,
   reencodeOpaquePng: boolean
-): Promise<{ totalBytes: number; failed: number }> {
+): Promise<{ totalBytes: number; jpegBytes: number; failed: number }> {
   let totalBytes = 0
+  let jpegBytes = 0
   let failed = 0
 
   for (const item of items) {
@@ -83,10 +84,13 @@ export async function probeImageBytes(
       continue
     }
 
-    totalBytes += keepsOriginal(original.length, result.bytes.length)
-      ? original.length
-      : result.bytes.length
+    if (keepsOriginal(original.length, result.bytes.length)) {
+      totalBytes += original.length
+    } else {
+      totalBytes += result.bytes.length
+      if (result.mime === 'image/jpeg') jpegBytes += result.bytes.length
+    }
   }
 
-  return { totalBytes, failed }
+  return { totalBytes, jpegBytes, failed }
 }

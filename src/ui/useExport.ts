@@ -80,6 +80,10 @@ function imageBytesOf(parts: readonly PdfPart[]): number {
   return parts.reduce((sum, part) => sum + part.stats.bytesAfter + part.stats.bytesUntouched, 0)
 }
 
+function imageJpegBytesOf(parts: readonly PdfPart[]): number {
+  return parts.reduce((sum, part) => sum + part.stats.bytesJpeg, 0)
+}
+
 /** ui-preview 캡처 자동화용 — Figma 안에서는 전역이 없어 항상 null */
 function previewReport(): ExportReport | null {
   return (window as { __PREVIEW_REPORT__?: ExportReport }).__PREVIEW_REPORT__ ?? null
@@ -147,14 +151,18 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
         emit<FitMeasuredHandler>('fit:measured', {
           reqId: done.reqId ?? '',
           pdfBytes: merged.bytes.length,
-          imageBytes: imageBytesOf(collected)
+          imageBytes: imageBytesOf(collected),
+          imageJpegBytes: imageJpegBytesOf(collected),
+          pdfImageBytes: merged.images.bytes
         })
       } catch {
         measured.current = { parts: collected, merged: null }
         emit<FitMeasuredHandler>('fit:measured', {
           reqId: done.reqId ?? '',
           pdfBytes: 0,
-          imageBytes: 0
+          imageBytes: 0,
+          imageJpegBytes: 0,
+          pdfImageBytes: 0
         })
       }
     }

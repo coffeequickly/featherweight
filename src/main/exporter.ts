@@ -90,6 +90,7 @@ export async function exportFrame(
         stats: {
           imagesProcessed: images.processed,
           imageHashes: images.seen,
+          bytesJpeg: images.bytesJpeg,
           bytesBefore: images.bytesBefore,
           bytesAfter: images.bytesAfter,
           bytesUntouched: images.bytesUntouched,
