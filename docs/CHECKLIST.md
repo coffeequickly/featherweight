@@ -69,6 +69,13 @@ in the header is the build you mean to ship.
       open: the Fonts row turns orange with "1 added file doesn't match its
       slot", and the row on the Fonts screen shows why in orange under the file
       name; replacing the file clears both
+- [ ] Hyperlinks: a text layer with a URL link on part of its text exports as a
+      clickable area over exactly those characters (Preview: hover shows the
+      URL); "Keep hyperlinks" off in Advanced removes them; it is greyed out
+      when "Export all text as outlines" is on
+- [ ] An .otf (CFF) font file is accepted by Add and by the folder picker,
+      `pdffonts` shows it as "CID Type 0C" with no "Mismatch" warning from
+      `pdftotext`, and the text is selectable
 - [ ] Fonts: the font list and Add button work; "Find in a font folder…" opens
       a folder picker, reads the .ttf files and adds the matching ones (one
       canvas toast says how many fonts were added — not one per font; adding a
