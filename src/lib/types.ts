@@ -28,6 +28,8 @@ export type Settings = {
   minEdge: 640 | 1024 | 1600
   reencodeOpaquePng: boolean
   embedText: boolean // Phase 2
+  /** 텍스트에 건 URL 하이퍼링크를 PDF 링크 주석으로 넣는다 — 텍스트를 다시 그리며 잃는 것을 되살린다 */
+  keepLinks: boolean
   /** 목표 용량에 맞춰 압축을 자동으로 고른다 (docs/FIT-TO-SIZE.md) */
   fitToSize: boolean
   fitTargetMb: number
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   minEdge: 640,
   reencodeOpaquePng: true,
   embedText: true,
+  keepLinks: true,
   fitToSize: false,
   fitTargetMb: 5
 }

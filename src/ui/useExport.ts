@@ -89,7 +89,11 @@ function previewReport(): ExportReport | null {
   return (window as { __PREVIEW_REPORT__?: ExportReport }).__PREVIEW_REPORT__ ?? null
 }
 
-export function useExport(storedFonts: StoredFont[], embedText: boolean): ExportState {
+export function useExport(
+  storedFonts: StoredFont[],
+  embedText: boolean,
+  keepLinks: boolean
+): ExportState {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [report, setReport] = useState<ExportReport | null>(previewReport)
@@ -101,8 +105,10 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
   const startedAt = useRef(0)
   const fonts = useRef<StoredFont[]>(storedFonts)
   const wantsText = useRef(embedText)
+  const wantsLinks = useRef(keepLinks)
   fonts.current = storedFonts
   wantsText.current = embedText
+  wantsLinks.current = keepLinks
 
   useEffect(() => {
     const offProgress = on<ProgressHandler>('progress', setProgress)
@@ -134,7 +140,9 @@ export function useExport(storedFonts: StoredFont[], embedText: boolean): Export
               const part = collected.find((candidate) => candidate.index === index)
               if (part === undefined || part.text.length === 0) return { drawn: 0, fallbacks: [] }
               cache ??= new FontCache(document, fonts.current, (font) => loadFontBytes(font))
-              return await drawTextLayer(page, part.text, cache)
+              return await drawTextLayer(page, part.text, cache, undefined, {
+                links: wantsLinks.current
+              })
             }
           : undefined
       })

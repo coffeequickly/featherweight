@@ -86,6 +86,7 @@ const FIXTURE = {
     minEdge: 640,
     reencodeOpaquePng: true,
     embedText: true,
+    keepLinks: true,
     fitToSize: false,
     fitTargetMb: 5
   },
