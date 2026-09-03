@@ -145,6 +145,16 @@ export function SettingsPanel({
           <Text>{t('settings.outlineAll')}</Text>
         </Checkbox>
         <Says text={t('settings.outlineAllSays')} />
+        <VerticalSpace space="small" />
+        {/* 아웃라인으로 내보내면 링크를 얹을 글자가 없다 */}
+        <Checkbox
+          disabled={disabled || !settings.embedText}
+          onValueChange={(value: boolean) => onChange({ ...settings, keepLinks: value })}
+          value={settings.keepLinks}
+        >
+          <Text>{t('settings.keepLinks')}</Text>
+        </Checkbox>
+        <Says text={t('settings.keepLinksSays')} />
       </Section>
 
       <div class="aboutLine">

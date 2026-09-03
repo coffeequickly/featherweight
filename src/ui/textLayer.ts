@@ -7,13 +7,15 @@ import {
   popGraphicsState,
   pushGraphicsState,
   rgb,
-  setCharacterSpacing
+  setCharacterSpacing,
+  PDFString
 } from 'pdf-lib'
 
 import { catalogEntry } from '../lib/fontCatalog'
 import { matchFont } from '../lib/fontMatch'
 import { styleForRun } from '../lib/runStyle'
 import { codePointsOf, parseSvgText, ParseXml, SvgRun } from '../lib/svgText'
+import { LinkSpan, linkSpansForRun } from '../lib/textLinks'
 import { FontRef, Reason, StoredFont, TextRunSource } from '../lib/types'
 import { createProbe, FontProbe, pdfLibFontkit } from './fontkitAdapter'
 
@@ -101,11 +103,17 @@ export type FontProvider = Pick<FontCache, 'get'>
  * 폰트로 그려야 한다. 규칙은 검증(validateSources)과 같은 styleForRun 이라 어긋나지 않는다.
  * run 하나라도 폰트를 못 구하면 노드 전체를 포기한다 — 반쯤 그린 노드를 남기지 않는다.
  */
+export type DrawOptions = {
+  /** 텍스트에 건 URL 링크를 링크 주석으로 넣는다 (Settings.keepLinks) */
+  links: boolean
+}
+
 export async function drawTextLayer(
   page: PDFPage,
   sources: readonly TextRunSource[],
   cache: FontProvider,
-  parse: ParseXml = parseXml
+  parse: ParseXml = parseXml,
+  options: DrawOptions = { links: true }
 ): Promise<DrawResult> {
   const result: DrawResult = { drawn: 0, fallbacks: [] }
   const pageHeight = page.getHeight()
@@ -152,13 +160,47 @@ export async function drawTextLayer(
       continue
     }
 
+    let cursor = 0
     for (const { run, font } of planned) {
       drawRun(page, run, source.offset, pageHeight, font)
+      if (!options.links) continue
+      const { spans, next } = linkSpansForRun(source.characters, cursor, run.text, source.segments)
+      cursor = next
+      for (const span of spans) addLink(page, run, source.offset, pageHeight, font, span)
     }
     result.drawn += 1
   }
 
   return result
+}
+
+/**
+ * run 의 일부 글자에 걸린 URL 을 링크 주석으로. 글자 폭은 폰트에서 재고 자간은 글자 수만큼 더한다.
+ * 세로 범위는 baseline 기준 위 0.9em·아래 0.25em — 어센더·디센더를 대략 덮는다.
+ */
+function addLink(
+  page: PDFPage,
+  run: SvgRun,
+  offset: { x: number; y: number },
+  pageHeight: number,
+  font: PDFFont,
+  span: LinkSpan
+): void {
+  const size = run.fontSize
+  const width = (text: string): number =>
+    font.widthOfTextAtSize(text, size) + run.letterSpacing * text.length
+  const x0 = offset.x + run.x + width(run.text.slice(0, span.start))
+  const x1 = x0 + width(run.text.slice(span.start, span.end))
+  const baseline = pageHeight - (offset.y + run.y)
+  const context = page.doc.context
+  const annot = context.obj({
+    Type: 'Annot',
+    Subtype: 'Link',
+    Rect: [x0, baseline - size * 0.25, x1, baseline + size * 0.9],
+    Border: [0, 0, 0],
+    A: { Type: 'Action', S: 'URI', URI: PDFString.of(span.url) }
+  })
+  page.node.addAnnot(context.register(annot))
 }
 
 function drawRun(
