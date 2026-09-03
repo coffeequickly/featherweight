@@ -9,16 +9,14 @@ describe('screenFontFile', () => {
     expect(screenFontFile(TTF)).toEqual({ ok: true })
   })
 
-  it('OTF(CFF) 는 막는다 — 임베드하면 텍스트 추출이 통째로 실패한다', () => {
+  it('OTF(CFF) 도 통과한다 — 어댑터가 CFF 라벨로 쓰게 된 2.3 부터', () => {
     const otf: FontFacts = { tables: ['CFF ', 'cmap', 'head'], axes: [] }
-    const verdict = screenFontFile(otf)
-    expect(verdict.ok).toBe(false)
-    if (!verdict.ok) expect(verdict.reason.code).toBe('fontFile.cff')
+    expect(screenFontFile(otf).ok).toBe(true)
   })
 
   it("CFF 테이블 이름의 뒤쪽 공백('CFF ')을 흘리지 않는다", () => {
-    expect(screenFontFile({ tables: ['CFF2'], axes: [] }).ok).toBe(false)
-    expect(screenFontFile({ tables: ['CFF '], axes: [] }).ok).toBe(false)
+    expect(screenFontFile({ tables: ['CFF2'], axes: [] }).ok).toBe(true)
+    expect(screenFontFile({ tables: ['CFF '], axes: [] }).ok).toBe(true)
   })
 
   it('가변 폰트는 막는다 — 축을 못 골라 엉뚱한 굵기가 박힌다', () => {
@@ -34,9 +32,10 @@ describe('screenFontFile', () => {
     if (!verdict.ok) expect(verdict.reason.code).toBe('fontFile.noOutlines')
   })
 
-  it('CFF 와 가변이 겹치면 CFF 를 먼저 말한다 — .ttf 로 바꾸면 둘 다 풀린다', () => {
+  it('CFF 라도 가변이면 막는다', () => {
     const verdict = screenFontFile({ tables: ['CFF2'], axes: ['wght'] })
-    if (!verdict.ok) expect(verdict.reason.code).toBe('fontFile.cff')
+    expect(verdict.ok).toBe(false)
+    if (!verdict.ok) expect(verdict.reason.code).toBe('fontFile.variable')
   })
 })
 

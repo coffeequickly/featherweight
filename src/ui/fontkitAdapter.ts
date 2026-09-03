@@ -27,7 +27,7 @@ export type FontProbe = Font
 
 type PdfLibFontkit = Parameters<PDFDocument['registerFontkit']>[0]
 
-type Subset2 = { includeGlyph: (glyph: never) => number; encode: () => Uint8Array }
+type Subset2 = { includeGlyph: (glyph: never) => number; encode: () => Uint8Array; cff?: unknown }
 
 function asFont(value: unknown): Font {
   const font = value as Font & { fonts?: unknown }
@@ -90,9 +90,22 @@ export function pdfLibFontkit(): PdfLibFontkit {
       const mutable = font as unknown as Record<string, unknown>
       const createSubset = (mutable.createSubset as () => Subset2).bind(font)
 
+      // pdf-lib 은 `font.cff` 로 CFF(OTF) 인지 본다. fontkit 1.x 에는 있었고 2.x 에는 없다 —
+      // 없으면 CFF 데이터를 TrueType 라벨(FontFile2·CIDFontType2)로 써서 뷰어가
+      // "Mismatch between font type and embedded font file" 을 낸다. 실측: 채워 주면
+      // CIDFontType0 + FontFile3/CIDFontType0C 로 쓰고 추출·렌더 다 된다.
+      const tables = (font as unknown as { directory?: { tables?: Record<string, unknown> } })
+        .directory?.tables
+      mutable.cff = tables !== undefined && ('CFF ' in tables || 'CFF2' in tables)
+
       mutable.createSubset = (): unknown => {
         const subset = createSubset()
         return {
+          // 서브셋 임베더는 `subset.cff` 로 CFF(OTF) 인지 본다 — 감싸면서 빠뜨리면 CFF 데이터를
+          // TrueType 라벨(FontFile2·CIDFontType2)로 써서 뷰어가 형식 불일치를 낸다.
+          // 실측(STIXGeneralBol.otf): 넘겨 주면 CIDFontType0 + FontFile3/CIDFontType0C 로
+          // 쓰고 pdftotext 경고 없이 추출·렌더 된다.
+          cff: subset.cff,
           includeGlyph: (glyph: never) => subset.includeGlyph(glyph),
           // pdf-lib 이 기다리는 스트림 모양으로 감싼다
           encodeStream: () => {
