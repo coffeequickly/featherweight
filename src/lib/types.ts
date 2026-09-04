@@ -30,6 +30,8 @@ export type Settings = {
   embedText: boolean // Phase 2
   /** 텍스트에 건 URL 하이퍼링크를 PDF 링크 주석으로 넣는다 — 텍스트를 다시 그리며 잃는 것을 되살린다 */
   keepLinks: boolean
+  /** 폰트에 없는 글자를 대체 폰트(Inter → Pretendard)로 그린다. 끄면 그 텍스트는 아웃라인 */
+  glyphFallback: boolean
   /** 목표 용량에 맞춰 압축을 자동으로 고른다 (docs/FIT-TO-SIZE.md) */
   fitToSize: boolean
   fitTargetMb: number
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reencodeOpaquePng: true,
   embedText: true,
   keepLinks: true,
+  glyphFallback: true,
   fitToSize: false,
   fitTargetMb: 5
 }
@@ -91,6 +94,11 @@ export type TextSegment = {
   textDecoration: string
   textCase: string
   hyperlink: { type: 'URL'; value: string } | null
+  /**
+   * OpenType 기능 태그(소문자) → 켬/끔. ss18 같은 스타일 세트는 글리프가 바뀌고, kern/liga 는
+   * Figma 가 기본으로 켜 두는데 사용자가 끌 수 있다 — 끈 것도 따라야 같은 모양이 나온다
+   */
+  features: Record<string, boolean>
 }
 
 export type TextRunSource = {

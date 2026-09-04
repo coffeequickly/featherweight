@@ -329,6 +329,14 @@ const MESSAGES = {
     en: 'URL links on text stay clickable in the PDF.',
     ko: '텍스트에 건 URL 링크가 PDF 에서도 눌립니다.'
   },
+  'settings.glyphFallback': {
+    en: 'Draw missing characters with a fallback font',
+    ko: '폰트에 없는 글자는 대체 폰트로 그리기'
+  },
+  'settings.glyphFallbackSays': {
+    en: 'Only those characters — from Inter first, then Pretendard. Off: the whole layer is outlined instead.',
+    ko: '그 글자만 Inter, 그다음 Pretendard 순으로 대체합니다. 끄면 그 텍스트는 통째로 아웃라인이 됩니다.'
+  },
   'settings.outlineAllSays': {
     en: 'Only when the fonts cannot be had. Outlined text cannot be searched, copied or read by an ATS.',
     ko: '폰트를 구할 수 없을 때만 쓰세요. 아웃라인 텍스트는 검색·복사·ATS 파싱이 안 됩니다.'
@@ -458,6 +466,14 @@ const MESSAGES = {
     en: (p) => ` · ${n(Number(p.count), 'image', 'images')} ${p.size}`,
     ko: ' · 이미지 {count}장 {size}'
   },
+  'report.substituted': {
+    en: (p) =>
+      `${n(Number(p.count), 'character', 'characters')} the font lacks (${p.chars}) drawn with ${p.family}`,
+    ko: '폰트에 없는 글자 {count}개({chars})는 {family} 로 그렸습니다'
+  },
+  'char.thinSpace': { en: 'thin space', ko: '얇은 공백' },
+  'char.narrowNbsp': { en: 'narrow no-break space', ko: '좁은 줄바꿈 없는 공백' },
+  'char.nbsp': { en: 'no-break space', ko: '줄바꿈 없는 공백' },
   'report.imagesShrunk': {
     en: (p) => ` · ${p.count} shrunk`,
     ko: ' · {count}장 줄임'

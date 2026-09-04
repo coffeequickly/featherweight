@@ -13,6 +13,7 @@ function segment(family: string, style: string, start: number, end: number): Tex
     letterSpacing: { unit: 'PIXELS', value: 0 },
     textDecoration: 'NONE',
     textCase: 'ORIGINAL',
+    features: {},
     hyperlink: null
   }
 }
@@ -28,8 +29,11 @@ describe('styleForRun', () => {
       segment('Pretendard', 'Regular', 2, 6)
     ])
 
-    expect(styleForRun(source, 700, false)).toEqual({ family: 'Pretendard', style: 'Bold' })
-    expect(styleForRun(source, 400, false)).toEqual({ family: 'Pretendard', style: 'Regular' })
+    expect(styleForRun(source, 700, false)).toMatchObject({ family: 'Pretendard', style: 'Bold' })
+    expect(styleForRun(source, 400, false)).toMatchObject({
+      family: 'Pretendard',
+      style: 'Regular'
+    })
   })
 
   it('italic 이 일치하는 세그먼트를 우선한다', () => {
@@ -38,18 +42,35 @@ describe('styleForRun', () => {
       segment('Inter', 'Bold', 2, 4)
     ])
 
-    expect(styleForRun(source, 700, true)).toEqual({ family: 'Inter', style: 'Bold Italic' })
-    expect(styleForRun(source, 700, false)).toEqual({ family: 'Inter', style: 'Bold' })
+    expect(styleForRun(source, 700, true)).toMatchObject({ family: 'Inter', style: 'Bold Italic' })
+    expect(styleForRun(source, 700, false)).toMatchObject({ family: 'Inter', style: 'Bold' })
   })
 
   it('맞는 weight 가 없으면 첫 세그먼트로 넘어간다', () => {
     const source = sourceWith([segment('Pretendard', 'Medium', 0, 6)])
 
-    expect(styleForRun(source, 900, false)).toEqual({ family: 'Pretendard', style: 'Medium' })
+    expect(styleForRun(source, 900, false)).toMatchObject({ family: 'Pretendard', style: 'Medium' })
+  })
+
+  it('run 의 font-family 가 있으면 그 서체의 세그먼트를 먼저 고른다 — 한 노드에 서체가 섞인 경우', () => {
+    const source = sourceWith([
+      segment('SUIT', 'Regular', 0, 2),
+      segment('Pretendard Variable', 'Regular', 2, 3)
+    ])
+    expect(styleForRun(source, 400, false, 'Pretendard Variable')).toMatchObject({
+      family: 'Pretendard Variable',
+      style: 'Regular'
+    })
+    // 표기가 달라도 같은 서체로 본다
+    expect(styleForRun(source, 400, false, "'pretendard-variable'").family).toBe(
+      'Pretendard Variable'
+    )
+    // 모르는 서체명이면 예전처럼 weight 로
+    expect(styleForRun(source, 400, false, 'Nexa').family).toBe('SUIT')
   })
 
   it('세그먼트가 없으면 빈 이름을 돌려준다', () => {
-    expect(styleForRun(sourceWith([]), 400, false)).toEqual({ family: '', style: '' })
+    expect(styleForRun(sourceWith([]), 400, false)).toEqual({ family: '', style: '', features: {} })
   })
 })
 
@@ -80,5 +101,13 @@ describe('isItalicStyle', () => {
     expect(isItalicStyle('Bold Italic')).toBe(true)
     expect(isItalicStyle('Oblique')).toBe(true)
     expect(isItalicStyle('Bold')).toBe(false)
+  })
+})
+
+describe('styleForRun — OpenType 기능', () => {
+  it('고른 세그먼트의 기능을 그대로 넘긴다 — 스타일 세트를 잃으면 다른 글리프가 나간다', () => {
+    const source = sourceWith([segment('SUIT', 'Regular', 0, 5)])
+    source.segments[0].features = { ss18: true, kern: false }
+    expect(styleForRun(source, 400, false).features).toEqual({ ss18: true, kern: false })
   })
 })

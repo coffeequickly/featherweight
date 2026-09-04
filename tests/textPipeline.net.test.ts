@@ -47,6 +47,7 @@ function segment(style: string, start: number, end: number): TextSegment {
     letterSpacing: { unit: 'PERCENT', value: -1.5 },
     textDecoration: 'NONE',
     textCase: 'ORIGINAL',
+    features: {},
     hyperlink: null
   }
 }

@@ -87,6 +87,7 @@ const FIXTURE = {
     reencodeOpaquePng: true,
     embedText: true,
     keepLinks: true,
+    glyphFallback: true,
     fitToSize: false,
     fitTargetMb: 5
   },
@@ -200,6 +201,7 @@ const FIXTURE = {
     imagesProcessed: 5,
     imageHashes: [],
     textDrawn: 127,
+    substitutions: [{ family: 'Inter', chars: ['—', '–', '\u2009'] }],
     fallbacks: [
       { nodeId: 't1', reason: { code: 'reject.stroked' } },
       { nodeId: 't2', reason: { code: 'reject.stroked' } },

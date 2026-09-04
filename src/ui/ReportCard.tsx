@@ -27,6 +27,15 @@ type Props = {
  * 목표 용량 결과 한 줄. 못 맞췄을 때는 "왜 안 됐는지"보다 "그럼 얼마가 최선인지"가
  * 쓸모 있다 — 목표를 다시 잡을 근거가 되는 건 그 숫자다.
  */
+/** 눈에 안 보이는 글자는 이름으로 — "얇은 공백" 이 " " 보다 낫다 */
+function charName(char: string): string {
+  const code = char.codePointAt(0) ?? 0
+  if (code === 0x2009) return t('char.thinSpace')
+  if (code === 0x202f) return t('char.narrowNbsp')
+  if (code === 0x00a0) return t('char.nbsp')
+  return char
+}
+
 function fitLine(fit: NonNullable<ExportReport['fit']>, actualBytes: number): string {
   const target = formatBytes(fit.targetBytes)
   if (fit.outcome === 'unreachable') {
@@ -93,6 +102,17 @@ export function ReportCard({ report, onClose, onOpenPreview }: Props): JSX.Eleme
               : ''}
           </Muted>
         </Text>
+        {report.substitutions.map((item) => (
+          <Text key={item.family}>
+            <Muted>
+              {t('report.substituted', {
+                count: item.chars.length,
+                chars: item.chars.map(charName).join(', '),
+                family: item.family
+              })}
+            </Muted>
+          </Text>
+        ))}
       </div>
 
       {report.extractable.length === 0 ? null : (

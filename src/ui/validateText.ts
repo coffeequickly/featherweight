@@ -17,7 +17,8 @@ const parseXml = (svg: string): Document => new DOMParser().parseFromString(svg,
 
 export async function validateSources(
   sources: readonly TextRunSource[],
-  available: readonly StoredFont[]
+  available: readonly StoredFont[],
+  options: { glyphFallback: boolean } = { glyphFallback: true }
 ): Promise<ValidationOutcome> {
   const outcome: ValidationOutcome = { eligible: [], rejected: [] }
 
@@ -30,7 +31,7 @@ export async function validateSources(
 
     const families = new Map<string, { family: string; style: string; codePoints: number[] }>()
     for (const run of runs) {
-      const style = styleForRun(source, run.fontWeight, run.italic)
+      const style = styleForRun(source, run.fontWeight, run.italic, run.fontFamily)
       const key = `${style.family} ${style.style}`
       const found = families.get(key)
       const points = codePointsOf([run])
@@ -46,7 +47,8 @@ export async function validateSources(
       const result = await checkCoverage(
         { family: entry.family, style: entry.style },
         [...new Set(entry.codePoints)],
-        available
+        available,
+        options
       )
       if (!result.ok) {
         reason = result.reason

@@ -4,6 +4,7 @@ import { PDFDocument, PDFFont, StandardFonts } from 'pdf-lib'
 import { describe, expect, it, vi } from 'vitest'
 
 import { TextRunSource, TextSegment } from '../src/lib/types'
+import { FontProbe } from '../src/ui/fontkitAdapter'
 import { drawTextLayer, FontProvider } from '../src/ui/textLayer'
 
 const parseXml = (svg: string): Document =>
@@ -19,6 +20,7 @@ function segment(family: string, style: string, start: number, end: number): Tex
     letterSpacing: { unit: 'PIXELS', value: 0 },
     textDecoration: 'NONE',
     textCase: 'ORIGINAL',
+    features: {},
     hyperlink: null
   }
 }
@@ -50,7 +52,12 @@ function providerWith(entries: Record<string, ProviderEntry>, requested: string[
       const entry = entries[key]
       if (entry === undefined)
         return { ok: false, reason: { code: 'font.noFile', params: { family, style } } as const }
-      return { ok: true, font: entry.font, covers: () => entry.missing ?? [] }
+      // 표준 폰트에는 fontkit 프로브가 없다 — layout 이 빈 배열을 주면 커닝 없이 통째로 그린다
+      const probe = {
+        layout: () => ({ glyphs: [], positions: [] }),
+        unitsPerEm: 1000
+      } as unknown as FontProbe
+      return { ok: true, font: entry.font, probe, covers: () => entry.missing ?? [] }
     }
   }
 }
@@ -75,16 +82,15 @@ describe('drawTextLayer', () => {
       { 'Test Bold': { font: bold }, 'Test Regular': { font: regular } },
       requested
     )
-    const draw = vi.spyOn(page, 'drawText')
+    // drawText 대신 연산자를 직접 쓴다(커닝) — 페이지에 등록되는 폰트의 순서로 본다
+    const registered = vi.spyOn(page.node, 'newFontDictionary')
 
     const result = await drawTextLayer(page, [mixedSource()], provider, parseXml)
 
     expect(result.drawn).toBe(1)
     expect(result.fallbacks).toEqual([])
     expect(requested).toEqual(['Test Bold', 'Test Regular'])
-    expect(draw).toHaveBeenCalledTimes(2)
-    expect(draw.mock.calls[0][1]?.font).toBe(bold)
-    expect(draw.mock.calls[1][1]?.font).toBe(regular)
+    expect(registered.mock.calls.map((call) => call[1])).toEqual([bold.ref, regular.ref])
   })
 
   it('run 하나라도 폰트를 못 구하면 노드 전체를 그리지 않는다', async () => {

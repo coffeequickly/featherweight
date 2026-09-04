@@ -13,6 +13,7 @@ function segment(start: number, end: number, url: string | null): TextSegment {
     letterSpacing: { unit: 'PERCENT', value: 0 },
     textDecoration: 'NONE',
     textCase: 'ORIGINAL',
+    features: {},
     hyperlink: url === null ? null : { type: 'URL', value: url }
   }
 }
@@ -46,6 +47,16 @@ describe('linkSpansForRun', () => {
   it('원문에서 못 찾으면(대소문자 변환 등) 링크를 넣지 않고 커서도 그대로', () => {
     const segments = [segment(0, 24, 'https://x.io')]
     expect(linkSpansForRun(characters, 0, 'SEE OUR', segments)).toEqual({ spans: [], next: 0 })
+  })
+
+  it('원문에 묶음문자가 섞여 있어도 run(묶음문자 없음)을 찾고, run 기준 인덱스는 그것을 뺀 수로', () => {
+    // 원문 "경\u2060력\u2060의 링\u2060크" — 링크는 원문 인덱스 6..10 ("링\u2060크")
+    const text = '경\u2060력\u2060의 링\u2060크'
+    // 원문은 9자(묶음문자 3개 포함) — 링크는 원문 인덱스 6..9
+    const segments = [segment(0, 6, null), segment(6, 9, 'https://w.io')]
+    const { spans, next } = linkSpansForRun(text, 0, '경력의 링크', segments)
+    expect(spans).toEqual([{ start: 4, end: 6, url: 'https://w.io' }])
+    expect(next).toBe(9)
   })
 
   it('빈 URL·링크 없는 세그먼트는 무시', () => {
