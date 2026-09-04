@@ -24,6 +24,14 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 
 The plugin UI follows your Figma app language (English / Korean). 한국어 안내는 [아래](#한국어-안내)에 있습니다.
 
+**New in 2.4** — text comes out the way Figma draws it. Pair kerning is
+applied, OpenType features you set in Figma (stylistic sets, kerning and
+ligature toggles) are honoured, mixed fonts inside one layer each get their own
+font, and a glyph the font lacks (an em dash, a thin space) is drawn with a
+fallback font — Inter first, Pretendard for CJK — instead of turning the whole
+layer into outlines; the report says which characters, and you can turn it off.
+Korean line-break joiners no longer force outlines either.
+
 **New in 2.3** — hyperlinks on text stay clickable in the PDF (Advanced →
 Keep hyperlinks). **OTF fonts** can be added now, not just TTF. The font
 folder picker explains itself.
