@@ -155,10 +155,60 @@ export function collectTextNodes(root: SceneNode): TextNode[] {
  * HUG 로 잡힌 프레임은 레이아웃을 끄는 순간 크기가 변하므로 먼저 FIXED 로 바꾼다.
  * 클론에서만 부르므로 원본 문서는 그대로다.
  */
-function freezeLayout(parent: BaseNode | null): void {
-  if (parent === null || !('layoutMode' in parent)) return
+/**
+ * 클론 안의 인스턴스를 전부 떼어 낸다(detach).
+ *
+ * 인스턴스는 레이아웃 속성을 못 바꾼다 — 그래서 freezeLayout 이 안 먹고, 그 안의 텍스트를
+ * 숨기면 허그 높이가 줄어 형제가 당겨진다. 실측: 이력서의 "섹션 타이틀" 인스턴스(세로
+ * 오토레이아웃·허그)에서 제목을 숨기자 아래 구분선이 제목 높이만큼(14pt) 올라와 제목 위에
+ * 얹혔다. 떼어 낸 프레임은 보기에 똑같고 클론은 버리는 것이라 잃을 게 없다.
+ * 바깥 인스턴스부터 떼야 안쪽이 떼어진다 — 안쪽 것은 던지므로 한 바퀴 더 돈다.
+ * 루트 자체가 인스턴스면 새 프레임을 돌려주니 호출자가 바꿔 잡아야 한다.
+ */
+export function detachInstances(root: SceneNode): SceneNode {
+  let top: SceneNode = root
+  if (top.type === 'INSTANCE') top = top.detachInstance()
 
-  const frame = parent as FrameNode
+  for (let round = 0; round < 20; round += 1) {
+    if (!('findAll' in top)) return top
+    const instances = top.findAll((node) => node.type === 'INSTANCE') as InstanceNode[]
+    if (instances.length === 0) return top
+    let detached = 0
+    for (const instance of instances) {
+      try {
+        if (!instance.removed) {
+          instance.detachInstance()
+          detached += 1
+        }
+      } catch {
+        // 안쪽 인스턴스는 바깥을 뗀 뒤에야 떼어진다 — 다음 바퀴
+      }
+    }
+    if (detached === 0) return top // 하나도 못 뗐으면 돌아 봐야 같다
+  }
+  return top
+}
+
+/**
+ * 텍스트를 숨겨도 형제가 움직이지 않게 — 가장 가까운 오토레이아웃 조상을 굳힌다.
+ *
+ * 직계 부모만 보면 안 된다. 텍스트가 **그룹** 안에 있으면 그룹은 자식 크기를 따라가므로
+ * 숨기는 순간 그룹이 줄고, 그 위의 오토레이아웃이 아래 형제(구분선 등)를 끌어올린다.
+ * 실측: 이력서의 "Career History" 제목이 그룹 안에 있어 구분선이 14pt 위로 올라왔다.
+ * 오토레이아웃이 아닌 프레임을 만나면 그 안은 절대 좌표라 더 볼 것 없다.
+ */
+export function freezeLayout(parent: BaseNode | null): void {
+  let current: BaseNode | null = parent
+  while (current !== null && current.type !== 'PAGE' && current.type !== 'DOCUMENT') {
+    if ('layoutMode' in current) {
+      freezeFrame(current as FrameNode)
+      return
+    }
+    current = current.parent
+  }
+}
+
+function freezeFrame(frame: FrameNode): void {
   if (frame.layoutMode === 'NONE') return
 
   try {

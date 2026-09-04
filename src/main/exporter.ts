@@ -4,7 +4,13 @@ import { PdfPart, Reason, Settings, TextRunSource, TMP_NODE_NAME } from '../lib/
 import { withTimeout } from '../lib/withTimeout'
 import { ImageRequestSender, OriginalSink, shrinkImages } from './images'
 import { ExportableNode, isExportable } from './selection'
-import { collectTextNodes, extractText, hideTextGlyphs, screenTextNode } from './text'
+import {
+  collectTextNodes,
+  detachInstances,
+  extractText,
+  hideTextGlyphs,
+  screenTextNode
+} from './text'
 
 const EXPORT_TIMEOUT_MS = 30_000
 
@@ -53,10 +59,13 @@ export async function exportFrame(
   }
 
   // clone() 직후 페이지 루트로 옮긴다 — 오토레이아웃 부모 안에 남으면 형제가 밀린다 (S6)
-  const clone = node.clone() as ExportableNode
+  let clone = node.clone() as ExportableNode
   try {
     clone.name = TMP_NODE_NAME
     parkOffscreen(clone, index)
+    // 인스턴스 안의 텍스트는 숨길 때 레이아웃을 못 굳힌다 — 클론이니 전부 떼어 낸다 (text.ts)
+    clone = detachInstances(clone) as ExportableNode
+    clone.name = TMP_NODE_NAME
 
     const images = await shrinkImages(
       clone,
