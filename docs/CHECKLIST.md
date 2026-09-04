@@ -69,6 +69,10 @@ in the header is the build you mean to ship.
       open: the Fonts row turns orange with "1 added file doesn't match its
       slot", and the row on the Fonts screen shows why in orange under the file
       name; replacing the file clears both
+- [ ] A heading inside a component instance with vertical auto layout (hug)
+      and a divider below it exports with the divider still below the heading,
+      not on top of it; same for a text inside a group inside an auto-layout
+      column
 - [ ] Hyperlinks: a text layer with a URL link on part of its text exports as a
       clickable area over exactly those characters (Preview: hover shows the
       URL); "Keep hyperlinks" off in Advanced removes them; it is greyed out
