@@ -69,6 +69,19 @@ in the header is the build you mean to ship.
       open: the Fonts row turns orange with "1 added file doesn't match its
       slot", and the row on the Fonts screen shows why in orange under the file
       name; replacing the file clears both
+- [ ] Latin headings match Figma's width (pair kerning): "Forward Deployed"
+      in a kerned font is not wider than the native export
+- [ ] A layer with a stylistic set on (e.g. SUIT ss18 arrow) exports that
+      alternate glyph; a layer with Kerning turned off in Figma exports unkerned
+- [ ] A layer mixing two fonts (an arrow in another font) draws each run in its
+      own font
+- [ ] Korean body text with word joiners (U+2060) exports as real text, and a
+      line's last word lands where Figma put it (letter-spacing counts joiners)
+- [ ] A layer containing an em dash or thin space the font lacks stays real
+      text — only that character comes from Inter (Pretendard if it is CJK); the
+      report says "N characters the font lacks (…) drawn with Inter"; turning
+      off "Draw missing characters with a fallback font" in Advanced makes
+      that layer outlined again, and the checklist warns before export
 - [ ] A heading inside a component instance with vertical auto layout (hug)
       and a divider below it exports with the divider still below the heading,
       not on top of it; same for a text inside a group inside an auto-layout
