@@ -85,7 +85,12 @@ function AppBody(): JSX.Element {
   const main = useMainState()
   const { items, fonts, storedFonts, settings, preflight, showNotice } = main
   const order = useFrameOrder(items, main.selectionSerial)
-  const exporter = useExport(storedFonts, settings.embedText, settings.keepLinks)
+  const exporter = useExport(
+    storedFonts,
+    settings.embedText,
+    settings.keepLinks,
+    settings.glyphFallback
+  )
 
   useWindowResize(
     (size: { width: number; height: number }) => emit<ResizeWindowHandler>('resize:window', size),

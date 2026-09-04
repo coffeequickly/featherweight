@@ -88,6 +88,9 @@ export function useMainState(): MainState {
 
   const storedFontsRef = useRef<StoredFont[]>(storedFonts)
   storedFontsRef.current = storedFonts
+  // 검증은 그리기와 같은 규칙이어야 한다 — 대체 폰트 옵션을 같이 본다
+  const settingsRef = useRef<Settings>(settings)
+  settingsRef.current = settings
 
   const showNotice = useCallback((next: Notice): void => {
     if (next !== null && !next.error) emit<ToastHandler>('toast', next.message)
@@ -163,7 +166,9 @@ export function useMainState(): MainState {
 
     // fill 을 지워도 되는 노드인지 판정한다 — 폰트 파일과 글리프는 여기서만 볼 수 있다
     const offValidate = on<TextValidateHandler>('text:validate', (payload) => {
-      void validateSources(payload.sources, storedFontsRef.current).then((outcome) => {
+      void validateSources(payload.sources, storedFontsRef.current, {
+        glyphFallback: settingsRef.current.glyphFallback
+      }).then((outcome) => {
         emit<TextValidateResultHandler>('text:validate:result', {
           reqId: payload.reqId,
           ...outcome

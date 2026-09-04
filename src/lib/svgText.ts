@@ -7,6 +7,8 @@
 // ⚠ 이 파서가 가정하는 구조는 스파이크 S3 에서 실물로 확인해야 한다.
 // 구조가 다르면 runs 가 비고, 그 노드는 아웃라인으로 안전하게 fallback 된다.
 
+import { isIgnorable, splitIgnorable, stripIgnorable } from './ignorable'
+
 export type RGB = { r: number; g: number; b: number }
 
 export type SvgRun = {
@@ -20,6 +22,8 @@ export type SvgRun = {
   fontSize: number
   /** px 로 환산한 자간 */
   letterSpacing: number
+  /** 글자 i 앞에 있던 폭 0 서식 문자(묶음문자 등) 수. 길이 text.length + 1, 마지막은 끝에 붙은 수. 없으면 전부 0 */
+  gaps?: number[]
   fill: RGB
   opacity: number
 }
@@ -52,7 +56,13 @@ export function stripLineBreaks(text: string): string {
  * NFC 는 같은 글자의 표준 표기이므로 보이는 결과는 같다.
  */
 export function normalizeText(text: string): string {
-  return stripLineBreaks(text).normalize('NFC')
+  // 묶음문자 같은 폭 0 서식 문자는 뺀다 — 폰트에 없어도 그릴 게 없고, 남기면 노드째 아웃라인이 된다
+  return stripIgnorable(stripLineBreaks(text)).normalize('NFC')
+}
+
+/** run 텍스트로 — 무시 문자는 빼되 자릿수(gaps)는 남긴다. 자간이 그 수만큼 더 붙어야 Figma 와 같다 */
+function normalizeRun(text: string): { text: string; gaps: number[] } {
+  return splitIgnorable(stripLineBreaks(text).normalize('NFC'))
 }
 
 /**
@@ -86,11 +96,12 @@ export function parseSvgText(svg: string, parseXml: ParseXml): SvgRun[] {
     const spans = textElement.getElementsByTagName('tspan')
 
     if (spans.length === 0) {
-      const content = normalizeText(textElement.textContent ?? '')
-      if (content !== '') {
+      const content = normalizeRun(textElement.textContent ?? '')
+      if (content.text !== '') {
         runs.push({
           ...base,
-          text: content,
+          text: content.text,
+          gaps: content.gaps,
           x: readNumber(textElement, 'x', 0),
           y: readNumber(textElement, 'y', 0)
         })
@@ -100,13 +111,14 @@ export function parseSvgText(svg: string, parseXml: ParseXml): SvgRun[] {
 
     for (let spanIndex = 0; spanIndex < spans.length; spanIndex += 1) {
       const span = spans[spanIndex]
-      const content = normalizeText(span.textContent ?? '')
-      if (content === '') continue
+      const content = normalizeRun(span.textContent ?? '')
+      if (content.text === '') continue
 
       const style = readStyle(span, base)
       runs.push({
         ...style,
-        text: content,
+        text: content.text,
+        gaps: content.gaps,
         x: readNumber(span, 'x', readNumber(textElement, 'x', 0)),
         y: readNumber(span, 'y', readNumber(textElement, 'y', 0))
       })
@@ -218,7 +230,7 @@ export function codePointsOf(runs: readonly SvgRun[]): number[] {
   for (const run of runs) {
     for (const char of run.text) {
       const code = char.codePointAt(0)
-      if (code !== undefined) set.add(code)
+      if (code !== undefined && !isIgnorable(code)) set.add(code)
     }
   }
   return [...set]

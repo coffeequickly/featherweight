@@ -7,6 +7,8 @@
 import { emit } from '@create-figma-plugin/utilities'
 
 import { catalogEntry } from '../lib/fontCatalog'
+import { fallbackFontsFor } from '../lib/glyphFallback'
+import { isIgnorable } from '../lib/ignorable'
 import { unpackFont } from './fontPack'
 import { matchFont } from '../lib/fontMatch'
 import { FontBytesHandler, FontRef, Reason, StoredFont } from '../lib/types'
@@ -89,7 +91,7 @@ export async function probeFont(ref: FontRef): Promise<FontProbe | undefined> {
 }
 
 export function missingCodePoints(probe: FontProbe, codePoints: readonly number[]): number[] {
-  return codePoints.filter((point) => !probe.hasGlyphForCodePoint(point))
+  return codePoints.filter((point) => !isIgnorable(point) && !probe.hasGlyphForCodePoint(point))
 }
 
 /**
@@ -99,7 +101,8 @@ export function missingCodePoints(probe: FontProbe, codePoints: readonly number[
 export async function checkCoverage(
   ref: FontRef,
   codePoints: readonly number[],
-  available: readonly StoredFont[]
+  available: readonly StoredFont[],
+  options: { glyphFallback: boolean } = { glyphFallback: true }
 ): Promise<{ ok: true } | { ok: false; reason: Reason }> {
   const inCatalog = catalogEntry(ref) !== undefined
   if (!inCatalog && !matchFont(ref, available).ok) {
@@ -122,18 +125,27 @@ export async function checkCoverage(
   }
 
   const missing = missingCodePoints(probe, codePoints)
-  if (missing.length > 0) {
-    const sample = missing
-      .slice(0, 6)
-      .map((point) => String.fromCodePoint(point))
-      .join('')
-    return {
-      ok: false,
-      reason: { code: 'font.missingGlyphs', params: { count: missing.length, sample } }
+  if (missing.length === 0) return { ok: true }
+
+  // 주 폰트에 없는 글자는 대체 폰트 순서(Inter → Pretendard → JP) 중 전부 덮는 첫 것으로 그린다 —
+  // 그리는 쪽(textLayer)과 같은 규칙이라야 검증에서 통과한 노드가 실제로도 그려진다
+  if (options.glyphFallback) {
+    for (const candidate of fallbackFontsFor(ref.style)) {
+      const fallback = await probeFont(candidate)
+      if (fallback !== undefined && missingCodePoints(fallback, missing).length === 0) {
+        return { ok: true }
+      }
     }
   }
 
-  return { ok: true }
+  const sample = missing
+    .slice(0, 6)
+    .map((point) => String.fromCodePoint(point))
+    .join('')
+  return {
+    ok: false,
+    reason: { code: 'font.missingGlyphs', params: { count: missing.length, sample } }
+  }
 }
 
 /** 사용자가 폰트를 넣거나 지운 뒤 캐시를 비운다. */

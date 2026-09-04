@@ -85,7 +85,8 @@ export async function extractText(
         'letterSpacing',
         'textDecoration',
         'textCase',
-        'hyperlink'
+        'hyperlink',
+        'openTypeFeatures'
       ])
       .map((segment): TextSegment => ({
         start: segment.start,
@@ -107,7 +108,15 @@ export async function extractText(
         hyperlink:
           segment.hyperlink !== null && segment.hyperlink.type === 'URL'
             ? { type: 'URL', value: segment.hyperlink.value ?? '' }
-            : null
+            : null,
+        // Figma 는 'SS18' 처럼 대문자 — OpenType 태그는 소문자다. 실측: SUIT 의 "→" 는 ss18 을
+        // 켜야 막대 있는 화살표고, 기본은 꺾쇠(〉)다. 기능을 잃으면 다른 글자가 나간다
+        features: Object.fromEntries(
+          Object.entries(segment.openTypeFeatures ?? {}).map(([tag, enabled]) => [
+            tag.toLowerCase(),
+            enabled === true
+          ])
+        )
       }))
 
     const fontRefs = segments.map((segment) => segment.fontName)

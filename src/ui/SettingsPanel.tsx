@@ -162,6 +162,15 @@ export function SettingsPanel({
           <Text>{t('settings.keepLinks')}</Text>
         </Checkbox>
         <Says text={t('settings.keepLinksSays')} />
+        <VerticalSpace space="small" />
+        <Checkbox
+          disabled={disabled || !settings.embedText}
+          onValueChange={(value: boolean) => onChange({ ...settings, glyphFallback: value })}
+          value={settings.glyphFallback}
+        >
+          <Text>{t('settings.glyphFallback')}</Text>
+        </Checkbox>
+        <Says text={t('settings.glyphFallbackSays')} />
       </Section>
 
       {/* 폰트 화면은 체크리스트에서만 열렸다 — 선택이 없거나 텍스트가 없으면 넣어 둔 폰트를

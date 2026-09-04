@@ -37,6 +37,8 @@ export type ExportReport = {
   imagesProcessed: number
   textDrawn: number
   fallbacks: Array<{ nodeId: string; reason: Reason }>
+  /** 대체 폰트로 그린 글자 — 폰트별로 모은다. 사용자가 몰라도 되는 일이 아니다 */
+  substitutions: Array<{ family: string; chars: string[] }>
   /** 목표 용량 맞추기를 켰을 때만 있다 */
   fit: FitReport | null
   /** 아웃라인으로 남은 것의 무게 — Type 3 폰트 수와 벡터 바이트 */
@@ -76,6 +78,19 @@ function extractableText(parts: readonly PdfPart[]): string[] {
 }
 
 /** 이 부분들이 PDF 안에서 차지하는 이미지 바이트 — 손대지 않고 통과시킨 것까지 센다 */
+/** 노드별 대체 기록을 폰트별로 — 같은 글자는 한 번만 */
+function groupSubstitutions(
+  items: readonly { family: string; chars: string[] }[]
+): Array<{ family: string; chars: string[] }> {
+  const byFamily = new Map<string, Set<string>>()
+  for (const item of items) {
+    const chars = byFamily.get(item.family) ?? new Set<string>()
+    for (const char of item.chars) chars.add(char)
+    byFamily.set(item.family, chars)
+  }
+  return [...byFamily.entries()].map(([family, chars]) => ({ family, chars: [...chars].sort() }))
+}
+
 function imageBytesOf(parts: readonly PdfPart[]): number {
   return parts.reduce((sum, part) => sum + part.stats.bytesAfter + part.stats.bytesUntouched, 0)
 }
@@ -92,7 +107,8 @@ function previewReport(): ExportReport | null {
 export function useExport(
   storedFonts: StoredFont[],
   embedText: boolean,
-  keepLinks: boolean
+  keepLinks: boolean,
+  glyphFallback: boolean
 ): ExportState {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
@@ -106,9 +122,11 @@ export function useExport(
   const fonts = useRef<StoredFont[]>(storedFonts)
   const wantsText = useRef(embedText)
   const wantsLinks = useRef(keepLinks)
+  const wantsFallback = useRef(glyphFallback)
   fonts.current = storedFonts
   wantsText.current = embedText
   wantsLinks.current = keepLinks
+  wantsFallback.current = glyphFallback
 
   useEffect(() => {
     const offProgress = on<ProgressHandler>('progress', setProgress)
@@ -138,10 +156,12 @@ export function useExport(
         drawText: wantsText.current
           ? async (document, page, index) => {
               const part = collected.find((candidate) => candidate.index === index)
-              if (part === undefined || part.text.length === 0) return { drawn: 0, fallbacks: [] }
+              if (part === undefined || part.text.length === 0)
+                return { drawn: 0, fallbacks: [], substitutions: [] }
               cache ??= new FontCache(document, fonts.current, (font) => loadFontBytes(font))
               return await drawTextLayer(page, part.text, cache, undefined, {
-                links: wantsLinks.current
+                links: wantsLinks.current,
+                glyphFallback: wantsFallback.current
               })
             }
           : undefined
@@ -205,6 +225,7 @@ export function useExport(
             imagesProcessed: 0,
             textDrawn: 0,
             fallbacks: [],
+            substitutions: [],
             fit: done.fit ?? null,
             outlines: { fonts: 0, vectorBytes: 0 },
             images: { count: 0, bytes: 0 },
@@ -245,6 +266,7 @@ export function useExport(
           skipped: done.skipped,
           imagesProcessed: stats.imagesProcessed,
           textDrawn: merged.textDrawn,
+          substitutions: groupSubstitutions(merged.textSubstitutions),
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
           fit: done.fit ?? null,
           outlines: merged.outlines,

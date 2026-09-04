@@ -4,7 +4,7 @@ import { t } from '../lib/i18n'
 import { Reason } from '../lib/types'
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFPage, PDFRawStream, PDFStream } from 'pdf-lib'
 
-import { DrawResult } from './textLayer'
+import { DrawResult, DrawSubstitution } from './textLayer'
 
 export type MergePart = { index: number; bytes: Uint8Array }
 
@@ -19,6 +19,8 @@ export type MergeOutput = PdfContents & {
   bytes: Uint8Array
   textDrawn: number
   textFallbacks: Array<{ nodeId: string; reason: Reason }>
+  /** 대체 폰트로 그린 글자들 (노드별) */
+  textSubstitutions: DrawSubstitution[]
 }
 
 /**
@@ -82,6 +84,7 @@ export async function mergePdfs(
   const out = await PDFDocument.create()
   let textDrawn = 0
   const textFallbacks: Array<{ nodeId: string; reason: Reason }> = []
+  const textSubstitutions: DrawSubstitution[] = []
 
   for (const part of ordered) {
     const source = await PDFDocument.load(part.bytes)
@@ -96,6 +99,7 @@ export async function mergePdfs(
       const drawn = await meta.drawText(out, page, part.index)
       textDrawn += drawn.drawn
       textFallbacks.push(...drawn.fallbacks)
+      textSubstitutions.push(...drawn.substitutions)
     }
   }
 
@@ -113,6 +117,7 @@ export async function mergePdfs(
     bytes: await out.save({ useObjectStreams: true }),
     textDrawn,
     textFallbacks,
+    textSubstitutions,
     ...contents
   }
 }
