@@ -4,6 +4,7 @@ import {
   FONT_INDEX_KEY,
   FONT_KEY_PREFIX,
   fontStorageKey,
+  legacyFontStorageKey,
   removeFont,
   upsertFont
 } from '../lib/fontStore'
@@ -29,6 +30,8 @@ export async function listFonts(): Promise<StoredFont[]> {
 export function saveFont(font: StoredFont, bytes: Uint8Array): Promise<StoredFont[]> {
   return queue(async () => {
     await figma.clientStorage.setAsync(fontStorageKey(font), bytes)
+    // 옛 키에 남은 같은 폰트의 바이트는 이제 참조되지 않는다 — 한도를 갉아먹지 않게 지운다
+    await figma.clientStorage.deleteAsync(legacyFontStorageKey(font))
     const next = upsertFont(await listFonts(), font)
     await figma.clientStorage.setAsync(FONT_INDEX_KEY, next)
     return next
@@ -49,6 +52,7 @@ export function setFontFacts(ref: FontRef, facts: FontFileFacts): Promise<Stored
 export function deleteFont(ref: FontRef): Promise<StoredFont[]> {
   return queue(async () => {
     await figma.clientStorage.deleteAsync(fontStorageKey(ref))
+    await figma.clientStorage.deleteAsync(legacyFontStorageKey(ref))
     const next = removeFont(await listFonts(), ref)
     await figma.clientStorage.setAsync(FONT_INDEX_KEY, next)
     return next
@@ -62,16 +66,31 @@ export function deleteFont(ref: FontRef): Promise<StoredFont[]> {
  */
 export function pruneOrphanFonts(): Promise<number> {
   return queue(async () => {
-    const referenced = new Set((await listFonts()).map((font) => fontStorageKey(font)))
     const keys = await figma.clientStorage.keysAsync()
+    const existing = new Set(keys)
+    const referenced = new Set<string>()
+    for (const font of await listFonts()) {
+      referenced.add(fontStorageKey(font))
+      // 아직 새 키로 못 옮긴 옛 저장분은 살려 둔다 — 읽을 때 옮긴다
+      if (!existing.has(fontStorageKey(font))) referenced.add(legacyFontStorageKey(font))
+    }
     const orphans = keys.filter((key) => key.startsWith(FONT_KEY_PREFIX) && !referenced.has(key))
     for (const key of orphans) await figma.clientStorage.deleteAsync(key)
     return orphans.length
   })
 }
 
-/** Phase 2 에서 텍스트를 그릴 때 UI 로 넘길 폰트 바이트. */
+/** Phase 2 에서 텍스트를 그릴 때 UI 로 넘길 폰트 바이트. 옛 키에 있으면 읽는 김에 새 키로 옮긴다. */
 export async function readFontBytes(ref: FontRef): Promise<Uint8Array | undefined> {
   const bytes = (await figma.clientStorage.getAsync(fontStorageKey(ref))) as Uint8Array | undefined
-  return bytes instanceof Uint8Array ? bytes : undefined
+  if (bytes instanceof Uint8Array) return bytes
+
+  const legacyKey = legacyFontStorageKey(ref)
+  const legacy = (await figma.clientStorage.getAsync(legacyKey)) as Uint8Array | undefined
+  if (!(legacy instanceof Uint8Array)) return undefined
+  void queue(async () => {
+    await figma.clientStorage.setAsync(fontStorageKey(ref), legacy)
+    await figma.clientStorage.deleteAsync(legacyKey)
+  }).catch(() => undefined) // 옮기기에 실패해도 다음 읽기가 다시 시도한다
+  return legacy
 }

@@ -1,15 +1,9 @@
 import { aggregateFontUsage } from '../lib/fontInventory'
 import { transformScale } from '../lib/imageTarget'
-import {
-  FontUsage,
-  FrameItem,
-  PreflightFrame,
-  RawFontSegment,
-  TextReject,
-  TMP_NODE_NAME
-} from '../lib/types'
+import { FontUsage, FrameItem, PreflightFrame, RawFontSegment, TextReject } from '../lib/types'
 import { imageUsagesOf } from './images'
 import { knownEdge, persistEdgeCache, readEdge, rememberEdge } from './imageSize'
+import { isTemporary } from './temporary'
 import { screenTextNode } from './text'
 
 const EXPORTABLE_TYPES = [
@@ -51,7 +45,7 @@ export function expandContainers(nodes: readonly SceneNode[]): ExportableNode[] 
   const seen = new Set<string>()
 
   const push = (node: SceneNode): void => {
-    if (node.name === TMP_NODE_NAME || seen.has(node.id)) return
+    if (isTemporary(node) || seen.has(node.id)) return
     if (CONTAINER_TYPES.includes(node.type) && 'children' in node) {
       const before = out.length
       for (const child of node.children) push(child)
@@ -77,7 +71,7 @@ export function exportableSelection(): ExportableNode[] {
   if (figma.editorType === 'slides') {
     return figma.currentPage
       .findAllWithCriteria({ types: ['SLIDE'] })
-      .filter((node) => node.name !== TMP_NODE_NAME) as ExportableNode[]
+      .filter((node) => !isTemporary(node)) as ExportableNode[]
   }
   return []
 }
@@ -199,7 +193,7 @@ async function scanNode(
       scan.textCount += 1
       collectFonts(current, scan.fontSegments)
       // export 때와 같은 판정을 미리 돌린다 — "왜 아웃라인인지" 를 내보내기 전에 안다
-      const screened = screenTextNode(current)
+      const screened = screenTextNode(current, root)
       if (!screened.ok) {
         scan.textRejects.push({ nodeId: current.id, name: current.name, reason: screened.reason })
       }

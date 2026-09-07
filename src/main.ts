@@ -22,7 +22,13 @@ import { skipFloor, transformScale } from './lib/imageTarget'
 import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
 import { exportFrame, removeLeftoverClones } from './main/exporter'
-import { forgetSeenImages, OriginalSink, planFor, seenImageInfo } from './main/images'
+import {
+  forgetReplacements,
+  forgetSeenImages,
+  OriginalSink,
+  planFor,
+  seenImageInfo
+} from './main/images'
 import { loadEdgeCache } from './main/imageSize'
 import {
   deleteFont,
@@ -110,11 +116,17 @@ export default async function main(): Promise<void> {
   })
 
   on<ExportHandler>('export', (request) => {
+    // 취소 직후 바로 다시 누르면 이전 실행이 아직 정리 중일 수 있다 — 버리지 않고 끝나는 대로 돌린다
+    if (exporting) {
+      pendingExport = request
+      return
+    }
     void runExport(request)
   })
 
   on<CancelHandler>('cancel', () => {
     cancelled = true
+    pendingExport = null
     rejectAllPending(t('main.cancelled'))
   })
 
@@ -137,12 +149,15 @@ export default async function main(): Promise<void> {
 
   // UI 에는 clientStorage 가 없어서 폰트 바이트를 여기서 꺼내 준다
   on<FontBytesHandler>('font:bytes', (payload) => {
-    void readFontBytes(payload.ref).then((bytes) => {
-      emit<FontBytesResultHandler>('font:bytes:result', {
-        reqId: payload.reqId,
-        bytes: bytes ?? null
+    // 읽기가 던져도 회신은 한다 — 안 하면 UI 가 타임아웃까지 통째로 기다린다
+    void readFontBytes(payload.ref)
+      .catch(() => undefined)
+      .then((bytes) => {
+        emit<FontBytesResultHandler>('font:bytes:result', {
+          reqId: payload.reqId,
+          bytes: bytes ?? null
+        })
       })
-    })
   })
 
   // 폴더에서 여러 개를 한꺼번에 넣으면 인덱스 읽기-수정-쓰기가 겹쳐 앞의 것이 사라진다 — 줄 세운다
@@ -193,11 +208,16 @@ export default async function main(): Promise<void> {
     figma.ui.resize(size.width, size.height)
   })
 
+  // 같은 프레임의 글자·폰트·이미지를 고치면 체크리스트가 따라 바뀐다 (선택 목록은 그대로)
+  watchContentChanges()
+
   showUI({ width: 400, height: WINDOW_HEIGHT })
 }
 
 let cancelled = false
 let exporting = false
+/** 이전 실행이 정리되는 동안 들어온 내보내기 요청 — 하나만 기억한다 */
+let pendingExport: ExportRequest | null = null
 
 /** 메인 한 화면이 스크롤 없이 들어가는 높이. 하위 화면은 안에서 스크롤한다. */
 const WINDOW_HEIGHT = 560
@@ -243,6 +263,7 @@ async function runExport({ order, settings, fileName }: ExportRequest): Promise<
   try {
     removeLeftoverClones()
     forgetSeenImages()
+    forgetReplacements()
 
     const outName = pdfFileName(fileName === '' ? figma.root.name : fileName)
 
@@ -254,15 +275,25 @@ async function runExport({ order, settings, fileName }: ExportRequest): Promise<
     const pass = await runPass(order, settings, FULL_WINDOW)
     emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: pass.skipped })
   } catch (error) {
-    emit<ErrorHandler>('error', {
-      message: error instanceof Error ? error.message : String(error)
-    })
+    // 취소로 끊긴 대기(rejectAllPending)는 오류가 아니다 — UI 는 취소 시점에 이미 비웠다
+    if (cancelled) {
+      emit<DoneHandler>('done', { fileName: '', cancelled: true, skipped: [] })
+    } else {
+      emit<ErrorHandler>('error', {
+        message: error instanceof Error ? error.message : String(error)
+      })
+    }
   } finally {
     // 취소·에러로 빠져나와도 임시 클론은 남기지 않는다 (PRD G4)
     rejectAllPending(t('main.exportFinished'))
     removeLeftoverClones()
     forgetSeenImages()
+    forgetReplacements()
     exporting = false
+    // 정리되는 동안 들어온 요청이 있으면 이어서
+    const next = pendingExport
+    pendingExport = null
+    if (next !== null) void runExport(next)
   }
 }
 
@@ -310,6 +341,9 @@ async function runPass(
       validateText: (sources: TextRunSource[]) => requestTextValidation(sources),
       isCancelled: () => cancelled
     })
+
+    // 취소됐으면 방금 끝난 프레임도 보내지 않는다 — UI 는 이미 버렸고 바이트만 오간다
+    if (cancelled) break
 
     if (result.ok) {
       emit<PdfPartHandler>('pdf:part', result.part)
@@ -483,13 +517,17 @@ async function probeItemsFor(
           imageHash: plan.imageHash,
           targetLongEdge: plan.targetLongEdge,
           skip,
-          originalBytes: info.bytes
+          originalBytes: info.bytes,
+          uses: 1
         })
         continue
       }
-      // 같은 이미지를 여러 프레임이 쓰면 가장 크게 쓰는 쪽에 맞춘다
+      // 같은 이미지를 여러 프레임이 쓰면 가장 크게 쓰는 쪽에 맞춘다. 인코딩은 한 번이지만
+      // PDF 에는 쪽마다 한 벌씩 실리므로 쓰는 쪽 수를 센다 — 31장에 깔린 배경을 한 번으로
+      // 세면 기준(쪽별 합)보다 30벌이 빠져 후보가 전부 "맞는다" 고 나온다
       found.targetLongEdge = Math.max(found.targetLongEdge, plan.targetLongEdge)
       found.skip = found.skip && skip
+      found.uses += 1
     }
   }
 
@@ -573,8 +611,19 @@ async function focusNodes(ids: string[]): Promise<void> {
   }
   if (nodes.length === 0) return
 
-  squelchSelectionEvents += 1
-  figma.currentPage.selection = nodes
+  // 이미 같은 선택이면 selectionchange 가 안 온다 — 카운터를 올려 두면 다음 진짜 변경을 삼킨다
+  const current = figma.currentPage.selection
+  const same =
+    current.length === nodes.length && current.every((node, index) => node.id === nodes[index].id)
+  if (!same) {
+    squelchSelectionEvents += 1
+    try {
+      figma.currentPage.selection = nodes
+    } catch {
+      squelchSelectionEvents -= 1 // 다른 페이지의 노드 등 — 선택이 안 바뀌었으니 이벤트도 없다
+      return
+    }
+  }
   figma.viewport.scrollAndZoomIntoView(nodes)
 }
 
@@ -614,7 +663,11 @@ async function sendSelection(force = false): Promise<void> {
   const isStale = (): boolean => generation !== selectionGeneration
 
   emit<SelectionHandler>('selection', listItems(nodes))
+  await sendScan(nodes, isStale)
+}
 
+/** 목록 뒤에 따라가는 집계·폰트·사전 검사. 선택이 바뀔 때도, 내용만 바뀔 때도 같은 것을 보낸다 */
+async function sendScan(nodes: ExportableNode[], isStale: () => boolean): Promise<void> {
   const scan = await scanSelection(nodes, isStale)
   if (scan === null) return
   emit<FrameMetaHandler>(
@@ -642,6 +695,63 @@ async function sendSelection(force = false): Promise<void> {
   })
   if (isStale()) return
   preflightWith(edges, false)
+}
+
+/**
+ * 선택은 그대로인데 내용이 바뀌었다(글자·폰트·이미지·크기) — 목록은 두고 집계·검사만 다시 보낸다.
+ * 'selection' 을 다시 보내면 UI 가 순서·제외를 초기화하므로 그것만은 안 보낸다.
+ */
+const CONTENT_DEBOUNCE_MS = 400
+let contentTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleContentRefresh(): void {
+  if (contentTimer !== null) clearTimeout(contentTimer)
+  contentTimer = setTimeout(() => {
+    contentTimer = null
+    void refreshPreflight()
+  }, CONTENT_DEBOUNCE_MS)
+}
+
+async function refreshPreflight(): Promise<void> {
+  if (exporting) return
+  const nodes = selectionNodes.filter((node) => !node.removed)
+  if (nodes.length === 0) return
+  selectionGeneration += 1
+  const generation = selectionGeneration
+  await sendScan(nodes, () => generation !== selectionGeneration)
+}
+
+/**
+ * 현재 페이지의 노드 변경을 듣는다. dynamic-page 문서에서 documentchange 는 모든 페이지를
+ * 불러와야 쓸 수 있으므로 페이지 단위 nodechange 를 쓰고, 페이지를 옮기면 다시 건다.
+ * 내보내기 중의 변경은 우리 클론이 내는 것이라 무시한다.
+ */
+function watchContentChanges(): void {
+  let watched: PageNode | null = null
+  const onChange = (event: NodeChangeEvent): void => {
+    if (exporting || selectionNodes.length === 0) return
+    const selected = new Set(selectionNodes.map((node) => node.id))
+    if (event.nodeChanges.some((change) => touchesSelection(change, selected))) {
+      scheduleContentRefresh()
+    }
+  }
+  const attach = (): void => {
+    if (watched !== null) watched.off('nodechange', onChange)
+    watched = figma.currentPage
+    watched.on('nodechange', onChange)
+  }
+  attach()
+  figma.on('currentpagechange', attach)
+}
+
+/** 바뀐 노드가 선택한 프레임 안에 있는가. 지워진 노드는 부모를 못 따라가니 관련 있다고 본다 */
+function touchesSelection(change: NodeChange, selected: ReadonlySet<string>): boolean {
+  if (change.type === 'DELETE' || change.node.removed) return true
+  for (let node: BaseNode | null = change.node as SceneNode; node !== null; node = node.parent) {
+    if (node.type === 'PAGE' || node.type === 'DOCUMENT') return false
+    if (selected.has(node.id)) return true
+  }
+  return false
 }
 
 /** 정렬 화면이 열릴 때만 — 그때의 집합으로 그린다 */
@@ -710,8 +820,12 @@ async function dropFont(ref: FontRef): Promise<void> {
 
 /** 이전 실행이 죽으면서 남은 임시 클론을 지운다. (PRD §7.4-0) */
 async function cleanupLeftovers(): Promise<void> {
-  const removed = removeLeftoverClones()
-  if (removed > 0) {
-    figma.notify(t('main.leftoverCleaned', { count: removed }))
+  try {
+    const removed = removeLeftoverClones()
+    if (removed > 0) {
+      figma.notify(t('main.leftoverCleaned', { count: removed }))
+    }
+  } catch {
+    // 정리가 실패해도 플러그인은 떠야 한다 — 다음 내보내기가 다시 시도한다
   }
 }

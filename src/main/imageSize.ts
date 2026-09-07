@@ -5,6 +5,7 @@
 // 해시는 내용 주소라 한 번 읽은 크기는 영원히 맞다 — 세션을 넘어 clientStorage 에도 둔다.
 // 선택 때 읽은 것을 내보내기가 그대로 쓴다.
 
+import { withTimeout } from '../lib/withTimeout'
 import { imageDimensions } from '../lib/imageHeader'
 
 const edgeCache = new Map<string, number>()
@@ -53,15 +54,20 @@ export function rememberEdge(hash: string, edge: number): void {
  * 파일 머리에서 먼저, 안 되면 Figma 에 묻는다 — 그건 통째로 디코드라 느리다.
  * 바이트를 이미 받아 뒀으면 넘겨서 두 번 받지 않는다. 못 읽으면 null.
  */
+/** 크기 읽기 한도 — getSizeAsync 는 통째 디코드라 큰 이미지에서 오래 걸릴 수 있다 */
+const READ_TIMEOUT_MS = 20_000
+
 export async function readEdge(image: Image, bytes?: Uint8Array): Promise<number | null> {
   try {
-    const size = imageDimensions(bytes ?? (await image.getBytesAsync()))
+    const size = imageDimensions(
+      bytes ?? (await withTimeout(image.getBytesAsync(), READ_TIMEOUT_MS, 'image'))
+    )
     if (size !== null) return Math.max(size.width, size.height)
   } catch {
     // 바이트를 못 받으면 아래로
   }
   try {
-    const size = await image.getSizeAsync()
+    const size = await withTimeout(image.getSizeAsync(), READ_TIMEOUT_MS, 'image')
     return Math.max(size.width, size.height)
   } catch {
     return null

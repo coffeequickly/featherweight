@@ -1,9 +1,10 @@
 // 프레임 1개 → PDF 1부. 원본은 절대 건드리지 않는다. (PRD §7.4, §12)
 
-import { PdfPart, Reason, Settings, TextRunSource, TMP_NODE_NAME } from '../lib/types'
+import { PdfPart, Reason, Settings, TextRunSource, TMP_MARK_KEY, TMP_NODE_NAME } from '../lib/types'
 import { withTimeout } from '../lib/withTimeout'
 import { ImageRequestSender, OriginalSink, shrinkImages } from './images'
 import { ExportableNode, isExportable } from './selection'
+import { isTemporary, markTemporary } from './temporary'
 import {
   collectTextNodes,
   detachInstances,
@@ -58,33 +59,41 @@ export async function exportFrame(
     }
   }
 
-  // clone() 직후 페이지 루트로 옮긴다 — 오토레이아웃 부모 안에 남으면 형제가 밀린다 (S6)
-  let clone = node.clone() as ExportableNode
+  // clone() 도 try 안에서 — 한 프레임의 클론 실패(인스턴스 안의 프레임 등)가 내보내기 전체를
+  // 죽이면 안 된다. 실패한 프레임만 건너뛰고 나머지로 PDF 를 만든다 (PRD FR-4)
+  let clone: ExportableNode | null = null
   try {
-    clone.name = TMP_NODE_NAME
-    parkOffscreen(clone, index)
+    let current = node.clone() as ExportableNode
+    clone = current
+    markTemporary(current)
+    // clone() 직후 페이지 루트로 옮긴다 — 오토레이아웃 부모 안에 남으면 형제가 밀린다 (S6)
+    parkOffscreen(current, index)
     // 인스턴스 안의 텍스트는 숨길 때 레이아웃을 못 굳힌다 — 클론이니 전부 떼어 낸다 (text.ts)
-    clone = detachInstances(clone) as ExportableNode
-    clone.name = TMP_NODE_NAME
+    current = detachInstances(current) as ExportableNode
+    clone = current
+    markTemporary(current)
 
     const images = await shrinkImages(
-      clone,
+      current,
       context.settings,
       context.sendResizeRequest,
       context.onImageProgress,
       context.isCancelled,
       context.keepOriginal
     )
+    // 취소는 단계 경계에서 본다 — Figma 호출 자체는 못 끊지만 다음 단계로는 안 간다 (PRD §7.4)
+    if (context.isCancelled()) return cancelledFrame(id, node.name)
 
     const text = context.settings.embedText
-      ? await prepareText(clone, node, context)
+      ? await prepareText(current, node, context)
       : {
           sources: [] as TextRunSource[],
           fallbacks: [] as Array<{ nodeId: string; reason: Reason }>
         }
+    if (context.isCancelled()) return cancelledFrame(id, node.name)
 
     const bytes = await withTimeout(
-      clone.exportAsync({ format: 'PDF', contentsOnly: true }),
+      current.exportAsync({ format: 'PDF', contentsOnly: true }),
       EXPORT_TIMEOUT_MS,
       node.name
     )
@@ -103,10 +112,8 @@ export async function exportFrame(
           bytesBefore: images.bytesBefore,
           bytesAfter: images.bytesAfter,
           bytesUntouched: images.bytesUntouched,
-          fallbacks: [
-            ...images.warnings.map((reason) => ({ nodeId: id, reason })),
-            ...text.fallbacks
-          ]
+          fallbacks: text.fallbacks,
+          imageWarnings: images.warnings.map((reason) => ({ nodeId: id, reason }))
         }
       }
     }
@@ -121,8 +128,18 @@ export async function exportFrame(
       }
     }
   } finally {
-    clone.remove()
+    if (clone !== null) {
+      try {
+        if (!clone.removed) clone.remove()
+      } catch {
+        // 이미 지워졌거나 지울 수 없는 상태 — 잔존 정리가 다음 실행 때 표식으로 찾아 지운다
+      }
+    }
   }
+}
+
+function cancelledFrame(id: string, name: string): FrameResult {
+  return { ok: false, id, name, reason: { code: 'main.cancelled' } }
 }
 
 /**
@@ -165,7 +182,7 @@ async function prepareText(
     const node = cloneTexts[index]
     const reportId = originalTexts[index]?.id ?? node.id
 
-    const screened = screenTextNode(node)
+    const screened = screenTextNode(node, clone)
     if (!screened.ok) {
       fallbacks.push({ nodeId: reportId, reason: screened.reason })
       continue
@@ -196,9 +213,32 @@ async function prepareText(
   return { sources, fallbacks }
 }
 
-/** 이전 실행이 죽으면서 남은 임시 클론을 지운다. (PRD §7.4-0) */
+/**
+ * 이전 실행이 죽으면서 남은 임시 클론을 지운다. (PRD §7.4-0)
+ *
+ * 우리 표식(pluginData)이 있는 노드만 우리 것이다. 표식이 생기기 전 버전이 남긴 클론은 이름이
+ * 같고 페이지 직속이며 화면 밖 자리에 있는 것만 지운다 — 사용자가 우연히 같은 이름을 붙인
+ * 프레임은 건드리지 않는다. 지울 수 없는 노드가 있어도 나머지는 지우고, 절대 던지지 않는다
+ * (내보내기의 finally 와 플러그인 시작에서 불린다).
+ */
 export function removeLeftoverClones(): number {
-  const leftovers = figma.currentPage.findAll((node) => node.name === TMP_NODE_NAME)
-  for (const node of leftovers) node.remove()
-  return leftovers.length
+  let removed = 0
+  try {
+    const marked = figma.currentPage.findAllWithCriteria({ pluginData: { keys: [TMP_MARK_KEY] } })
+    const legacy = figma.currentPage.children.filter(
+      (node) => node.name === TMP_NODE_NAME && !isTemporary(node) && node.x >= OFFSCREEN_X
+    )
+    for (const node of [...marked, ...legacy]) {
+      try {
+        if (node.removed) continue
+        node.remove()
+        removed += 1
+      } catch {
+        // 잠겼거나 지울 수 없는 자리의 노드 — 두고 간다
+      }
+    }
+  } catch {
+    // 페이지를 못 읽는 상태 — 정리를 못 해도 플러그인은 떠야 한다
+  }
+  return removed
 }

@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
 import { expandContainers } from '../src/main/selection'
-import { TMP_NODE_NAME } from '../src/lib/types'
+import { TMP_MARK_KEY, TMP_NODE_NAME } from '../src/lib/types'
 
-/** 섹션·프레임 흉내 — expandContainers 는 type·name·id·children 만 본다 */
-type Fake = { id: string; name: string; type: string; children?: Fake[] }
-const node = (id: string, type: string, children?: Fake[], name = id): Fake => ({
+/** 섹션·프레임 흉내 — expandContainers 는 type·name·id·children·임시 표식만 본다 */
+type Fake = {
+  id: string
+  name: string
+  type: string
+  children?: Fake[]
+  getPluginData: (key: string) => string
+}
+const node = (id: string, type: string, children?: Fake[], name = id, temporary = false): Fake => ({
   id,
   name,
   type,
+  getPluginData: (key) => (temporary && key === TMP_MARK_KEY ? '1' : ''),
   ...(children === undefined ? {} : { children })
 })
 const expand = (nodes: Fake[]): string[] =>
@@ -47,6 +54,10 @@ describe('expandContainers', () => {
   })
 
   it('임시 클론과 내보낼 수 없는 것은 뺀다', () => {
-    expect(expand([node('tmp', 'FRAME', undefined, TMP_NODE_NAME), node('t', 'TEXT')])).toEqual([])
+    expect(
+      expand([node('tmp', 'FRAME', undefined, TMP_NODE_NAME, true), node('t', 'TEXT')])
+    ).toEqual([])
+    // 이름만 같은 사용자 프레임은 우리 것이 아니다 — 내보낼 수 있다
+    expect(expand([node('u', 'FRAME', undefined, TMP_NODE_NAME)])).toEqual(['u'])
   })
 })

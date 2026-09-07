@@ -54,6 +54,28 @@ export function forgetSeenImages(): void {
   seenImages.clear()
 }
 
+/**
+ * 이번 export 에서 이미 만든 교체 이미지. 같은 원본을 같은 목표·설정으로 다시 쓰는 프레임은
+ * UI 왕복·재인코딩·createImage 없이 그 해시를 다시 꽂는다 — 31장에 깔린 배경은 한 번만 만든다.
+ * 값은 문자열·숫자뿐이라 상한이 필요 없다. runExport 가 비운다.
+ */
+type Replacement = {
+  /** null 이면 "줄여도 안 작아져 그대로 두기로 했다" — 그 판단도 재사용한다 */
+  hash: string | null
+  bytes: number
+  mime: string
+  originalBytes: number
+}
+const replacements = new Map<string, Replacement>()
+
+export function forgetReplacements(): void {
+  replacements.clear()
+}
+
+function replacementKey(plan: ImagePlan, settings: Settings): string {
+  return `${plan.imageHash}|${plan.targetLongEdge}|${settings.quality}|${settings.reencodeOpaquePng ? 1 : 0}`
+}
+
 /** 리사이즈 요청을 UI 로 보내는 통로 — 메시지 모양은 types.ts 의 것 하나뿐이다 */
 export type ImageRequestSender = (payload: ResizeRequestPayload) => void
 
@@ -65,6 +87,12 @@ function hasFills(node: SceneNode): node is FillsNode {
 
 /** 새로 만든 이미지가 그릴 수 있는 상태가 되기를 기다리는 한도 */
 const READY_TIMEOUT_MS = 20_000
+/** 원본 바이트 읽기 한도 — 응답 없는 이미지 하나가 프레임을 영영 잡아 두지 않게 */
+const BYTES_TIMEOUT_MS = 20_000
+
+function bytesOf(image: Image, hash: string): Promise<Uint8Array> {
+  return withTimeout(image.getBytesAsync(), BYTES_TIMEOUT_MS, hash.slice(0, 8))
+}
 
 /**
  * 탐색용: 이 프로필로 처리한다면 각 이미지의 목표 크기가 얼마인지.
@@ -205,7 +233,7 @@ async function shrinkOne(
   let original: Uint8Array | null = null
   let longEdge = knownEdge(plan.imageHash)
   if (longEdge === undefined) {
-    original = await image.getBytesAsync()
+    original = await bytesOf(image, plan.imageHash)
     const read = await readEdge(image, original)
     if (read === null) throw new Error('cannot read image size')
     rememberEdge(plan.imageHash, read)
@@ -214,7 +242,20 @@ async function shrinkOne(
   const belowFloor = longEdge <= floor
   if (belowFloor && keepOriginal === undefined) return null
 
-  original ??= await image.getBytesAsync()
+  // 앞 프레임에서 같은 목표·설정으로 만든 결과가 있으면 그대로 — 바이트도 안 읽고 UI 도 안 부른다
+  const key = replacementKey(plan, settings)
+  const known = replacements.get(key)
+  if (known !== undefined && !belowFloor) {
+    seenImages.set(plan.imageHash, { longEdge, bytes: known.originalBytes })
+    stats.bytesBefore += known.originalBytes
+    stats.bytesAfter += known.bytes
+    if (known.hash === null) return null
+    if (known.mime === 'image/jpeg') stats.bytesJpeg += known.bytes
+    stats.processed += 1
+    return known.hash
+  }
+
+  original ??= await bytesOf(image, plan.imageHash)
   seenImages.set(plan.imageHash, { longEdge, bytes: original.length })
 
   // 이미 가벼운 파일은 픽셀이 커도 그대로 둔다 — 절감의 본질은 바이트다
@@ -236,7 +277,9 @@ async function shrinkOne(
     targetLongEdge: plan.targetLongEdge,
     quality: settings.quality,
     reencodeOpaquePng: settings.reencodeOpaquePng,
-    imageHash: plan.imageHash // UI 가 탐색용으로 원본을 들고 있는다
+    // 목표 용량 탐색 때만 — UI 가 원본을 들고 있어야 후보를 다시 재본다. 일반 내보내기에서
+    // 실어 보내면 UI 가 원본을 200MB 까지 쌓아 둔다
+    imageHash: keepOriginal === undefined ? undefined : plan.imageHash
   })
   const result = await promise
 
@@ -251,6 +294,12 @@ async function shrinkOne(
 
   if (!result.changed) {
     stats.bytesAfter += original.length
+    replacements.set(key, {
+      hash: null,
+      bytes: original.length,
+      mime: result.mime,
+      originalBytes: original.length
+    })
     return null
   }
 
@@ -271,6 +320,12 @@ async function shrinkOne(
     stats.bytesAfter += result.bytes.length
     if (result.mime === 'image/jpeg') stats.bytesJpeg += result.bytes.length
     stats.processed += 1
+    replacements.set(key, {
+      hash: created.hash,
+      bytes: result.bytes.length,
+      mime: result.mime,
+      originalBytes: original.length
+    })
     return created.hash
   } catch (error) {
     // createImage 는 형식·크기 제한(4096)에 걸리면 throw 한다 (C4)
