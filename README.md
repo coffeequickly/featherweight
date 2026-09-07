@@ -90,9 +90,13 @@ Auto-downloaded families (all SIL OFL 1.1):
 > Coding · Nanum Pen/Brush Script · Gothic A1 · Gowun Dodum · Gowun Batang ·
 > IBM Plex Sans KR · Spoqa Han Sans Neo · Do Hyeon · Jua · Black Han Sans
 
+Inter is fetched as the same build Figma bundles (3.19, from the Inter
+repository), so widths and stem weights match Figma's rendering; the Inter 4.0
+that Google Fonts ships has a narrower "1" and slightly heavier strokes.
+
 Every URL in the catalog is verified against the real files by
-`npm run verify:catalog` (is it a static TTF, does it cover Hangul, does the
-weight match).
+`npm run verify:catalog` (is it a static font with outlines, does it cover
+Hangul, does the weight match).
 
 ## What stays as outlines
 
@@ -103,6 +107,15 @@ and why, and clicking a reason selects them on canvas:
 - Text with gradient/image fills, strokes, or effects (shadow, blur)
 - Underlined or struck-through text (redrawing those isn't implemented yet —
   better an outline than a silently dropped underline)
+- Text used as a mask or inside a masked group, text with a blend mode, text
+  inside a translucent layer, under a layer blur or an unfilled shadow, or
+  running outside a clipping frame — redrawn text can't take part in that
+  compositing, so the original outlines stay
+- Superscript and subscript text — Figma synthesizes superscripts for glyphs the
+  font lacks (and, once mixed, for the whole layer); redrawing with the font's
+  own `sups`/`subs` glyphs looked different and left commas at body size
+- Bulleted and numbered lists — the bullets and numbers are not part of the
+  text data Figma exposes, so they can't be redrawn yet
 - Text whose font file can't be obtained, or containing glyphs the font lacks
 
 ## Good to know
@@ -110,6 +123,15 @@ and why, and clicking a reason selects them on canvas:
 - **Always proofread the exported PDF before submitting it anywhere.** Text is
   redrawn with real fonts and may differ subtly from Figma's rendering. You are
   responsible for the files you produce with this plugin.
+- Embedded text can look a touch heavier than Figma's outlines in some viewers
+  (macOS Preview renders real fonts with its own smoothing). The glyph shapes are
+  identical; it is the viewer, not the file.
+- A font with the same name can come in different builds (Inter 3.19 as bundled
+  by Figma vs Inter 4.0 from Google Fonts: a narrower "1", slightly heavier
+  strokes). The Fonts screen shows which build is embedded, and before drawing,
+  the export compares the width of a line as Figma rendered it with the same
+  line set in the embedded font — if they differ, that font's text stays as
+  outlines and the report says why.
 - **Fonts you add yourself are embedded as-is.** Confirming that your font's
   license permits document embedding is your responsibility — many commercial
   fonts restrict it. All auto-downloaded fonts are SIL OFL and permit embedding.
@@ -188,6 +210,8 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
 
 ## Development
 
+Node 22.12 or newer (`.nvmrc` says 22; the build tooling and jsdom need it).
+
 ```
 npm ci
 npm run dev             # watch build
@@ -246,7 +270,8 @@ version and verified weekly (`.github/workflows/catalog.yml`).
 | Source | Families | |
 |---|---|---|
 | [Google Fonts](https://github.com/google/fonts) | 20 | first-party |
-| [Expo Google Fonts](https://github.com/expo/google-fonts) | 37 | static builds of families Google now ships variable-only |
+| [Expo Google Fonts](https://github.com/expo/google-fonts) | 36 | static builds of families Google now ships variable-only |
+| [Inter](https://github.com/rsms/inter) | 1 | first-party, v3.19 — the build Figma bundles |
 | [Pretendard](https://github.com/orioncactus/pretendard) | 2 | first-party |
 | [Spoqa Han Sans Neo](https://github.com/spoqa/spoqa-han-sans) | 1 | first-party |
 

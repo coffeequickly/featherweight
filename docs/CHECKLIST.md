@@ -139,7 +139,46 @@ for a document with nothing to outline; `report=1` for the result card).
 - [ ] `pdftotext` output matches the Figma text, Hangul included
 - [ ] Underlined text keeps its underline (stays as outlines), and the report
       says why
+- [ ] A layer with superscript/subscript text (e.g. "1st, 2nd" with Position:
+      Superscript) stays as outlines and looks exactly as in Figma; the
+      pre-flight Text row and the report both say "superscript/subscript"
+- [ ] A bulleted or numbered list keeps its bullets/numbers (stays as outlines)
+      and the report says "bulleted/numbered list"
+- [ ] Text used as a mask, text with Multiply blend, text inside a 50% opacity
+      group, and text overflowing a clipping frame all stay as outlines with
+      their own reason; text inside a card with a filled drop shadow is still
+      embedded
+- [ ] A 60% opacity text layer is embedded and the PDF shows it at 60%
+- [ ] Inter body text: a line of "1111111111" in Inter Regular 40pt has the same
+      width in the PDF as in Figma's own PDF export (`pdftotext -bbox`), and an
+      Inter Semi Bold layer is embedded (`pdffonts` shows Inter-SemiBold as
+      CID Type 0C), not outlined
+- [ ] Baseline snap: in the exported PDF's content stream every `Tm` y of our
+      text equals Figma's own PDF export for the same layer (integer baselines,
+      e.g. 376 not 376.45) and `npm run compare` reports no vertical shift
+- [ ] Fonts screen: Inter shows "v3.19 · the build Figma bundles", Pretendard
+      shows its version, and an uploaded file shows "file vX.Y" read from the
+      font; stored fonts list the version too
+- [ ] Font build check: with a font Figma renders in one build and a *different*
+      build uploaded for a family that is not in the catalog (e.g. upload an
+      older/newer version of a custom font), the export keeps that font's text
+      as outlines and the report says "letter widths differ from Figma by N%";
+      a full Pretendard/Inter resume produces no such reason (no false alarms)
+- [ ] A link on part of a line whose text mixes a fallback glyph (e.g. "—") has
+      its link rectangle exactly under the linked words
+- [ ] Cancelling at any point (page loop, Fit-to-Size probing, final pass) saves
+      nothing, shows a "Cancelled" toast and returns the panel to idle at once;
+      clicking Export again right away runs a fresh export after the previous
+      one finishes cleaning up, with no leftover clone on the canvas
+- [ ] The result card says the target was missed if the file is bigger than the
+      Fit-to-Size target
+- [ ] With Wi-Fi turned off after the pre-flight check passed, an export whose
+      catalog font can't be fetched at draw time ends with "could not be drawn"
+      and saves nothing, instead of a PDF with missing text
 - [ ] Clicking a reason in the report selects those layers on the canvas
+- [ ] With frames selected, editing a text (characters, font, size) or swapping
+      an image inside one of them refreshes the pre-flight rows within a second
+      while a manual order and exclusions in the Pages screen are kept
 
 ## Fonts & fallback
 

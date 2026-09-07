@@ -138,7 +138,7 @@
 - 프레임마다: clone → 이미지 교체 → (Phase 2: 텍스트 추출·제거) → `exportAsync({format:'PDF'})` → UI 전송 → 클론 제거. 전부 도착하면 UI에서 pdf-lib로 순서대로 머지.
 - 출력: 기본 단일 파일 `{figma.root.name}.pdf`. 페이지별 파일은 P2.
 - 메타데이터: Title = 파일명, Producer = "Sheaf", CreationDate.
-- 진행률: 현재 단계 텍스트("이미지 3/12", "페이지 2/8") + 취소 버튼. 취소 시 진행 중 클론 제거 후 중단.
+- 진행률: 현재 단계 텍스트("이미지 3/12", "페이지 2/8") + 취소 버튼. 취소 시 진행 중 클론 제거 후 중단 — 부분 결과는 저장하지 않고, UI 는 즉시 비워져 바로 다시 내보낼 수 있다 (2026-09-07 확정).
 - 수용 기준: G4(원본 무변경, 잔여 클론 0). 실패한 프레임이 있어도 나머지로 PDF를 만들고 리포트에 표시한다.
 
 ### FR-5 결과 리포트 (P0)
@@ -156,6 +156,7 @@
 - 대상 TextNode 조건(전부 만족해야 처리, 하나라도 아니면 아웃라인 유지 + 사유 기록):
   1. `visible`, 회전 없음(`absoluteTransform`의 회전 성분 0), 패스 텍스트 아님
   2. `fills`가 전부 visible한 SOLID, `strokes` 없음, `effects` 없음
+     - 위첨자·아래첨자(`openTypeFeatures` SUPS/SUBS) 없음, 목록(`listOptions` ORDERED/UNORDERED) 아님 — Figma 의 합성 위첨자 규칙과 목록 마커를 재현하기 전까지
   3. 모든 세그먼트의 `fontName`이 `fonts/fonts.json`에 매핑됨
   4. 매핑된 폰트가 `characters`의 모든 코드포인트 글리프를 가짐 (UI의 fontkit으로 검사 — 이모지·특수문자 때문에 필수)
 - 추출(메인): 조건 1~3 통과 노드마다
