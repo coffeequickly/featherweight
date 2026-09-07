@@ -9,13 +9,12 @@
 // 전부 SIL OFL 1.1 이고 jsDelivr 가 CORS 와 immutable 캐시로 내보낸다. npm 은 버전,
 // GitHub 은 태그·커밋에 고정해서 같은 주소가 언제나 같은 바이트를 준다.
 //
-// TTF(glyf) 만 넣는 이유 둘:
-//   - OTF(CFF) 를 넣으면 pdf-lib 이 CIDFontType2 로 선언해 뷰어가
-//     "Mismatch between font type and embedded font file" 을 낸다.
-//   - variable 은 fontkit 서브셋이 불안정하고 pdf-lib 이 축을 못 고른다. static 만.
+// static 만 넣는다 — variable 은 fontkit 서브셋이 불안정하고 pdf-lib 이 축을 못 고른다.
+// OTF(CFF) 는 2.2 까지 막았지만(어댑터가 CFF 표시를 빠뜨려 뷰어가 형식 불일치를 냈다)
+// 고친 뒤로는 받는다 — Inter 3.19 가 CFF 다 (lib/fontFile 참고).
 //
 // 여기 있는 모든 주소는 `npm run verify:catalog` 가 실제로 받아서 확인한다 —
-// TTF(glyf)인지, static 인지, 한글이 있는지, weight 가 맞는지. 항목을 추가하면 돌려라.
+// 윤곽(glyf/CFF)이 있는지, static 인지, 한글이 있는지, weight 가 맞는지. 항목을 추가하면 돌려라.
 //
 // 넣고 싶어도 못 넣은 것 (배포처에 static TTF 가 없다):
 //   - Noto Sans KR · Noto Serif KR — google/fonts 에 variable 만 남았다
@@ -35,7 +34,7 @@ import { FontRef } from './types'
  * 최악이 "못 받아서 아웃라인으로 나감" 이라 토글로 얻을 게 없다. 정책으로 처리한다:
  * 같은 서체가 양쪽에 있으면 first-party 를 쓴다.
  */
-export type SourceId = 'pretendard' | 'pretendard-jp' | 'google-fonts' | 'spoqa' | 'expo'
+export type SourceId = 'pretendard' | 'pretendard-jp' | 'google-fonts' | 'spoqa' | 'expo' | 'inter'
 
 export type FontSource = {
   id: SourceId
@@ -79,6 +78,13 @@ export const SOURCES: Record<SourceId, FontSource> = {
     label: 'Expo Google Fonts',
     upstream: 'github.com/expo/google-fonts',
     kind: 'repackaged'
+  },
+  inter: {
+    // Figma 가 내장한 것과 같은 판(3.19)을 원저작자 저장소의 태그에서 받는다 (INTER_GROUP 참고)
+    id: 'inter',
+    label: 'Inter',
+    upstream: 'github.com/rsms/inter',
+    kind: 'first-party'
   }
 }
 
@@ -91,6 +97,10 @@ export type CatalogEntry = FontRef & {
   source: SourceId
   /** 한글을 덮는가. 검증에서 어떤 글리프를 요구할지 정한다. */
   hangul: boolean
+  /** 고정해 둔 판("3.19") — 폰트 화면에 보인다. 없으면 배포처 커밋에 고정된 것 */
+  build?: string
+  /** Figma 가 내장한 것과 같은 판인가 — 폭·굵기가 화면과 같다고 말할 수 있는 근거 */
+  figmaBundled?: true
 }
 
 const OFL = 'SIL Open Font License 1.1'
@@ -131,6 +141,8 @@ type FamilyGroup = {
   styles: Weighted[]
   file: (style: string) => string
   license: string
+  build?: string
+  figmaBundled?: true
 }
 
 const GROUPS: FamilyGroup[] = [
@@ -138,6 +150,7 @@ const GROUPS: FamilyGroup[] = [
     source: 'pretendard',
     families: ['Pretendard', 'Pretendard Variable'],
     styles: WEIGHTS_9,
+    build: PRETENDARD_VERSION,
     file: (style) =>
       `https://cdn.jsdelivr.net/npm/pretendard@${PRETENDARD_VERSION}/dist/public/static/alternative/Pretendard-${style}.ttf`,
     license: `Pretendard · ${OFL}`
@@ -147,6 +160,7 @@ const GROUPS: FamilyGroup[] = [
     source: 'pretendard-jp',
     families: ['Pretendard JP', 'Pretendard JP Variable'],
     styles: WEIGHTS_9,
+    build: PRETENDARD_VERSION,
     file: (style) =>
       `https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v${PRETENDARD_VERSION}/packages/pretendard-jp/dist/public/static/alternative/PretendardJP-${style}.ttf`,
     license: `Pretendard JP · ${OFL}`
@@ -290,32 +304,6 @@ type ExpoFamily = {
 }
 
 const EXPO_FAMILIES: ExpoFamily[] = [
-  {
-    slug: 'inter',
-    family: 'Inter',
-    prefix: 'Inter',
-    version: '0.4.2',
-    styles: [
-      '100Thin',
-      '100Thin_Italic',
-      '200ExtraLight',
-      '200ExtraLight_Italic',
-      '300Light',
-      '300Light_Italic',
-      '400Regular',
-      '400Regular_Italic',
-      '500Medium',
-      '500Medium_Italic',
-      '600SemiBold',
-      '600SemiBold_Italic',
-      '700Bold',
-      '700Bold_Italic',
-      '800ExtraBold',
-      '800ExtraBold_Italic',
-      '900Black',
-      '900Black_Italic'
-    ]
-  },
   {
     slug: 'roboto',
     family: 'Roboto',
@@ -1193,20 +1181,72 @@ const GOOGLE_LATIN_GROUPS: FamilyGroup[] = GOOGLE_LATIN.map((entry) => ({
   license: `${entry.family} · ${OFL}`
 }))
 
-export const CATALOG: CatalogEntry[] = [...GROUPS, ...GOOGLE_LATIN_GROUPS, ...EXPO_GROUPS].flatMap(
-  (group) =>
-    group.families.flatMap((family) =>
-      group.styles.map(({ style, weight }) => ({
-        family,
-        style,
-        weight,
-        italic: style.endsWith('Italic'),
-        url: group.file(style),
-        license: group.license,
-        source: group.source,
-        hangul: group.latinOnly !== true
-      }))
-    )
+/**
+ * Inter — Figma 가 내장한 3.19 그대로. (2026-09-07 실측)
+ *
+ * Google Fonts·Expo 의 Inter 는 4.0 이라 이름은 같아도 다른 서체다: 40pt 에서 "1" 이 14%
+ * 좁고(16.3pt vs 18.6pt) 세로획이 5% 굵어, 임베드한 본문이 Figma 화면보다 굵고 좁게 나왔다.
+ * 3.19 의 폭은 Figma 기본 PDF 내보내기와 소수점까지 같다. 3.19 는 OTF(CFF) 뿐인데 어댑터가
+ * CFF 를 표시하므로 CIDFontType0C 로 임베드되고 pdftotext·poppler·Quartz 모두 정상이다.
+ *
+ * Figma 는 내장 Inter 의 스타일을 name 테이블대로 "Semi Bold"·"Extra Bold"·"Extra Light" 로
+ * 띄어 부른다. 로컬에 Google Fonts 판을 깐 사람은 "SemiBold" 로 부르므로 두 표기를 다 받는다.
+ */
+const INTER_VERSION = 'v3.19'
+const INTER_STYLES: Array<{ style: string; weight: number; file: string }> = ROMAN_9.flatMap(
+  (name) => {
+    const weight = WEIGHT_OF[name]
+    const spaced = name.replace(/([a-z])([A-Z])/g, '$1 $2') // ExtraLight → Extra Light
+    const roman = { style: spaced, weight, file: name }
+    const italic =
+      name === 'Regular'
+        ? { style: 'Italic', weight, file: 'Italic' }
+        : { style: `${spaced} Italic`, weight, file: `${name}Italic` }
+    const aliases =
+      spaced === name
+        ? []
+        : [
+            { style: name, weight, file: name },
+            { style: `${name} Italic`, weight, file: `${name}Italic` }
+          ]
+    return [roman, italic, ...aliases]
+  }
+)
+
+const INTER_GROUP: FamilyGroup = {
+  source: 'inter',
+  latinOnly: true,
+  families: ['Inter'],
+  styles: INTER_STYLES.map(({ style, weight }) => ({ style, weight })),
+  file: (style) => {
+    const found = INTER_STYLES.find((candidate) => candidate.style === style)
+    return `https://cdn.jsdelivr.net/gh/rsms/inter@${INTER_VERSION}/docs/font-files/Inter-${found?.file ?? 'Regular'}.otf`
+  },
+  license: `Inter · ${OFL}`,
+  build: INTER_VERSION.slice(1),
+  figmaBundled: true
+}
+
+export const CATALOG: CatalogEntry[] = [
+  ...GROUPS,
+  INTER_GROUP,
+  ...GOOGLE_LATIN_GROUPS,
+  ...EXPO_GROUPS
+].flatMap((group) =>
+  group.families.flatMap((family) =>
+    group.styles.map(({ style, weight }) => ({
+      family,
+      style,
+      weight,
+      italic: style.endsWith('Italic'),
+      url: group.file(style),
+      license: group.license,
+      source: group.source,
+      hangul: group.latinOnly !== true,
+      ...(group.build === undefined ? {} : { build: group.build }),
+      ...(group.figmaBundled === true ? { figmaBundled: true as const } : {})
+    }))
+  )
 )
 
 /** 이 폰트를 받아올 수 있나. 없으면 사용자가 파일을 넣어야 한다. */

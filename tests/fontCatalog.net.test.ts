@@ -2,7 +2,7 @@
 //
 //   npm run verify:catalog
 //
-// 확인하는 것: 받아지는가 / TTF(glyf)인가 / static 인가 / 한글이 있는가 / weight 가 맞는가.
+// 확인하는 것: 받아지는가 / 윤곽(glyf 또는 CFF)이 있는가 / static 인가 / 한글이 있는가 / weight 가 맞는가.
 // 카탈로그에 항목을 추가·변경하면 반드시 한 번 돌린다.
 
 import * as fontkit from 'fontkit'
@@ -42,7 +42,8 @@ describe.runIf(enabled)('카탈로그 실검증', () => {
         const tables = Object.keys(
           (font as unknown as { directory: { tables: Record<string, unknown> } }).directory.tables
         )
-        expect(tables).toContain('glyf') // CFF 는 pdf-lib 이 잘못 선언한다
+        // glyf 든 CFF 든 윤곽이 있어야 한다 — CFF 는 어댑터가 표시해 CIDFontType0C 로 임베드된다 (Inter 3.19)
+        expect(tables.some((name) => name === 'glyf' || name.trim() === 'CFF')).toBe(true)
         expect(Object.keys(font.variationAxes)).toEqual([]) // variable 금지
 
         // 스타일↔파일 연결 실수를 잡는다.

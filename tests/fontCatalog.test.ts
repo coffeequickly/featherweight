@@ -44,7 +44,34 @@ describe('catalogEntry', () => {
   it('IBM Plex Sans KR 은 Bold 초과 굵기가 없다', () => {
     expect(catalogEntry({ family: 'IBM Plex Sans KR', style: 'ExtraBold' })).toBeUndefined()
   })
+
+  it('Inter 는 Figma 가 내장한 3.19 를 원저작자 태그에서 받는다', () => {
+    const regular = catalogEntry({ family: 'Inter', style: 'Regular' })
+    expect(regular?.url).toBe(
+      'https://cdn.jsdelivr.net/gh/rsms/inter@v3.19/docs/font-files/Inter-Regular.otf'
+    )
+    expect(regular?.source).toBe('inter')
+    expect(catalogEntry({ family: 'Inter', style: 'Italic' })?.url).toContain('Inter-Italic.otf')
+  })
+
+  it('Inter 스타일은 Figma 표기("Semi Bold")와 파일 표기("SemiBold") 둘 다 같은 파일로', () => {
+    const spaced = catalogEntry({ family: 'Inter', style: 'Semi Bold' })
+    expect(spaced?.weight).toBe(600)
+    expect(spaced?.url).toContain('Inter-SemiBold.otf')
+    expect(catalogEntry({ family: 'Inter', style: 'SemiBold' })?.url).toBe(spaced?.url)
+    const italic = catalogEntry({ family: 'Inter', style: 'Extra Light Italic' })
+    expect(italic?.weight).toBe(200)
+    expect(italic?.italic).toBe(true)
+    expect(fileNameOf(italic?.url)).toBe('Inter-ExtraLightItalic.otf')
+    expect(catalogEntry({ family: 'Inter', style: 'Bold Italic' })?.url).toContain(
+      'Inter-BoldItalic.otf'
+    )
+  })
 })
+
+function fileNameOf(url: string | undefined): string {
+  return url?.split('/').pop() ?? ''
+}
 
 describe('CATALOG', () => {
   it('주소가 전부 allowedDomains 안에 있다 — manifest 와 어긋나면 런타임에 막힌다', () => {
