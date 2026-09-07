@@ -3,7 +3,12 @@
 // Figma 는 텍스트를 Type 3 폰트로 내보낸다 — 한글이면 이게 파일의 84% 다.
 // fill 을 비우면 그 글리프가 빠지고, UI 가 같은 자리에 진짜 폰트로 다시 그린다.
 
+import { transformScale } from '../lib/imageTarget'
 import { FontRef, Reason, TextRunSource, TextSegment } from '../lib/types'
+import { withTimeout } from '../lib/withTimeout'
+
+/** SVG 추출 한도 — 응답 없는 노드 하나가 내보내기 전체를 멈추지 않게 */
+const SVG_TIMEOUT_MS = 15_000
 
 export type TextCandidate = {
   node: TextNode
@@ -23,7 +28,10 @@ function isAxisAligned(node: TextNode): boolean {
  * 처리 대상 판정. 하나라도 어긋나면 아웃라인을 그대로 두고 사유를 남긴다.
  * "안 되면 원래대로" 가 이 기능의 안전장치다 — 절대 다른 폰트로 대체하지 않는다.
  */
-export function screenTextNode(node: TextNode): { ok: true } | { ok: false; reason: Reason } {
+export function screenTextNode(
+  node: TextNode,
+  root?: BaseNode
+): { ok: true } | { ok: false; reason: Reason } {
   if (node.visible === false) return { ok: false, reason: { code: 'reject.hidden' } }
   if (node.characters === '') return { ok: false, reason: { code: 'reject.empty' } }
   if (!isAxisAligned(node)) return { ok: false, reason: { code: 'reject.rotated' } }
@@ -55,7 +63,85 @@ export function screenTextNode(node: TextNode): { ok: true } | { ok: false; reas
     return { ok: false, reason: { code: 'reject.decorated' } }
   }
 
+  // 합성 상태 — 다시 그린 글자는 마스크·블렌드·조상의 불투명도·효과·클리핑을 받지 않는다.
+  // 노드 자신의 불투명도는 SVG 에 실려 오므로 그대로 그린다(svgText 가 <g opacity> 까지 읽는다).
+  if (node.isMask) return { ok: false, reason: { code: 'reject.mask' } }
+  if (!isNormalBlend(node.blendMode)) return { ok: false, reason: { code: 'reject.blend' } }
+  const composed = screenAncestors(node, root)
+  if (composed !== null) return { ok: false, reason: composed }
+
+  // 위첨자·아래첨자: Figma 는 폰트에 위첨자 글리프가 없는 글자를 축소·이동해 합성하고, 한 레이어에
+  // 있는 글자와 없는 글자가 섞이면 전부 합성으로 통일한다. 우리는 OpenType sups/subs 를 켜서
+  // 그릴 뿐이라 숫자는 폰트의 위첨자 글리프, 쉼표는 본문 크기 기준선으로 남았다(사용자 제보).
+  // 그 규칙을 흉내 내기 전까지는 원래 모양(아웃라인)으로 둔다.
+  // 목록: 번호·불릿은 characters 에도 SVG export 에도 없어 다시 그릴 재료가 없다 — 숨기면 사라진다.
+  for (const segment of node.getStyledTextSegments(['openTypeFeatures', 'listOptions'])) {
+    const features = (segment.openTypeFeatures ?? {}) as Partial<Record<string, boolean>>
+    if (features.SUPS === true || features.SUBS === true) {
+      return { ok: false, reason: { code: 'reject.superscript' } }
+    }
+    if (segment.listOptions !== undefined && segment.listOptions.type !== 'NONE') {
+      return { ok: false, reason: { code: 'reject.list' } }
+    }
+  }
+
   return { ok: true }
+}
+
+function isNormalBlend(mode: BlendMode): boolean {
+  return mode === 'NORMAL' || mode === 'PASS_THROUGH'
+}
+
+type Box = { x: number; y: number; width: number; height: number }
+
+function contains(outer: Box, inner: Box, tolerance = 0.5): boolean {
+  return (
+    inner.x >= outer.x - tolerance &&
+    inner.y >= outer.y - tolerance &&
+    inner.x + inner.width <= outer.x + outer.width + tolerance &&
+    inner.y + inner.height <= outer.y + outer.height + tolerance
+  )
+}
+
+/**
+ * 내보내는 루트까지의 조상을 본다. 루트 밖(페이지·섹션)은 export 에 안 실리므로 보지 않는다 —
+ * 프리플라이트(원본 프레임)와 export(클론)가 같은 답을 내려면 같은 경계에서 멈춰야 한다.
+ *
+ * - 불투명도·블렌드가 있는 컨테이너: 다시 그린 글자는 그 합성을 안 받는다
+ * - 마스크 그룹: 마스크 위의 글자를 숨기면 마스크 모양이 바뀌고(글자가 마스크일 때), 글자가
+ *   마스크에 잘리던 것도 통째로 나온다. 형제 중 마스크가 있으면 보수적으로 뺀다
+ * - 레이어 흐림은 글자까지 흐리고, 채움 없는 부모의 그림자는 글자 모양으로 진다
+ * - 클리핑 프레임 밖으로 나간 글자는 잘려 보였는데 다시 그리면 통째로 보인다
+ */
+function screenAncestors(node: TextNode, root: BaseNode | undefined): Reason | null {
+  const box = node.absoluteRenderBounds ?? node.absoluteBoundingBox
+  for (let parent = node.parent; parent !== null && parent !== root; parent = parent.parent) {
+    if (parent.type === 'PAGE' || parent.type === 'DOCUMENT') break
+
+    if ('opacity' in parent && parent.opacity < 1) return { code: 'reject.translucent' }
+    if ('blendMode' in parent && !isNormalBlend(parent.blendMode)) return { code: 'reject.blend' }
+    if (parent.children.some((child) => 'isMask' in child && child.isMask === true)) {
+      return { code: 'reject.mask' }
+    }
+    if ('effects' in parent && Array.isArray(parent.effects)) {
+      const filled =
+        'fills' in parent &&
+        Array.isArray(parent.fills) &&
+        parent.fills.some((paint) => paint.visible !== false)
+      const breaks = parent.effects.some(
+        (effect) =>
+          effect.visible !== false &&
+          (effect.type === 'LAYER_BLUR' ||
+            (!filled && (effect.type === 'DROP_SHADOW' || effect.type === 'INNER_SHADOW')))
+      )
+      if (breaks) return { code: 'reject.parentEffects' }
+    }
+    if ('clipsContent' in parent && parent.clipsContent === true && box !== null) {
+      const frame = parent.absoluteBoundingBox
+      if (frame !== null && !contains(frame, box)) return { code: 'reject.clipped' }
+    }
+  }
+  return null
 }
 
 /**
@@ -67,11 +153,15 @@ export async function extractText(
   frame: SceneNode
 ): Promise<TextCandidate | { failed: Reason }> {
   try {
-    const svg = await node.exportAsync({
-      format: 'SVG_STRING',
-      svgOutlineText: false,
-      useAbsoluteBounds: true
-    })
+    const svg = await withTimeout(
+      node.exportAsync({
+        format: 'SVG_STRING',
+        svgOutlineText: false,
+        useAbsoluteBounds: true
+      }),
+      SVG_TIMEOUT_MS,
+      node.name
+    )
 
     const box = node.absoluteBoundingBox
     const frameBox = frame.absoluteBoundingBox
@@ -121,6 +211,12 @@ export async function extractText(
 
     const fontRefs = segments.map((segment) => segment.fontName)
 
+    // Figma 가 그린 잉크 폭 — UI 가 우리 폰트로 놓은 폭과 견줘 다른 판의 폰트를 잡는다
+    const render = node.absoluteRenderBounds
+    const scale = transformScale(node.absoluteTransform)
+    const inkWidth =
+      render === null || !(scale.x > 0) || !(render.width > 0) ? undefined : render.width / scale.x
+
     return {
       node,
       fontRefs,
@@ -129,7 +225,8 @@ export async function extractText(
         characters: node.characters,
         svg,
         offset: { x: box.x - frameBox.x, y: box.y - frameBox.y },
-        segments
+        segments,
+        ...(inkWidth === undefined ? {} : { inkWidth })
       }
     }
   } catch (error) {
