@@ -36,16 +36,30 @@ function charName(char: string): string {
   return char
 }
 
-function fitLine(fit: NonNullable<ExportReport['fit']>, actualBytes: number): string {
+function fitLine(
+  fit: NonNullable<ExportReport['fit']>,
+  actualBytes: number
+): { text: string; warn: boolean } {
   const target = formatBytes(fit.targetBytes)
   if (fit.outcome === 'unreachable') {
-    return t('report.fitUnreachable', {
-      target,
-      floor: formatBytes(Math.max(fit.predictedBytes, actualBytes))
-    })
+    return {
+      text: t('report.fitUnreachable', {
+        target,
+        floor: formatBytes(Math.max(fit.predictedBytes, actualBytes))
+      }),
+      warn: true
+    }
   }
-  if (fit.outcome === 'already-small') return t('report.fitAlready', { target })
-  return t('report.fitOk', { target })
+  // 예측은 예측이다 — 실제 파일이 목표를 넘겼으면 맞췄다고 말하지 않는다
+  if (actualBytes > fit.targetBytes) {
+    return {
+      text: t('report.fitOver', { target, actual: formatBytes(actualBytes) }),
+      warn: true
+    }
+  }
+  if (fit.outcome === 'already-small')
+    return { text: t('report.fitAlready', { target }), warn: false }
+  return { text: t('report.fitOk', { target }), warn: false }
 }
 
 export function ReportCard({ report, onClose, onOpenPreview }: Props): JSX.Element {
@@ -56,22 +70,26 @@ export function ReportCard({ report, onClose, onOpenPreview }: Props): JSX.Eleme
       reason: t('report.skipped', { name: skip.name, reason: formatReason(skip.reason) }),
       id: skip.id
     })),
+    ...report.imageWarnings.map((item) => ({
+      reason: formatReason(item.reason),
+      id: item.nodeId
+    })),
     ...unifyMissingGlyphs(report.fallbacks).map((item) => ({
       reason: formatReason(item.reason),
       id: item.nodeId
     }))
   ])
 
-  // "아웃라인 처리된 텍스트 N개" 는 텍스트만 세야 한다. 통째로 실패한 프레임까지
-  // 합치면 프레임을 텍스트로 세는 셈이 된다 — 목록에는 둘 다 보여주되 수는 나눈다.
+  // "아웃라인 처리된 텍스트 N개" 는 텍스트만 세야 한다. 통째로 실패한 프레임과 이미지 경고까지
+  // 합치면 프레임을 텍스트로 세는 셈이 된다 — 목록에는 다 보여주되 수는 텍스트만 센다.
   const outlinedTexts = report.fallbacks.length
+  const fit = report.fit === null ? null : fitLine(report.fit, report.byteLength)
 
   return (
     <div class="reportCard">
       <div class="rowBetween">
         <div class="reportLine ellipsis">
           <Text>
-            {report.cancelled ? t('report.cancelledPrefix') : ''}
             {t('report.summary', {
               file: report.fileName,
               pages: report.pageCount,
@@ -128,8 +146,9 @@ export function ReportCard({ report, onClose, onOpenPreview }: Props): JSX.Eleme
         </Fragment>
       )}
 
-      {/* 전부 임베드했는데 Type 3 가 남았다면 글리프를 못 지운 것이다 (유령 텍스트) */}
-      {report.fallbacks.length === 0 && report.outlines.fonts > 0 ? (
+      {/* 텍스트 임베드를 켜고 전부 임베드했는데 Type 3 가 남았다면 글리프를 못 지운 것이다 (유령 텍스트).
+          임베드를 끈 내보내기는 글자가 전부 Type 3 로 남는 게 정상이라 이 경고와 무관하다 */}
+      {report.textEmbedded && report.fallbacks.length === 0 && report.outlines.fonts > 0 ? (
         <Fragment>
           <VerticalSpace space="extraSmall" />
           <div class="reportLine reportWarn">
@@ -140,14 +159,12 @@ export function ReportCard({ report, onClose, onOpenPreview }: Props): JSX.Eleme
         </Fragment>
       ) : null}
 
-      {report.fit === null ? null : (
+      {fit === null ? null : (
         <Fragment>
           <VerticalSpace space="extraSmall" />
-          <div
-            class={report.fit.outcome === 'unreachable' ? 'reportLine reportWarn' : 'reportLine'}
-          >
+          <div class={fit.warn ? 'reportLine reportWarn' : 'reportLine'}>
             <Text>
-              <Muted>{fitLine(report.fit, report.byteLength)}</Muted>
+              <Muted>{fit.text}</Muted>
             </Text>
           </div>
         </Fragment>

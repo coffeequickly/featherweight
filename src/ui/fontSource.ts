@@ -16,10 +16,17 @@ import { awaitResponse, nextRequestId } from './bridge'
 import { createProbe, FontProbe } from './fontkitAdapter'
 
 const FETCH_TIMEOUT_MS = 20_000
+/** 실패한 폰트를 다시 받아 보기까지의 시간. 노드마다 20초씩 다시 기다리면 프레임 검증 30초를 넘긴다 */
+const FAILURE_TTL_MS = 60_000
 
 const bytesCache = new Map<string, Uint8Array>()
 const probeCache = new Map<string, FontProbe>()
 const failed = new Map<string, string>()
+const failedAt = new Map<string, number>()
+/** 진행 중인 로드 — 같은 폰트를 동시에 찾는 노드들이 한 요청을 같이 기다린다 */
+const inflight = new Map<string, Promise<Uint8Array | undefined>>()
+/** resetFontCache 세대. 비우기 전에 시작한 로드가 끝나서 낡은 바이트를 다시 채우지 못하게 한다 */
+let generation = 0
 
 function keyOf(ref: FontRef): string {
   return `${ref.family} ${ref.style}`
@@ -60,16 +67,40 @@ async function fetchFromStorage(ref: FontRef): Promise<Uint8Array | undefined> {
   return unpackFont(response.bytes) // 압축해 둔 것은 풀고, 옛 원본은 그대로
 }
 
-export async function loadFontBytes(ref: FontRef): Promise<Uint8Array | undefined> {
+export function loadFontBytes(ref: FontRef): Promise<Uint8Array | undefined> {
   const key = keyOf(ref)
   const cached = bytesCache.get(key)
-  if (cached !== undefined) return cached
+  if (cached !== undefined) return Promise.resolve(cached)
 
-  const bytes = (await fetchFromCatalog(ref)) ?? (await fetchFromStorage(ref))
-  if (bytes === undefined) return undefined
+  const pending = inflight.get(key)
+  if (pending !== undefined) return pending
 
-  bytesCache.set(key, bytes)
-  return bytes
+  const lastFailure = failedAt.get(key)
+  if (lastFailure !== undefined && Date.now() - lastFailure < FAILURE_TTL_MS) {
+    return Promise.resolve(undefined)
+  }
+
+  const started = generation
+  const promise = (async (): Promise<Uint8Array | undefined> => {
+    try {
+      const bytes = (await fetchFromCatalog(ref)) ?? (await fetchFromStorage(ref))
+      if (bytes === undefined) {
+        failedAt.set(key, Date.now())
+        return undefined
+      }
+      if (started === generation) bytesCache.set(key, bytes)
+      return bytes
+    } catch (error) {
+      // 저장분이 깨졌거나(압축 해제 실패) 브리지가 끊긴 경우 — 사유를 남기고 한동안 다시 묻지 않는다
+      failed.set(key, error instanceof Error ? error.message : String(error))
+      failedAt.set(key, Date.now())
+      return undefined
+    } finally {
+      inflight.delete(key)
+    }
+  })()
+  inflight.set(key, promise)
+  return promise
 }
 
 export async function probeFont(ref: FontRef): Promise<FontProbe | undefined> {
@@ -150,7 +181,10 @@ export async function checkCoverage(
 
 /** 사용자가 폰트를 넣거나 지운 뒤 캐시를 비운다. */
 export function resetFontCache(): void {
+  generation += 1
   bytesCache.clear()
   probeCache.clear()
   failed.clear()
+  failedAt.clear()
+  inflight.clear()
 }

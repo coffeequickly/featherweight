@@ -196,7 +196,6 @@ const FIXTURE = {
     byteLength: 4404019,
     pageCount: 3,
     elapsedMs: 8300,
-    cancelled: false,
     skipped: [],
     imagesProcessed: 5,
     imageHashes: [],
@@ -209,6 +208,8 @@ const FIXTURE = {
       { nodeId: 't5', reason: { code: 'font.noFile', params: { family: 'Nexa', style: 'Heavy' } } },
       { nodeId: 't3', reason: { code: 'reject.nonSolidFill' } }
     ],
+    imageWarnings: [],
+    textEmbedded: true,
     fit: null,
     outlines: { fonts: 2, vectorBytes: 183000 },
     images: { count: 10, bytes: 3040000 },

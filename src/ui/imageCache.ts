@@ -19,6 +19,8 @@ let cachedBytes = 0
 
 export function rememberOriginal(imageHash: string, bytes: Uint8Array): void {
   if (originals.has(imageHash)) return
+  // 혼자서 상한을 넘는 원본은 들고 있어 봐야 다른 것을 다 밀어낸다 — 재보지 않고 원본 크기로 센다
+  if (bytes.length > MAX_CACHE_BYTES) return
 
   originals.set(imageHash, bytes)
   cachedBytes += bytes.length
@@ -57,15 +59,18 @@ export async function probeImageBytes(
   let failed = 0
 
   for (const item of items) {
+    // PDF 에는 쪽마다 한 벌씩 실린다 — 인코딩은 한 번 하고 쓰는 쪽 수를 곱한다
+    const uses = Math.max(1, item.uses)
+
     // 메인이 안 건드릴 이미지(프레임 예산 이하)와 이미 가벼운 파일은 원본 그대로 나간다
     if (item.skip || item.originalBytes <= KEEP_BYTES_FLOOR) {
-      totalBytes += item.originalBytes
+      totalBytes += item.originalBytes * uses
       continue
     }
 
     const original = originals.get(item.imageHash)
     if (original === undefined) {
-      totalBytes += item.originalBytes
+      totalBytes += item.originalBytes * uses
       failed += 1
       continue
     }
@@ -79,16 +84,16 @@ export async function probeImageBytes(
 
     if (!result.ok) {
       // 인코딩이 안 되면 실제 export 에서도 원본이 남는다 — 원본 크기로 센다
-      totalBytes += original.length
+      totalBytes += original.length * uses
       failed += 1
       continue
     }
 
     if (keepsOriginal(original.length, result.bytes.length)) {
-      totalBytes += original.length
+      totalBytes += original.length * uses
     } else {
-      totalBytes += result.bytes.length
-      if (result.mime === 'image/jpeg') jpegBytes += result.bytes.length
+      totalBytes += result.bytes.length * uses
+      if (result.mime === 'image/jpeg') jpegBytes += result.bytes.length * uses
     }
   }
 

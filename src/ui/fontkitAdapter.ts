@@ -19,7 +19,7 @@ import { t } from '../lib/i18n'
 import * as fontkit from 'fontkit'
 import { Font } from 'fontkit'
 
-import { FontFacts } from '../lib/fontFile'
+import { FontFacts, parseFontVersion } from '../lib/fontFile'
 import { PDFDocument } from 'pdf-lib'
 
 /** 단일 폰트만 다룬다. TTC(컬렉션)는 대상이 아니다. */
@@ -59,7 +59,8 @@ export function factsOf(font: FontProbe): FontFacts {
     axes: Object.keys(inner.variationAxes ?? {}),
     weightClass: inner['OS/2']?.usWeightClass,
     italic: inner['OS/2']?.fsSelection?.italic,
-    defaultWeight: wght?.defaultValue
+    defaultWeight: wght?.defaultValue,
+    version: parseFontVersion((font as unknown as { version?: string }).version)
   }
 }
 
@@ -109,16 +110,27 @@ export function pdfLibFontkit(): PdfLibFontkit {
           includeGlyph: (glyph: never) => subset.includeGlyph(glyph),
           // pdf-lib 이 기다리는 스트림 모양으로 감싼다
           encodeStream: () => {
-            const handlers: Record<string, ((chunk: Uint8Array) => void) | undefined> = {}
+            const handlers: Record<string, ((payload: never) => void) | undefined> = {}
             const stream = {
-              on(event: string, callback: (chunk: Uint8Array) => void) {
+              on(event: string, callback: (payload: never) => void) {
                 handlers[event] = callback
                 return stream
               }
             }
+            // pdf-lib 의 serializeFont 는 data/end/error 이벤트로만 끝난다. encode() 가 던진 것을
+            // microtask 밖으로 흘리면 어느 핸들러도 안 불려 save() 가 영원히 기다린다 — error 로 넘긴다.
             queueMicrotask(() => {
-              handlers.data?.(subset.encode())
-              handlers.end?.(new Uint8Array())
+              let bytes: Uint8Array
+              try {
+                bytes = subset.encode()
+              } catch (error) {
+                handlers.error?.(
+                  (error instanceof Error ? error : new Error(String(error))) as never
+                )
+                return
+              }
+              handlers.data?.(bytes as never)
+              handlers.end?.(new Uint8Array() as never)
             })
             return stream
           }

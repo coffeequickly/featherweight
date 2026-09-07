@@ -43,7 +43,7 @@ import { backfillFontFacts } from './fontFacts'
 import { resetFontCache } from './fontSource'
 import { forgetOriginals, probeImageBytes, rememberOriginal } from './imageCache'
 import { resizeImage } from './resize'
-import { validateSources } from './validateText'
+import { ValidationOutcome, validateSources } from './validateText'
 
 export type Notice = { message: string; error: boolean } | null
 
@@ -157,23 +157,45 @@ export function useMainState(): MainState {
 
     // 목표 용량 탐색: 캐시된 원본을 재인코딩해 바이트 합계만 돌려준다 (Figma 미개입)
     const offProbe = on<ImageProbeHandler>('image:probe', (payload) => {
-      void probeImageBytes(payload.items, payload.quality, payload.reencodeOpaquePng).then(
-        (result) => {
+      void probeImageBytes(payload.items, payload.quality, payload.reencodeOpaquePng)
+        .catch(() => ({
+          // 재기가 통째로 실패하면 원본 크기로 센다 — 예측이 커지는 쪽이라 목표를 넘기지는 않는다.
+          // 회신을 안 하면 메인이 타임아웃까지 기다린다
+          totalBytes: payload.items.reduce(
+            (sum, item) => sum + item.originalBytes * Math.max(1, item.uses),
+            0
+          ),
+          jpegBytes: 0,
+          failed: payload.items.length
+        }))
+        .then((result) => {
           emit<ImageProbeResultHandler>('image:probe:result', { reqId: payload.reqId, ...result })
-        }
-      )
+        })
     })
 
     // fill 을 지워도 되는 노드인지 판정한다 — 폰트 파일과 글리프는 여기서만 볼 수 있다
     const offValidate = on<TextValidateHandler>('text:validate', (payload) => {
       void validateSources(payload.sources, storedFontsRef.current, {
         glyphFallback: settingsRef.current.glyphFallback
-      }).then((outcome) => {
-        emit<TextValidateResultHandler>('text:validate:result', {
-          reqId: payload.reqId,
-          ...outcome
-        })
       })
+        .catch((error: unknown): ValidationOutcome => ({
+          // 검증이 던지면(손상된 저장 폰트 등) 전부 보류한다 — 회신을 안 하면 메인이 30초를
+          // 기다린 뒤 같은 결론을 내리지만 사유가 "시간 초과" 로 남는다
+          eligible: [],
+          rejected: payload.sources.map((source) => ({
+            nodeId: source.nodeId,
+            reason: {
+              code: 'reason.raw',
+              params: { message: error instanceof Error ? error.message : String(error) }
+            }
+          }))
+        }))
+        .then((outcome) => {
+          emit<TextValidateResultHandler>('text:validate:result', {
+            reqId: payload.reqId,
+            ...outcome
+          })
+        })
     })
 
     emit<UiReadyHandler>('ui:ready', navigator.language)

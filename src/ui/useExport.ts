@@ -21,7 +21,7 @@ import {
   ToastHandler
 } from '../lib/types'
 import { formatBytes } from '../lib/fontStore'
-import { t } from '../lib/i18n'
+import { formatReason, t } from '../lib/i18n'
 import { forgetOriginals } from './imageCache'
 import { downloadPdf, ImageWeight, MergeOutput, mergePdfs, OutlineCost } from './pdf'
 import { drawTextLayer, FontCache } from './textLayer'
@@ -32,11 +32,15 @@ export type ExportReport = {
   byteLength: number
   pageCount: number
   elapsedMs: number
-  cancelled: boolean
   skipped: DoneReport['skipped']
   imagesProcessed: number
   textDrawn: number
+  /** 아웃라인으로 남은 텍스트 — 노드별 사유. 이미지 경고는 섞지 않는다(길이가 텍스트 수다) */
   fallbacks: Array<{ nodeId: string; reason: Reason }>
+  /** 이미지 처리 경고 — nodeId 는 그 프레임 */
+  imageWarnings: Array<{ nodeId: string; reason: Reason }>
+  /** 텍스트 임베드를 켜고 돌았는가 — 유령 텍스트 경고는 이때만 뜻이 있다 */
+  textEmbedded: boolean
   /** 대체 폰트로 그린 글자 — 폰트별로 모은다. 사용자가 몰라도 되는 일이 아니다 */
   substitutions: Array<{ family: string; chars: string[] }>
   /** 목표 용량 맞추기를 켰을 때만 있다 */
@@ -119,6 +123,10 @@ export function useExport(
   // 목표 용량 탐색 1회차 결과. 2회차가 없으면(이미 목표 이하) 이걸 그대로 저장한다.
   const measured = useRef<{ parts: PdfPart[]; merged: MergeOutput | null } | null>(null)
   const startedAt = useRef(0)
+  // 실행 번호. 늦게 끝난 옛 실행의 머지·측정이 새 실행에 섞이지 않게 완료 시점에 대조한다
+  const run = useRef(0)
+  // 지금 받는 중인 실행이 있는가 — 취소한 뒤 늦게 오는 진행·조각·오류는 버린다
+  const active = useRef(false)
   const fonts = useRef<StoredFont[]>(storedFonts)
   const wantsText = useRef(embedText)
   const wantsLinks = useRef(keepLinks)
@@ -129,10 +137,12 @@ export function useExport(
   wantsFallback.current = glyphFallback
 
   useEffect(() => {
-    const offProgress = on<ProgressHandler>('progress', setProgress)
+    const offProgress = on<ProgressHandler>('progress', (progress) => {
+      if (active.current) setProgress(progress)
+    })
 
     const offPart = on<PdfPartHandler>('pdf:part', (part) => {
-      parts.current.push(part)
+      if (active.current) parts.current.push(part)
     })
 
     const offDone = on<DoneHandler>('done', (done) => {
@@ -140,6 +150,12 @@ export function useExport(
     })
 
     const offError = on<ErrorHandler>('error', (payload) => {
+      if (!active.current) return
+      active.current = false
+      // 실패로 끝난 실행의 조각을 남기면 다음 실행에 섞여 들어간다
+      parts.current = []
+      measured.current = null
+      forgetOriginals()
       setError(payload.message)
       setBusy(false)
       setProgress(null)
@@ -173,8 +189,10 @@ export function useExport(
      * 머지가 실패하면 크기 0 으로 알린다 — 메인이 탐색을 접고 기준 결과로 마무리한다.
      */
     async function measure(done: DoneReport, collected: PdfPart[]): Promise<void> {
+      const mine = run.current
       try {
         const merged = await mergeCollected(collected, done.fileName)
+        if (mine !== run.current) return // 늦게 끝난 옛 실행 — 새 실행의 측정을 덮어쓰지 않는다
         measured.current = { parts: collected, merged }
         emit<FitMeasuredHandler>('fit:measured', {
           reqId: done.reqId ?? '',
@@ -184,6 +202,7 @@ export function useExport(
           pdfImageBytes: merged.images.bytes
         })
       } catch {
+        if (mine !== run.current) return
         measured.current = { parts: collected, merged: null }
         emit<FitMeasuredHandler>('fit:measured', {
           reqId: done.reqId ?? '',
@@ -196,35 +215,45 @@ export function useExport(
     }
 
     async function finish(done: DoneReport): Promise<void> {
+      const mine = run.current
       const arrived = parts.current
       parts.current = []
+
+      // 취소는 저장하지 않는다 — 조각을 버리고 다음 실행을 바로 받을 수 있게 비운다 (PRD §7.4).
+      // 취소 버튼이 이미 화면을 정리했으므로 여기서는 남은 것만 버린다
+      if (done.cancelled || !active.current) {
+        measured.current = null
+        forgetOriginals()
+        return
+      }
 
       if (done.measureOnly === true) {
         await measure(done, arrived)
         return
       }
 
-      // 2회차가 아무것도 안 보냈으면 1회차 결과를 그대로 쓴다 (이미 목표 이하였던 경우)
       const stash = measured.current
       measured.current = null
       forgetOriginals()
 
+      // 2회차가 아무것도 안 보냈으면 1회차 결과를 그대로 쓴다 (이미 목표 이하였던 경우)
       const collected = arrived.length > 0 ? arrived : (stash?.parts ?? [])
       const premerged = arrived.length > 0 ? null : (stash?.merged ?? null)
 
       try {
         if (collected.length === 0) {
-          setError(done.cancelled ? t('export.cancelled') : t('export.nothing'))
+          setError(t('export.nothing'))
           setReport({
             fileName: done.fileName,
             byteLength: 0,
             pageCount: 0,
             elapsedMs: Date.now() - startedAt.current,
-            cancelled: done.cancelled,
             skipped: done.skipped,
             imagesProcessed: 0,
             textDrawn: 0,
             fallbacks: [],
+            imageWarnings: [],
+            textEmbedded: wantsText.current,
             substitutions: [],
             fit: done.fit ?? null,
             outlines: { fonts: 0, vectorBytes: 0 },
@@ -235,6 +264,20 @@ export function useExport(
         }
 
         const merged = premerged ?? (await mergeCollected(collected, done.fileName))
+        if (mine !== run.current) return // 늦게 끝난 옛 실행 — 새 실행 위에 저장하지 않는다
+
+        // 검증을 통과해 글리프를 지운 노드를 그리지 못했다면 글자가 빠진 문서다 — 성공으로 저장하지
+        // 않는다. 원본은 그대로이니 다시 시도하면 된다 (PRD G4 는 원본, 이건 출력물의 내용 보존)
+        if (merged.textFallbacks.length > 0) {
+          setError(
+            t('export.textLost', {
+              count: merged.textFallbacks.length,
+              reason: formatReason(merged.textFallbacks[0].reason)
+            })
+          )
+          return
+        }
+
         const bytes = merged.bytes
         downloadPdf(bytes, done.fileName)
         // 플러그인 창을 안 보고 있어도 완료를 알 수 있게 캔버스 토스트로도 알린다
@@ -246,11 +289,13 @@ export function useExport(
         const stats = collected.reduce(
           (sum, part) => ({
             imagesProcessed: sum.imagesProcessed + part.stats.imagesProcessed,
-            fallbacks: [...sum.fallbacks, ...part.stats.fallbacks]
+            fallbacks: [...sum.fallbacks, ...part.stats.fallbacks],
+            imageWarnings: [...sum.imageWarnings, ...part.stats.imageWarnings]
           }),
           {
             imagesProcessed: 0,
-            fallbacks: [] as Array<{ nodeId: string; reason: Reason }>
+            fallbacks: [] as Array<{ nodeId: string; reason: Reason }>,
+            imageWarnings: [] as Array<{ nodeId: string; reason: Reason }>
           }
         )
         // 장수는 서로 다른 원본으로 센다 — PDF 안의 이미지 객체 수(쪽마다 한 벌씩)로 세면
@@ -262,12 +307,13 @@ export function useExport(
           byteLength: bytes.length,
           pageCount: merged.pageCount,
           elapsedMs: Date.now() - startedAt.current,
-          cancelled: done.cancelled,
           skipped: done.skipped,
           imagesProcessed: stats.imagesProcessed,
           textDrawn: merged.textDrawn,
           substitutions: groupSubstitutions(merged.textSubstitutions),
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
+          imageWarnings: stats.imageWarnings,
+          textEmbedded: wantsText.current,
           fit: done.fit ?? null,
           outlines: merged.outlines,
           images: { count: distinctImages.size, bytes: merged.images.bytes },
@@ -275,10 +321,15 @@ export function useExport(
         })
         setError(null)
       } catch (mergeError) {
+        if (mine !== run.current) return
         setError(mergeError instanceof Error ? mergeError.message : String(mergeError))
       } finally {
-        setBusy(false)
-        setProgress(null)
+        // 옛 실행의 뒷정리가 새 실행의 busy 를 풀면 안 된다
+        if (mine === run.current) {
+          active.current = false
+          setBusy(false)
+          setProgress(null)
+        }
       }
     }
 
@@ -294,6 +345,8 @@ export function useExport(
 
   const start = useCallback((order: string[], settings: Settings, fileName: string) => {
     lastRequest.current = { order, settings, fileName }
+    run.current += 1
+    active.current = true
     parts.current = []
     measured.current = null
     startedAt.current = Date.now()
@@ -309,8 +362,23 @@ export function useExport(
     if (request !== null) start(request.order, request.settings, request.fileName)
   }, [start])
 
+  /**
+   * 즉시 취소 — 메인의 정리를 기다리지 않고 화면을 비운다. 부분 결과는 저장하지 않는다.
+   * 늦게 오는 진행·조각·완료·오류는 실행 번호가 달라 버려지고, 바로 다시 내보낼 수 있다.
+   */
   const cancel = useCallback(() => {
+    if (!active.current) return
+    run.current += 1
+    active.current = false
+    parts.current = []
+    measured.current = null
+    forgetOriginals()
     emit<CancelHandler>('cancel')
+    setBusy(false)
+    setProgress(null)
+    setError(null)
+    setReport(null)
+    emit<ToastHandler>('toast', t('export.cancelled'))
   }, [])
 
   const dismiss = useCallback(() => {

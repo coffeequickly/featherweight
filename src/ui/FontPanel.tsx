@@ -16,6 +16,7 @@ import { formatNumber, formatReason, t } from '../lib/i18n'
 import { FontFacts, screenFontFile, weightMismatch } from '../lib/fontFile'
 import { fontKey, weightName } from '../lib/fontInventory'
 import { describeFileProblem } from './fontProblem'
+import { catalogEntry } from '../lib/fontCatalog'
 import { availabilityOf, FontAvailability, missingFonts } from '../lib/fontStatus'
 import { fitsWithin, formatBytes, upsertFont, usedBytes } from '../lib/fontStore'
 import {
@@ -147,6 +148,9 @@ function StoredFonts({
                 <Text>
                   <Muted>
                     {font.fileName} · {formatBytes(font.byteLength)}
+                    {font.facts?.version === undefined
+                      ? ''
+                      : t('fonts.detailVersion', { version: font.facts.version })}
                     {inUse.has(fontKey(font)) ? t('fonts.storedInUse') : ''}
                   </Muted>
                 </Text>
@@ -386,15 +390,27 @@ function FontRow({
   }
 
   const problem = state.kind === 'uploaded' ? describeFileProblem(state.font) : null
+  // 어떤 판을 넣는지 보여 준다 — 같은 이름의 다른 판(Inter 3.19 vs 4.0)은 폭·굵기가 다르다
+  const entry = state.kind === 'catalog' ? catalogEntry(font) : undefined
+  const build =
+    entry?.build === undefined
+      ? ''
+      : t(entry.figmaBundled === true ? 'fonts.detailFigmaBuild' : 'fonts.detailBuild', {
+          build: entry.build
+        })
+  const version =
+    state.kind === 'uploaded' && state.font.facts?.version !== undefined
+      ? t('fonts.detailVersion', { version: state.font.facts.version })
+      : ''
   const detail =
     state.kind === 'catalog'
-      ? t('fonts.detailCatalog', { count: font.nodeCount })
+      ? t('fonts.detailCatalog', { count: font.nodeCount }) + build
       : state.kind === 'uploaded'
         ? t('fonts.detailUploaded', {
             file: state.font.fileName,
             size: formatBytes(state.font.byteLength),
             count: font.nodeCount
-          })
+          }) + version
         : t('fonts.detailMissing', {
             count: font.nodeCount,
             chars: formatNumber(font.charCount)
