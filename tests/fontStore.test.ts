@@ -5,6 +5,7 @@ import {
   fitsWithin,
   fontStorageKey,
   formatBytes,
+  legacyFontStorageKey,
   remainingBytes,
   removeFont,
   upsertFont,
@@ -28,9 +29,37 @@ function stored(family: string, style: string, weight: number, byteLength: numbe
 const MB = 1024 * 1024
 
 describe('fontStorageKey', () => {
-  it('공백·기호를 지운 키를 만든다', () => {
+  it('family·style 을 그대로 부호화한다', () => {
     expect(fontStorageKey({ family: 'Pretendard Variable', style: 'SemiBold' })).toBe(
+      'sheaf.font.Pretendard%20Variable|SemiBold'
+    )
+  })
+
+  it('글자를 지우던 옛 키에서 겹치던 이름들이 갈라진다', () => {
+    expect(fontStorageKey({ family: 'Nanum Gothic', style: 'Bold' })).not.toBe(
+      fontStorageKey({ family: 'NanumGothic', style: 'Bold' })
+    )
+    expect(fontStorageKey({ family: '游ゴシック', style: 'Regular' })).not.toBe(
+      fontStorageKey({ family: 'ヒラギノ角ゴ', style: 'Regular' })
+    )
+    // 옛 키는 둘 다 빈 슬러그로 겹쳤다 — 그래서 옮긴다
+    expect(legacyFontStorageKey({ family: '游ゴシック', style: 'Regular' })).toBe(
+      legacyFontStorageKey({ family: 'ヒラギノ角ゴ', style: 'Regular' })
+    )
+  })
+
+  it('옛 키는 2.4 형식 그대로 — 저장분을 옮겨 읽는 데 쓴다', () => {
+    expect(legacyFontStorageKey({ family: 'Pretendard Variable', style: 'SemiBold' })).toBe(
       'sheaf.font.PretendardVariable.SemiBold'
+    )
+  })
+
+  it('이름 안의 구분자와 점은 키를 섞지 않는다', () => {
+    expect(fontStorageKey({ family: 'A|B', style: 'C' })).not.toBe(
+      fontStorageKey({ family: 'A', style: 'B|C' })
+    )
+    expect(fontStorageKey({ family: 'A.B', style: 'C' })).not.toBe(
+      fontStorageKey({ family: 'A', style: 'B.C' })
     )
   })
 

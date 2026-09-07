@@ -45,6 +45,13 @@ export function screenFontFile(facts: FontFacts): FontVerdict {
   return { ok: true }
 }
 
+/** "Version 3.019;git-0a5106e0b" → "3.019". 숫자가 없으면 undefined */
+export function parseFontVersion(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined
+  const match = /(\d+(?:\.\d+)*)/.exec(raw)
+  return match === null ? undefined : match[1]
+}
+
 /**
  * 올린 파일이 그 자리에 맞는 굵기·기울기인가.
  *

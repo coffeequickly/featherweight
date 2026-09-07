@@ -1,6 +1,8 @@
 // main <-> ui 공유 타입. Figma·DOM 의존 금지. (PRD §7.3)
 
 export const TMP_NODE_NAME = '__sheaf_tmp__'
+/** 임시 클론의 소유권 표식(pluginData 키). 이름은 사용자도 쓸 수 있지만 이 키는 우리만 쓴다 */
+export const TMP_MARK_KEY = 'sheaf.tmp'
 import type { MessageKey } from './i18n'
 
 export const SETTINGS_KEY = 'sheaf.settings.v1'
@@ -107,6 +109,11 @@ export type TextRunSource = {
   characters: string
   svg: string
   offset: { x: number; y: number }
+  /**
+   * Figma 가 실제로 그린 글자의 잉크 폭(pt, 부모 배율 제거) — absoluteRenderBounds.
+   * 우리 폰트로 같은 줄을 놓은 폭과 견줘 "같은 이름의 다른 판" 을 잡는다. 없으면 검사하지 않는다.
+   */
+  inkWidth?: number
   segments: TextSegment[]
 }
 
@@ -126,6 +133,8 @@ export type FontFileFacts = {
   italic?: boolean
   /** 가변 폰트의 굵기 축 기본값 — 인스턴스를 안 뽑으면 이 굵기로 나간다 */
   defaultWeight?: number
+  /** name 테이블의 버전 숫자("3.019") — 같은 이름의 다른 판을 가려내는 데 쓴다 */
+  version?: string
 }
 
 export type StoredFont = FontRef & {
@@ -150,7 +159,10 @@ export type PartStats = {
   bytesAfter: number
   /** 손대지 않고 통과시킨 이미지의 바이트 합. 목표 용량 예측에만 쓴다. */
   bytesUntouched: number
+  /** 아웃라인으로 남은 텍스트 노드와 사유 — 텍스트만. "아웃라인 텍스트 N개" 가 이 길이다 */
   fallbacks: Array<{ nodeId: string; reason: Reason }>
+  /** 이미지 처리 경고 — nodeId 는 그 프레임. 텍스트 수에 섞이지 않게 따로 든다 */
+  imageWarnings: Array<{ nodeId: string; reason: Reason }>
 }
 
 // create-figma-plugin 의 emit/on 용 핸들러 시그니처.
@@ -424,6 +436,11 @@ export type ImageProbeItem = {
   skip: boolean
   /** 원본 바이트 수. skip 이거나 캐시에 없을 때 이 값으로 센다. */
   originalBytes: number
+  /**
+   * 이 이미지를 쓰는 쪽(프레임) 수. 인코딩은 한 번이지만 쪽마다 부분 PDF 를 따로 뽑아
+   * 합치므로 PDF 에는 쪽 수만큼 실린다 — 기준 측정이 쪽별로 더한 것과 같은 단위로 세야 한다
+   */
+  uses: number
 }
 
 /**

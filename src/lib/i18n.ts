@@ -363,6 +363,12 @@ const MESSAGES = {
     en: (p) => `no file · ${n(Number(p.count), 'text node', 'text nodes')} · ${p.chars} chars`,
     ko: '파일 없음 · 텍스트 {count}개 · {chars}자'
   },
+  'fonts.detailBuild': { en: ' · v{build}', ko: ' · v{build}' },
+  'fonts.detailFigmaBuild': {
+    en: ' · v{build}, the build Figma bundles',
+    ko: ' · v{build} · Figma 내장과 동일'
+  },
+  'fonts.detailVersion': { en: ' · file v{version}', ko: ' · 파일 v{version}' },
   'fonts.replace': { en: 'Replace', ko: '교체' },
   // ── 폰트 폴더에서 자동으로 찾기 ────────────────────────
   'fonts.scanFolder': { en: 'Find in a font folder…', ko: '폰트 폴더에서 찾기…' },
@@ -441,11 +447,14 @@ const MESSAGES = {
     ko: '고른 화질로 다시 내보내는 중'
   },
   'export.cancelled': { en: 'Cancelled.', ko: '취소했습니다.' },
+  'export.textLost': {
+    en: '{count} text layers passed the check but could not be drawn ({reason}). The PDF was not saved — please try again.',
+    ko: '검사를 통과한 텍스트 {count}개를 그리지 못했습니다({reason}). PDF를 저장하지 않았습니다 — 다시 시도해 주세요.'
+  },
   'export.nothing': {
     en: 'No pages could be exported. See the reasons below.',
     ko: '내보낼 수 있는 페이지가 없습니다. 아래 사유를 확인해 주세요.'
   },
-  'report.cancelledPrefix': { en: 'Cancelled · ', ko: '취소됨 · ' },
   'report.summary': {
     en: (p) => `${p.file} · ${n(Number(p.pages), 'page', 'pages')} · ${p.size} · ${p.seconds}s`,
     ko: '{file} · {pages}쪽 · {size} · {seconds}초'
@@ -522,6 +531,10 @@ const MESSAGES = {
     en: 'Already under {target} — kept at the best quality that fits',
     ko: '이미 {target} 이하입니다 — 이 안에서 가장 좋은 화질로 두었습니다'
   },
+  'report.fitOver': {
+    en: 'Over the {target} target — the file came out at {actual}. The estimate missed; try a lower target or a lighter preset.',
+    ko: '{target} 목표를 넘겼습니다 — 실제 파일은 {actual}입니다. 예측이 빗나갔으니 목표를 낮추거나 더 가벼운 프리셋을 써 보세요.'
+  },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",
     ko: '{target}까지는 줄이지 못했습니다. 이 문서는 화질 하한을 지키는 한 약 {floor} 아래로 내려가지 않습니다.'
@@ -558,6 +571,35 @@ const MESSAGES = {
   'reject.decorated': {
     en: 'underline/strikethrough (not supported yet)',
     ko: '밑줄·취소선 텍스트 (미지원)'
+  },
+  'font.metricsDiffer': {
+    en: '{family} {style}: letter widths differ from Figma by {percent}% — a different build of the font, so the original outlines stay',
+    ko: '{family} {style}: 글자 폭이 Figma와 {percent}% 다름 — 다른 판의 폰트라 원본 아웃라인을 둠'
+  },
+  'reject.mask': {
+    en: 'used as a mask, or inside a masked group',
+    ko: '마스크이거나 마스크 그룹 안에 있음'
+  },
+  'reject.blend': { en: 'has a blend mode', ko: '블렌드 모드가 있음' },
+  'reject.translucent': {
+    en: 'inside a translucent layer (opacity below 100%)',
+    ko: '반투명 레이어 안에 있음 (불투명도 100% 미만)'
+  },
+  'reject.parentEffects': {
+    en: 'inside a layer with a blur or an unfilled shadow',
+    ko: '흐림이나 채움 없는 그림자가 있는 레이어 안에 있음'
+  },
+  'reject.clipped': {
+    en: 'runs outside a clipping frame',
+    ko: '클리핑 프레임 밖으로 나감'
+  },
+  'reject.superscript': {
+    en: 'superscript/subscript (not supported yet)',
+    ko: '위첨자·아래첨자 텍스트 (미지원)'
+  },
+  'reject.list': {
+    en: 'bulleted/numbered list (not supported yet)',
+    ko: '불릿·번호 목록 텍스트 (미지원)'
   },
   'reject.noBounds': { en: 'cannot read bounding box', ko: '바운딩 박스를 읽을 수 없음' },
   // 체크리스트·텍스트 화면용 — export 리포트의 font.* 사유와 달리 미리 아는 것

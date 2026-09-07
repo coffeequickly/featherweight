@@ -47,7 +47,7 @@ export const PROFILE_LADDER: CompressionProfile[] = [
   }
 ]
 
-/** 기준 export 에 쓰는 프로필 — 현재 Balanced 와 같은 자리 */
+/** 기준 export 에 쓰는 프로필 — 사다리 4번째 칸(2048·0.8). Balanced 프리셋(1920·0.8)과 가까운 자리 */
 export const BASELINE_INDEX = 3
 
 /**

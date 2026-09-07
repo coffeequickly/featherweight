@@ -7,8 +7,18 @@ import { CLIENT_STORAGE_LIMIT, FontRef, StoredFont } from './types'
 export const FONT_INDEX_KEY = 'sheaf.fonts.v1'
 export const FONT_KEY_PREFIX = 'sheaf.font.'
 
-/** 폰트 바이트가 들어가는 clientStorage 키. family 안의 공백·점은 키에서 제거한다. */
+/**
+ * 폰트 바이트가 들어가는 clientStorage 키. family·style 을 그대로 부호화한다 — 구분자 `|` 는
+ * encodeURIComponent 가 %7C 로 바꾸므로 이름 안의 `|` 와 섞이지 않는다.
+ * 글자를 지워 만들던 옛 키(legacyFontStorageKey)는 "Nanum Gothic"/"NanumGothic" 이 겹쳤고,
+ * 영문·숫자·한글이 아닌 이름(일본어 서체)은 전부 빈 문자열이 돼 서로 덮어썼다.
+ */
 export function fontStorageKey(ref: FontRef): string {
+  return `${FONT_KEY_PREFIX}${encodeURIComponent(ref.family)}|${encodeURIComponent(ref.style)}`
+}
+
+/** 2.4 까지 쓰던 키. 읽을 때만 본다 — 있으면 새 키로 옮긴다 (main/fontStore) */
+export function legacyFontStorageKey(ref: FontRef): string {
   const slug = (value: string): string => value.replace(/[^A-Za-z0-9가-힣]+/g, '')
   return `${FONT_KEY_PREFIX}${slug(ref.family)}.${slug(ref.style)}`
 }

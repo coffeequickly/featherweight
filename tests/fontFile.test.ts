@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FontFacts, screenFontFile, weightMismatch } from '../src/lib/fontFile'
+import { FontFacts, parseFontVersion, screenFontFile, weightMismatch } from '../src/lib/fontFile'
 
 const TTF: FontFacts = { tables: ['glyf', 'loca', 'cmap', 'head', 'OS/2'], axes: [] }
 
@@ -70,5 +70,18 @@ describe('weightMismatch', () => {
 
   it('파일이 굵기를 안 밝히면 트집 잡지 않는다', () => {
     expect(weightMismatch(TTF, { weight: 700, italic: false })).toEqual({ differs: false })
+  })
+})
+
+describe('parseFontVersion', () => {
+  it('name 테이블의 버전 문자열에서 숫자만 남긴다', () => {
+    expect(parseFontVersion('Version 3.019;git-0a5106e0b')).toBe('3.019')
+    expect(parseFontVersion('4.001;git-66647c0bb')).toBe('4.001')
+    expect(parseFontVersion('Version 1.3.9')).toBe('1.3.9')
+  })
+
+  it('숫자가 없거나 비어 있으면 undefined', () => {
+    expect(parseFontVersion('Version')).toBeUndefined()
+    expect(parseFontVersion(undefined)).toBeUndefined()
   })
 })
