@@ -7,7 +7,7 @@
 // 고정 위치에 복사해 두면 레포와 무관하게 계속 쓸 수 있다.
 //
 // 개인 계정에는 비공개 게시가 없다(Organization·Enterprise 전용). 개발 플러그인으로 두는 편이
-// 오히려 낫다 — clientStorage 가 유지되고, localhost 폰트 서버(devAllowedDomains)도 계속 된다.
+// 오히려 낫다 — clientStorage 가 유지된다.
 //
 // 처음 한 번만 Figma 에서 아래 경로의 manifest.json 을 import 하면,
 // 그 뒤로는 `npm run install:local` 만 다시 돌리면 갱신된다 (재import 불필요).

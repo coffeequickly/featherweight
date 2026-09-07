@@ -41,6 +41,8 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
+          # zip 이 안 나왔는데 빈 릴리즈가 나가는 것보다 실패가 낫다
+          fail_on_unmatched_files: true
           body: |
             압축을 풀고 Figma 데스크톱에서
             **Plugins → Development → Import plugin from manifest…** 로 `manifest.json` 을 고르면 된다.

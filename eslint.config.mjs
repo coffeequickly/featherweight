@@ -52,6 +52,11 @@ export default tseslint.config(
     }
   },
   {
+    // build-figma-plugin 이 require 로 읽는 CommonJS 설정 파일
+    files: ['build-figma-plugin.ui.js'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' }
+  },
+  {
     files: ['src/lib/**/*.ts'],
     rules: {
       'no-restricted-globals': [

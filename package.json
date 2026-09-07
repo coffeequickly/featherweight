@@ -9,15 +9,15 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "scripts": {
     "dev": "build-figma-plugin --typecheck --watch",
     "build": "build-figma-plugin --typecheck --minify",
     "watch": "build-figma-plugin --typecheck --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src tests tools *.mjs && prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"tools/**/*.mjs\" \"*.{mjs,json}\"",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.{mjs,json}\"",
+    "lint": "eslint src tests tools *.mjs build-figma-plugin.ui.js && prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"tools/**/*.mjs\" \"*.{mjs,json}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"tools/**/*.mjs\" \"*.{mjs,json}\"",
     "test": "vitest run",
     "verify:catalog": "CATALOG_NET=1 vitest run tests/fontCatalog.net.test.ts tests/textPipeline.net.test.ts",
     "compare": ".venv/bin/python tools/compare-pdf.py",
