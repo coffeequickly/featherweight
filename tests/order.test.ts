@@ -14,6 +14,15 @@ describe('sortByPosition', () => {
     expect(out.map((i) => i.id)).toEqual(['a', 'b'])
   })
 
+  it('x 가 같은 세로 배치는 위 → 아래 — 행 후보를 뒤에서 뽑아도 순서가 뒤집히지 않는다', () => {
+    const out = sortByPosition([
+      item('a', 'A', 0, 0),
+      item('b', 'B', 0, 300),
+      item('c', 'C', 0, 450)
+    ])
+    expect(out.map((i) => i.id)).toEqual(['a', 'b', 'c'])
+  })
+
   it('행 판정 허용오차는 프레임 높이의 50%', () => {
     // height 1000 → tolerance 500. y=400 은 같은 행, y=600 은 다음 행.
     const out = sortByPosition([

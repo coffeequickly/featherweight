@@ -4,6 +4,7 @@
 // 세그먼트에서 weight 가 맞는 것을 찾아 잇는다. **검증(validateText)과 드로잉(textLayer)이
 // 반드시 같은 규칙을 써야 한다** — 어긋나면 검증을 통과한 노드가 다른 폰트로 그려진다.
 
+import { guessWeight } from './fontInventory'
 import { TextRunSource } from './types'
 
 /**
@@ -26,12 +27,21 @@ export function styleForRun(
       : source.segments.filter((segment) => normalizeFamily(segment.fontName.family) === wanted)
   const pool = sameFamily.length > 0 ? sameFamily : source.segments
 
-  const candidates = pool.filter((segment) => {
-    const guessed = weightOfStyle(segment.fontName.style)
-    return guessed === weight && isItalicStyle(segment.fontName.style) === italic
-  })
+  // italic 이 맞는 것 중 굵기가 가장 가까운 것. SVG 의 weight 는 폰트가 말하는 값(350·950 도 온다)이고
+  // 이름표를 숫자로 옮긴 값과 정확히 같지 않을 수 있다 — 딱 맞는 게 없다고 첫 세그먼트로 가면
+  // Bold 와 DemiLight 가 섞인 노드에서 가는 글자가 굵게 나간다
+  const sameItalic = pool.filter((segment) => isItalicStyle(segment.fontName.style) === italic)
+  const candidates = sameItalic.length > 0 ? sameItalic : pool
 
-  const chosen = candidates[0] ?? pool[0]
+  let chosen = candidates[0]
+  let closest = Number.POSITIVE_INFINITY
+  for (const segment of candidates) {
+    const distance = Math.abs(weightOfStyle(segment.fontName.style) - weight)
+    if (distance < closest) {
+      closest = distance
+      chosen = segment
+    }
+  }
   return chosen === undefined
     ? { family: '', style: '', features: {} }
     : { family: chosen.fontName.family, style: chosen.fontName.style, features: chosen.features }
@@ -50,27 +60,10 @@ export function isItalicStyle(style: string): boolean {
   return normalized.includes('italic') || normalized.includes('oblique')
 }
 
+/**
+ * 스타일 이름표 → 굵기 숫자. 표는 하나여야 한다 — 인벤토리(fontInventory)와 여기가 다른 표를
+ * 쓰면 같은 "SemiLight" 가 한쪽에선 350, 다른 쪽에선 300 이 돼 세그먼트 매칭이 어긋난다.
+ */
 export function weightOfStyle(style: string): number {
-  const normalized = style.toLowerCase().replace(/[\s_-]/g, '')
-  const table: Array<[string, number]> = [
-    ['extrabold', 800],
-    ['ultrabold', 800],
-    ['extralight', 200],
-    ['ultralight', 200],
-    ['semibold', 600],
-    ['demibold', 600],
-    ['black', 900],
-    ['heavy', 900],
-    ['bold', 700],
-    ['medium', 500],
-    ['light', 300],
-    ['thin', 100],
-    ['regular', 400],
-    ['normal', 400],
-    ['book', 400]
-  ]
-  for (const [needle, value] of table) {
-    if (normalized.includes(needle)) return value
-  }
-  return 400
+  return guessWeight(style)
 }

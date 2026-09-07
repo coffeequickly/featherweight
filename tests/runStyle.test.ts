@@ -52,6 +52,16 @@ describe('styleForRun', () => {
     expect(styleForRun(source, 900, false)).toMatchObject({ family: 'Pretendard', style: 'Medium' })
   })
 
+  it('딱 맞는 굵기가 없으면 가장 가까운 것 — 350 은 Light 쪽이지 첫 세그먼트(Bold)가 아니다', () => {
+    const source = sourceWith([
+      segment('Pretendard', 'Bold', 0, 2),
+      segment('Pretendard', 'Light', 2, 6)
+    ])
+
+    expect(styleForRun(source, 350, false).style).toBe('Light')
+    expect(styleForRun(source, 650, false).style).toBe('Bold')
+  })
+
   it('run 의 font-family 가 있으면 그 서체의 세그먼트를 먼저 고른다 — 한 노드에 서체가 섞인 경우', () => {
     const source = sourceWith([
       segment('SUIT', 'Regular', 0, 2),
@@ -93,6 +103,12 @@ describe('weightOfStyle', () => {
 
   it('모르는 이름은 400', () => {
     expect(weightOfStyle('Display')).toBe(400)
+  })
+
+  it('인벤토리와 같은 표를 쓴다 — SemiLight 350, ExtraBlack 950, 숫자 이름표', () => {
+    expect(weightOfStyle('SemiLight')).toBe(350)
+    expect(weightOfStyle('ExtraBlack')).toBe(950)
+    expect(weightOfStyle('700 Italic')).toBe(700)
   })
 })
 

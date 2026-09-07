@@ -242,3 +242,17 @@ describe('stripLineBreaks', () => {
     expect(stripLineBreaks('1  /  5')).toBe('1  /  5')
   })
 })
+
+describe('parseSvgText — 감싼 <g opacity>', () => {
+  it('레이어 불투명도가 <g opacity> 로 오면 run 에 곱해 싣는다 — 겹겹이면 전부 곱한다', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><g opacity="0.5"><g opacity="0.5"><text fill="black" fill-opacity="0.8" font-family="A" font-size="12" font-weight="400"><tspan x="0" y="10">가</tspan></text></g></g></svg>`
+    const runs = parseSvgText(svg, parseXml)
+    expect(runs).toHaveLength(1)
+    expect(runs[0].opacity).toBeCloseTo(0.2)
+  })
+
+  it('감싼 요소에 opacity 가 없으면 그대로 1', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><g><text fill="black" font-family="A" font-size="12" font-weight="400"><tspan x="0" y="10">가</tspan></text></g></svg>`
+    expect(parseSvgText(svg, parseXml)[0].opacity).toBe(1)
+  })
+})

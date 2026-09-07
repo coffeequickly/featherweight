@@ -83,7 +83,7 @@ export function parseSvgText(svg: string, parseXml: ParseXml): SvgRun[] {
 
   for (let index = 0; index < texts.length; index += 1) {
     const textElement = texts[index]
-    const base = readStyle(textElement, {
+    const own = readStyle(textElement, {
       fontFamily: '',
       fontWeight: 400,
       italic: false,
@@ -92,6 +92,8 @@ export function parseSvgText(svg: string, parseXml: ParseXml): SvgRun[] {
       fill: DEFAULT_FILL,
       opacity: 1
     })
+    // 레이어 불투명도는 <text> 를 감싸는 <g opacity> 로 나올 수 있다 — 겹겹이면 곱한다
+    const base = { ...own, opacity: clamp01(own.opacity * ancestorOpacity(textElement)) }
 
     const spans = textElement.getElementsByTagName('tspan')
 
@@ -129,6 +131,18 @@ export function parseSvgText(svg: string, parseXml: ParseXml): SvgRun[] {
 }
 
 type Style = Omit<SvgRun, 'text' | 'x' | 'y'>
+
+/** <text> 를 감싼 요소들의 opacity 곱. 없으면 1 */
+function ancestorOpacity(element: Element): number {
+  let value = 1
+  for (let parent = element.parentElement; parent !== null; parent = parent.parentElement) {
+    const raw = parent.getAttribute('opacity')
+    if (raw === null) continue
+    const parsed = Number(raw)
+    if (Number.isFinite(parsed)) value *= clamp01(parsed)
+  }
+  return value
+}
 
 function readStyle(element: Element, inherited: Style): Style {
   const fontSize = readNumber(element, 'font-size', inherited.fontSize)

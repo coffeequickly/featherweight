@@ -17,7 +17,23 @@ describe('sanitizeFileName', () => {
   })
 
   it('앞뒤 점과 공백을 다듬는다', () => {
-    expect(sanitizeFileName('\u0000이력\u001f서')).toBe('이력서')
+    expect(sanitizeFileName(' ..이력서. ')).toBe('이력서')
+  })
+
+  it('자른 뒤에도 끝의 점·공백을 다듬는다', () => {
+    expect(sanitizeFileName(`${'가'.repeat(119)}.가나`)).toBe('가'.repeat(119))
+  })
+
+  it('글자 단위로 자른다 — 이모지 반쪽이 남지 않는다', () => {
+    const name = sanitizeFileName(`${'가'.repeat(119)}😀나`)
+    expect(name).toBe(`${'가'.repeat(119)}😀`)
+    expect([...name]).toHaveLength(120) // 글자 수로 120, 반쪽 서로게이트 없이
+  })
+
+  it('Windows 장치 이름은 뒤에 밑줄을 붙인다', () => {
+    expect(sanitizeFileName('CON')).toBe('CON_')
+    expect(sanitizeFileName('lpt1')).toBe('lpt1_')
+    expect(sanitizeFileName('console')).toBe('console')
   })
 
   it('전부 걸러지면 기본값', () => {

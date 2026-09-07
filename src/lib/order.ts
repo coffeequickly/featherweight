@@ -29,7 +29,8 @@ export function sortByPosition<T extends Positioned>(items: readonly T[]): T[] {
       }
     }
 
-    row.sort((a, b) => a.x - b.x)
+    // 행 후보는 뒤에서부터 뽑혀 들어와 순서가 뒤집혀 있다 — x 가 같으면 y 로 되돌린다
+    row.sort((a, b) => a.x - b.x || a.y - b.y)
     out.push(...row)
   }
 

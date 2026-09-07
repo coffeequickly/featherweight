@@ -5,18 +5,29 @@ const MAX_LENGTH = 120
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g
 const RESERVED_CHARS = /[/\\:*?"<>|]/g
+/** Windows 가 확장자와 무관하게 거부하는 장치 이름 */
+const RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+const TRIM_EDGES = /^[.\s]+|[.\s]+$/g
 
-/** 파일명에 못 쓰는 문자를 걷어낸다. 비면 기본값으로. */
+/**
+ * 파일명에 못 쓰는 문자를 걷어낸다. 비면 기본값으로.
+ * 자르기는 글자(코드포인트) 단위로 — 이모지 한가운데를 자르면 깨진 반쪽이 남는다.
+ * 자른 뒤 끝에 점·공백이 남을 수 있어 다시 다듬는다.
+ */
 export function sanitizeFileName(name: string, fallback = 'Featherweight'): string {
-  const cleaned = name
-    .replace(CONTROL_CHARS, '')
-    .replace(RESERVED_CHARS, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/^[.\s]+|[.\s]+$/g, '')
+  const cleaned = [
+    ...name
+      .replace(CONTROL_CHARS, '')
+      .replace(RESERVED_CHARS, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(TRIM_EDGES, '')
+  ]
     .slice(0, MAX_LENGTH)
-    .trim()
+    .join('')
+    .replace(TRIM_EDGES, '')
 
-  return cleaned === '' ? fallback : cleaned
+  if (cleaned === '') return fallback
+  return RESERVED_NAMES.test(cleaned) ? `${cleaned}_` : cleaned
 }
 
 export function pdfFileName(documentName: string): string {
