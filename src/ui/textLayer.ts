@@ -159,7 +159,7 @@ export async function drawTextLayer(
     }
 
     // 전부 그릴 수 있는지 먼저 확인하고, 확인이 끝난 뒤에만 그린다
-    const planned: Array<{ run: SvgRun; font: PDFFont; chunks: DrawChunk[] }> = []
+    const planned: Array<{ run: SvgRun; chunks: DrawChunk[] }> = []
     const substituted = new Map<string, Set<string>>()
     let reason: Reason | null = null
 
@@ -175,7 +175,6 @@ export async function drawTextLayer(
       if (missing.length === 0) {
         planned.push({
           run,
-          font: resolved.font,
           chunks: [
             {
               text: run.text,
@@ -211,10 +210,10 @@ export async function drawTextLayer(
       substituted.set(fallback.family, chars)
 
       const missingSet = new Set(missing)
-      let at = 0
+      let at = 0 // 코드포인트 단위 — gaps 와 같은 눈금이라야 보조평면 글자 뒤의 자간이 안 밀린다
       const chunks = splitByCoverage(run.text, missingSet).map((chunk) => {
         const start = at
-        at += chunk.text.length
+        at += [...chunk.text].length
         return {
           text: chunk.text,
           start,
@@ -224,7 +223,7 @@ export async function drawTextLayer(
           features: chunk.fallback ? {} : style.features
         }
       })
-      planned.push({ run, font: resolved.font, chunks })
+      planned.push({ run, chunks })
     }
 
     if (reason !== null) {
@@ -236,12 +235,12 @@ export async function drawTextLayer(
     }
 
     let cursor = 0
-    for (const { run, font, chunks } of planned) {
-      drawRun(page, run, source.offset, pageHeight, chunks)
+    for (const { run, chunks } of planned) {
+      const positions = drawRun(page, run, source.offset, pageHeight, chunks)
       if (!options.links) continue
       const { spans, next } = linkSpansForRun(source.characters, cursor, run.text, source.segments)
       cursor = next
-      for (const span of spans) addLink(page, run, source.offset, pageHeight, font, span)
+      for (const span of spans) addLink(page, run, source.offset, pageHeight, positions, span)
     }
     result.drawn += 1
   }
@@ -250,7 +249,8 @@ export async function drawTextLayer(
 }
 
 /**
- * run 의 일부 글자에 걸린 URL 을 링크 주석으로. 글자 폭은 폰트에서 재고 자간은 글자 수만큼 더한다.
+ * run 의 일부 글자에 걸린 URL 을 링크 주석으로. 가로 범위는 drawRun 이 돌려준 글자 위치에서
+ * 잰다 — 폭을 다시 재면 대체 폰트·커닝·숨은 글자의 자간이 빠져 사각형이 어긋난다.
  * 세로 범위는 baseline 기준 위 0.9em·아래 0.25em — 어센더·디센더를 대략 덮는다.
  */
 function addLink(
@@ -258,15 +258,14 @@ function addLink(
   run: SvgRun,
   offset: { x: number; y: number },
   pageHeight: number,
-  font: PDFFont,
+  positions: readonly number[],
   span: LinkSpan
 ): void {
   const size = run.fontSize
-  const width = (text: string): number =>
-    font.widthOfTextAtSize(text, size) + run.letterSpacing * text.length
-  const x0 = offset.x + run.x + width(run.text.slice(0, span.start))
-  const x1 = x0 + width(run.text.slice(span.start, span.end))
-  const baseline = pageHeight - (offset.y + run.y)
+  const x0 = positions[span.start] ?? positions[0] ?? offset.x + run.x
+  const x1 = positions[span.end] ?? positions[positions.length - 1] ?? x0
+  if (x1 <= x0) return
+  const baseline = pageHeight - snappedBaseline(offset, run)
   const context = page.doc.context
   const annot = context.obj({
     Type: 'Annot',
@@ -296,11 +295,38 @@ async function firstCovering(
 /** run 을 폰트별 덩어리로 — 대부분은 하나, 대체 글자가 섞이면 여럿 */
 type DrawChunk = {
   text: string
-  /** run.text 안에서의 시작 인덱스 — gaps(무시 문자 자릿수)를 찾는 데 쓴다 */
+  /** run.text 안에서의 시작 코드포인트 인덱스 — gaps(무시 문자 자릿수)와 같은 눈금 */
   start: number
   font: PDFFont
   probe: FontProbe
   features: Readonly<Record<string, boolean>>
+}
+
+/** 한 덩어리를 어떻게 놓을지 — 배치 결과와 커닝 보정. drawRun 이 x 를 셀 때도 같은 것을 쓴다 */
+type ChunkPlan = {
+  chars: string[]
+  layout: ReturnType<FontProbe['layout']>
+  /** 글자 수와 글리프 수가 같아 글자마다 커닝을 넣을 수 있는가 */
+  kerned: boolean
+  adjustments: number[]
+  /** 폰트 단위 → 텍스트 공간(pt) */
+  scale: number
+}
+
+function planChunk(chunk: DrawChunk, size: number): ChunkPlan {
+  const chars = [...chunk.text]
+  // 임베드한 폰트와 같은 기능으로 배치해야 글리프 수·커닝이 맞는다.
+  // 문맥으로 모양이 바뀌는 문자(아랍·태국 등)는 낱글자로 자르면 깨진다 — 통째로
+  const layout = chunk.probe.layout(chunk.text, { ...chunk.features })
+  const kerned = !needsShaping(chunk.text) && layout.glyphs.length === chars.length
+  const adjustments = kerned
+    ? kernAdjustments(
+        layout.glyphs.map((glyph) => glyph.advanceWidth),
+        layout.positions.map((position) => position.xAdvance),
+        chunk.probe.unitsPerEm
+      )
+    : []
+  return { chars, layout, kerned, adjustments, scale: size / chunk.probe.unitsPerEm }
 }
 
 /** 기능 켬/끔을 캐시 키로 — 같은 폰트라도 기능이 다르면 다른 벌이다 */
@@ -337,17 +363,35 @@ function fontKeyFor(page: PDFPage, font: PDFFont): PDFName {
  * drawText 는 글리프를 폭대로 나란히 놓아 Figma 가 건 짝 커닝이 사라지고 라틴 줄이 몇 % 넓어진다
  * (lib/kerning 참고). fontkit layout 이 준 전진폭과의 차를 TJ 배열로 넣는다. 자간(Tc)·색·불투명도는
  * drawText 가 하던 것과 같게 그래픽 상태로 건다.
+ *
+ * 돌려주는 값은 run.text 의 UTF-16 인덱스마다 그 글자 앞의 x(마지막 칸은 끝) — 링크 사각형이
+ * 이걸로 잰다. 다음 덩어리의 시작도 같은 셈에서 나온다: 커닝을 넣고 그린 덩어리 뒤를
+ * widthOfTextAtSize(커닝 없는 폭)로 재면 대체 글리프 뒤 글자가 그만큼 오른쪽으로 밀린다.
  */
+/**
+ * 줄의 기준선 y(위에서 잰 값). Figma 는 캔버스·PDF 에서 글자를 또렷하게 그리려고 각 줄의 기준선을
+ * 정수 픽셀에 스냅한다 — 실측: Figma PDF 의 기준선은 전부 정수(376.000, 257.000…)였고 SVG 의
+ * tspan y 는 소수(108.5455)였다. 소수를 그대로 쓰면 Inter 40pt 는 0.45pt 위, Pretendard 는 0.22pt
+ * 위로 어긋난다. x 는 스냅하지 않는다(글리프 위치는 소수 그대로다).
+ */
+function snappedBaseline(offset: { x: number; y: number }, run: SvgRun): number {
+  return Math.round(offset.y + run.y)
+}
+
 function drawRun(
   page: PDFPage,
   run: SvgRun,
   offset: { x: number; y: number },
   pageHeight: number,
   chunks: readonly DrawChunk[]
-): void {
-  let x = offset.x + run.x
-  const y = pageHeight - (offset.y + run.y)
+): number[] {
+  const startX = offset.x + run.x
+  const y = pageHeight - snappedBaseline(offset, run)
   const size = run.fontSize
+  const spacing = run.letterSpacing
+  const gaps = run.gaps ?? []
+  const totalPoints = [...run.text].length
+  const positions = new Array<number>(run.text.length + 1).fill(startX)
 
   const ops: PDFOperator[] = [pushGraphicsState()]
   if (run.opacity < 1) {
@@ -358,32 +402,56 @@ function drawRun(
     ops.push(setGraphicsState(state))
   }
   // characterSpacing 은 drawText 옵션이 아니다. PDF 연산자로 직접 건다.
-  if (run.letterSpacing !== 0) ops.push(setCharacterSpacing(run.letterSpacing))
+  if (spacing !== 0) ops.push(setCharacterSpacing(spacing))
   ops.push(setFillingRgbColor(run.fill.r, run.fill.g, run.fill.b))
 
-  const gaps = run.gaps ?? []
+  let x = startX
+  let unit = 0 // run.text 의 UTF-16 인덱스
   for (const chunk of chunks) {
-    // 덩어리 안 글자 앞에 있던 무시 문자(묶음문자) 수 — Figma 는 그것에도 자간을 붙인다
-    let hidden = 0
-    for (let i = chunk.start; i < chunk.start + chunk.text.length; i += 1) hidden += gaps[i] ?? 0
-    const last = chunk.start + chunk.text.length === run.text.length
-    if (last) hidden += gaps[run.text.length] ?? 0
+    const plan = planChunk(chunk, size)
     ops.push(
       beginText(),
       setFontAndSize(fontKeyFor(page, chunk.font), size),
       setTextMatrix(1, 0, 0, 1, x, y),
-      showKerned(page, chunk, gaps, run.letterSpacing, size),
+      showKerned(page, chunk, plan, gaps, spacing, size),
       endText()
     )
-    // 다음 덩어리는 이 덩어리의 폭만큼 오른쪽에서 — widthOfTextAtSize 는 커닝을 반영한 값이라
-    // 그린 것과 같다. 자간은 글자마다 Tc 로 붙으니 글자 수(숨은 글자 포함)만큼 더한다
-    x +=
-      chunk.font.widthOfTextAtSize(chunk.text, size) +
-      run.letterSpacing * (chunk.text.length + hidden)
+
+    if (plan.kerned) {
+      // 글자마다: 앞의 무시 문자 자간 → 글자 → 전진폭(마지막 글자는 보정이 없어 글리프 폭) + 자간
+      const last = plan.chars.length - 1
+      plan.chars.forEach((char, index) => {
+        x += spacing * (gaps[chunk.start + index] ?? 0)
+        for (let u = 0; u < char.length; u += 1) positions[unit + u] = x
+        unit += char.length
+        const advance =
+          index < last
+            ? plan.layout.positions[index].xAdvance
+            : plan.layout.glyphs[index].advanceWidth
+        x += advance * plan.scale + spacing
+      })
+    } else {
+      // 통째로 그린 덩어리: 폭은 글리프 폭 합(커닝 없음). 글자 위치는 폭을 글자 수로 나눠 어림한다
+      let hidden = 0
+      for (let index = 0; index < plan.chars.length; index += 1)
+        hidden += gaps[chunk.start + index] ?? 0
+      x += spacing * hidden
+      const width = chunk.font.widthOfTextAtSize(chunk.text, size) + spacing * plan.chars.length
+      plan.chars.forEach((char, index) => {
+        const at = x + (width * index) / plan.chars.length
+        for (let u = 0; u < char.length; u += 1) positions[unit + u] = at
+        unit += char.length
+      })
+      x += width
+    }
+    // 끝에 붙은 무시 문자에도 Figma 는 자간을 붙인다
+    if (chunk.start + plan.chars.length === totalPoints) x += spacing * (gaps[totalPoints] ?? 0)
   }
+  positions[run.text.length] = x
 
   ops.push(popGraphicsState())
   page.pushOperators(...ops)
+  return positions
 }
 
 /**
@@ -393,42 +461,30 @@ function drawRun(
 function showKerned(
   page: PDFPage,
   chunk: DrawChunk,
+  plan: ChunkPlan,
   gaps: readonly number[],
   letterSpacing: number,
   size: number
 ): PDFOperator {
-  const chars = [...chunk.text]
   // TJ 숫자는 1/1000 텍스트 공간, 양수가 왼쪽 — 자간 하나만큼 오른쪽으로 가려면 음수
   const gapShift = (count: number): number => Math.round((-letterSpacing * count * 1000) / size)
   const hiddenBefore = (index: number): number => gaps[chunk.start + index] ?? 0
 
-  // 임베드한 폰트와 같은 기능으로 배치해야 글리프 수·커닝이 맞는다.
-  // 문맥으로 모양이 바뀌는 문자(아랍·태국 등)는 낱글자로 자르면 깨진다 — 통째로
-  const layout = chunk.probe.layout(chunk.text, { ...chunk.features })
-  const kerned = !needsShaping(chunk.text) && layout.glyphs.length === chars.length
-  const adjustments = kerned
-    ? kernAdjustments(
-        layout.glyphs.map((glyph) => glyph.advanceWidth),
-        layout.positions.map((position) => position.xAdvance),
-        chunk.probe.unitsPerEm
-      )
-    : []
-
   const array = PDFArray.withContext(page.doc.context)
-  if (!kerned) {
+  if (!plan.kerned) {
     // 통째로 — 앞쪽 무시 문자 자간만 넣고 글리프 사이는 손대지 않는다
     let hidden = 0
-    for (let i = 0; i < chars.length; i += 1) hidden += hiddenBefore(i)
+    for (let i = 0; i < plan.chars.length; i += 1) hidden += hiddenBefore(i)
     if (letterSpacing !== 0 && hidden > 0) array.push(PDFNumber.of(gapShift(hidden)))
     array.push(chunk.font.encodeText(chunk.text))
     return PDFOperator.of(PDFOperatorNames.ShowTextAdjusted, [array])
   }
 
-  chars.forEach((char, index) => {
+  plan.chars.forEach((char, index) => {
     const hidden = hiddenBefore(index)
     if (letterSpacing !== 0 && hidden > 0) array.push(PDFNumber.of(gapShift(hidden)))
     array.push(chunk.font.encodeText(char))
-    const adjustment = adjustments[index]
+    const adjustment = plan.adjustments[index]
     if (adjustment !== undefined && adjustment !== 0) array.push(PDFNumber.of(adjustment))
   })
   return PDFOperator.of(PDFOperatorNames.ShowTextAdjusted, [array])

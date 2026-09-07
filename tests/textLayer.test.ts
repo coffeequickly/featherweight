@@ -82,8 +82,10 @@ describe('drawTextLayer', () => {
       { 'Test Bold': { font: bold }, 'Test Regular': { font: regular } },
       requested
     )
-    // drawText 대신 연산자를 직접 쓴다(커닝) — 페이지에 등록되는 폰트의 순서로 본다
+    // drawText 대신 연산자를 직접 쓴다(커닝) — 페이지에 등록되는 폰트의 순서와 run 마다 한 번씩
+    // 밀어 넣는 연산자 묶음으로 본다
     const registered = vi.spyOn(page.node, 'newFontDictionary')
+    const pushed = vi.spyOn(page, 'pushOperators')
 
     const result = await drawTextLayer(page, [mixedSource()], provider, parseXml)
 
@@ -91,6 +93,7 @@ describe('drawTextLayer', () => {
     expect(result.fallbacks).toEqual([])
     expect(requested).toEqual(['Test Bold', 'Test Regular'])
     expect(registered.mock.calls.map((call) => call[1])).toEqual([bold.ref, regular.ref])
+    expect(pushed).toHaveBeenCalledTimes(2) // run 2개 = 연산자 묶음 2개
   })
 
   it('run 하나라도 폰트를 못 구하면 노드 전체를 그리지 않는다', async () => {
@@ -98,7 +101,7 @@ describe('drawTextLayer', () => {
     const requested: string[] = []
     // Regular 가 없다 — Bold 만 있는 상황
     const provider = providerWith({ 'Test Bold': { font: bold } }, requested)
-    const draw = vi.spyOn(page, 'drawText')
+    const draw = vi.spyOn(page, 'pushOperators')
 
     const result = await drawTextLayer(page, [mixedSource()], provider, parseXml)
 
@@ -117,13 +120,40 @@ describe('drawTextLayer', () => {
       },
       []
     )
-    const draw = vi.spyOn(page, 'drawText')
+    const draw = vi.spyOn(page, 'pushOperators')
 
     const result = await drawTextLayer(page, [mixedSource()], provider, parseXml)
 
     expect(result.drawn).toBe(0)
     expect(result.fallbacks[0].reason.code).toBe('font.missingGlyphs')
     expect(draw).not.toHaveBeenCalled()
+  })
+
+  it('기준선은 Figma 처럼 정수 픽셀에 스냅한다 — SVG 의 소수 y 를 그대로 쓰면 0.5pt 까지 뜬다', async () => {
+    const { page, bold, regular } = await pageWithFonts()
+    const provider = providerWith(
+      { 'Test Bold': { font: bold }, 'Test Regular': { font: regular } },
+      []
+    )
+    const pushed = vi.spyOn(page, 'pushOperators')
+    // 노드 상자 top 69.7955 + tspan y 38.75 = 108.5455 → Figma PDF 는 109 에 그린다 (Inter 40pt 실측)
+    const source: TextRunSource = {
+      ...mixedSource(),
+      offset: { x: 0, y: 69.7955 },
+      svg: MIXED_SVG.replace(/y="10"/g, 'y="38.75"')
+    }
+
+    await drawTextLayer(page, [source], provider, parseXml)
+
+    const matrices = pushed.mock.calls
+      .flat()
+      .map((op) => String(op))
+      .filter((text) => text.endsWith(' Tm'))
+    expect(matrices.length).toBeGreaterThan(0)
+    for (const matrix of matrices) {
+      const y = Number(matrix.split(' ')[5])
+      expect(y).toBe(842 - 109)
+    }
   })
 
   it('실패한 노드가 있어도 다음 노드는 계속 그린다', async () => {
