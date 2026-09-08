@@ -230,6 +230,14 @@ for a document with nothing to outline; `report=1` for the result card).
 - [ ] macOS: Helvetica Neue "Medium Italic" and "Thin Italic" from the .ttc are
       stored without a "will export as Medium weight" warning (their italic
       bits are unset in the file; the name decides)
+- [ ] Embedding flag: a font whose OS/2 fsType is Restricted only is refused by
+      Add ("license flag forbids embedding") and by the folder scan (row says
+      "the folder's file forbids embedding"); Futura Medium (Restricted +
+      Preview & Print) and DIN Alternate (Preview & Print) are accepted;
+      Helvetica Neue (Installable) and Apple SD Gothic Neo (Editable) too
+- [ ] A restricted font stored by an older version is re-read on open, flagged
+      on the Fonts screen and in the pre-flight, and its text stays as outlines
+      at export with the reason in the report
 - [ ] Memory: scanning /System/Library/Fonts (370 files, 778 MB) with a font that
       is not there finishes in about a second and the plugin stays responsive.
       Node measurement 2026-09-08: reading every file gave peak RSS 1 GB from

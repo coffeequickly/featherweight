@@ -93,9 +93,13 @@ them to the family Figma shows and picks the size closest to your text. Width
 variants such as "Open Sans Condensed" are matched by name, never swapped for
 the normal width. After a scan each font says what was found and why it
 wasn't added; if the plugin's 5 MB of storage is full, the screen shows the
-space needed and a Retry that saves the file once you free some. When you add system or
-commercial fonts, make sure their license allows embedding in documents you
-share; most do for PDFs.
+space needed and a Retry that saves the file once you free some. A font whose
+own embedding flag forbids document embedding (the OS/2 "Restricted License"
+bit — the rule Acrobat and browsers follow) is refused and stays as outlines;
+Preview & Print, Editable and Installable fonts are embedded as subsets, and a
+font that forbids subsetting is embedded whole. The flag is the font's word, not
+a license review: when you add system or commercial fonts, make sure their
+license allows embedding in documents you share; most do for PDFs.
 
 Auto-downloaded families (all SIL OFL 1.1):
 
