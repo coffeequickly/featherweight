@@ -20,6 +20,7 @@ import * as fontkit from 'fontkit'
 import { Font } from 'fontkit'
 
 import { FontFacts, parseFontVersion } from '../lib/fontFile'
+import { FACTS_VERSION } from '../lib/types'
 import { PDFDocument } from 'pdf-lib'
 
 /** 단일 폰트만 다룬다. TTC(컬렉션)는 대상이 아니다. */
@@ -78,7 +79,8 @@ export function factsOf(font: FontProbe): FontFacts {
     version: parseFontVersion((font as unknown as { version?: string }).version),
     ...(fsType === undefined
       ? {}
-      : { embedding: embeddingOf(fsType), noSubsetting: fsType.noSubsetting })
+      : { embedding: embeddingOf(fsType), noSubsetting: fsType.noSubsetting }),
+    read: FACTS_VERSION
   }
 }
 

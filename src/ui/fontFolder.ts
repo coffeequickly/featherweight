@@ -60,6 +60,8 @@ export type ScanResult = {
   unread: number
   /** 고른 폰트의 바이트 합이 상한을 넘어 멈췄는가 */
   memoryCapped: boolean
+  /** 예기치 못한 오류로 중간에 멈췄다면 그 사유 — 그때까지의 결과는 그대로 쓴다 */
+  error?: string
 }
 
 export type ScanOptions = {
@@ -80,7 +82,13 @@ const REST_FILE_BYTES_CAP = 32 * 1024 * 1024
 const RETAINED_BYTES_CAP = 64 * 1024 * 1024
 
 export function isScanIncomplete(result: ScanResult): boolean {
-  return result.unreadable > 0 || result.brokenFaces > 0 || result.unread > 0 || result.memoryCapped
+  return (
+    result.unreadable > 0 ||
+    result.brokenFaces > 0 ||
+    result.unread > 0 ||
+    result.memoryCapped ||
+    result.error !== undefined
+  )
 }
 
 function isFontFile(file: File): boolean {
@@ -133,11 +141,19 @@ function candidatesOf(
   return { candidates, broken }
 }
 
-function missingGlyphCount(face: FontProbe, codePoints: readonly number[] | undefined): number {
+/** 이 파일에 없는 글자 수. 글리프 표가 깨져 조회가 던지면 null — 그 후보만 뺀다 */
+function missingGlyphCount(
+  face: FontProbe,
+  codePoints: readonly number[] | undefined
+): number | null {
   if (codePoints === undefined) return 0
-  let missing = 0
-  for (const point of codePoints) if (!face.hasGlyphForCodePoint(point)) missing += 1
-  return missing
+  try {
+    let missing = 0
+    for (const point of codePoints) if (!face.hasGlyphForCodePoint(point)) missing += 1
+    return missing
+  } catch {
+    return null
+  }
 }
 
 /** "3.019" vs "4.001" — 자리마다 숫자로. 양수면 a 가 새 판 */
@@ -248,29 +264,16 @@ export async function findFontFiles(
   let done = 0
   let retained = 0
 
-  scan: for (let at = 0; at < queue.length; at += 1) {
-    // 이름이 맞는 파일은 다 본다(더 나은 판이 있을 수 있다). 나머지는 다 찾았으면 그만 읽는다
-    if (at >= likely.length && result.found.size === missing.length) break
-
-    const file = queue[at]
-    let bytes: Uint8Array
-    let candidates: Candidate[]
-    let isCollection = false
-    try {
-      bytes = new Uint8Array(await file.arrayBuffer())
-      const faces = collectionFaces(bytes)
-      isCollection = faces !== null
-      const read = candidatesOf(file.name, faces ?? [createProbe(bytes)])
-      candidates = read.candidates
-      result.brokenFaces += read.broken
-      if (candidates.length === 0 && read.broken === 0) result.unreadable += 1
-    } catch {
-      result.unreadable += 1
-      done += 1
-      onProgress(done, total)
-      continue
-    }
-
+  /**
+   * 이 파일의 후보들을 없는 폰트마다 대조해 더 나은 것이면 갈아 끼운다.
+   * 보관 상한에 걸리면 false — 거기서 스캔을 멈춘다.
+   */
+  const matchInto = (
+    file: File,
+    bytes: Uint8Array,
+    candidates: readonly Candidate[],
+    isCollection: boolean
+  ): boolean => {
     for (const font of missing) {
       const key = fontKey(font)
       const evidenceFor = evidenceOf(key)
@@ -289,18 +292,29 @@ export async function findFontFiles(
       if (usable.length === 0) continue
       for (const entry of usable) evidenceFor.usableByTier[entry.tier] += 1
 
-      // 쓸 수 있는 후보 중 최선. 정렬은 안정적이라 점수가 같으면 파일 안의 순서를 지킨다
+      // 쓸 수 있는 후보 중 최선. 정렬은 안정적이라 점수가 같으면 파일 안의 순서를 지킨다.
+      // 글리프 표가 깨져 조회가 던지는 후보는 그것만 빼고 세어 둔다 — 하나 때문에 스캔이 멈추면 안 된다
       const scored = usable
-        .map(({ candidate, tier }) => ({
-          candidate,
-          tier,
-          missingGlyphs: missingGlyphCount(candidate.face, font.codePoints),
-          opszDistance: opszDistance(candidate.family, font.size),
-          facts: candidate.facts,
-          numGlyphs: candidate.face.numGlyphs
-        }))
+        .map(({ candidate, tier }) => {
+          const missingGlyphs = missingGlyphCount(candidate.face, font.codePoints)
+          if (missingGlyphs === null) {
+            result.brokenFaces += 1
+            return null
+          }
+          return {
+            candidate,
+            tier,
+            missingGlyphs,
+            opszDistance: opszDistance(candidate.family, font.size),
+            facts: candidate.facts,
+            numGlyphs: candidate.face.numGlyphs
+          }
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
         .sort((a, b) => compareCandidates(b, a))
       const best = scored[0]
+      if (best === undefined) continue
+
       const current = result.found.get(key)
       if (
         current !== undefined &&
@@ -332,7 +346,7 @@ export async function findFontFiles(
       retained += standalone.length - (current?.bytes.length ?? 0)
       if (retained > retainedCap) {
         result.memoryCapped = true
-        break scan
+        return false
       }
       result.found.set(key, {
         fileName: isCollection ? `${file.name} (${best.candidate.subfamily})` : file.name,
@@ -346,9 +360,43 @@ export async function findFontFiles(
         missingGlyphs: best.missingGlyphs
       })
     }
+    return true
+  }
 
+  for (let at = 0; at < queue.length; at += 1) {
+    // 이름이 맞는 파일은 다 본다(더 나은 판이 있을 수 있다). 나머지는 다 찾았으면 그만 읽는다
+    if (at >= likely.length && result.found.size === missing.length) break
+
+    const file = queue[at]
+    let bytes: Uint8Array
+    let candidates: Candidate[]
+    let isCollection = false
+    try {
+      bytes = new Uint8Array(await file.arrayBuffer())
+      const faces = collectionFaces(bytes)
+      isCollection = faces !== null
+      const read = candidatesOf(file.name, faces ?? [createProbe(bytes)])
+      candidates = read.candidates
+      result.brokenFaces += read.broken
+      if (candidates.length === 0 && read.broken === 0) result.unreadable += 1
+    } catch {
+      result.unreadable += 1
+      done += 1
+      onProgress(done, total)
+      continue
+    }
+
+    let capped = false
+    try {
+      capped = !matchInto(file, bytes, candidates, isCollection)
+    } catch (error) {
+      // 파일 하나의 예기치 못한 오류로 나머지를 안 읽으면 안 된다 — 사유를 남기고 계속한다
+      result.unreadable += 1
+      result.error ??= error instanceof Error ? error.message : String(error)
+    }
     done += 1
     onProgress(done, total)
+    if (capped) break
   }
 
   const incomplete = isScanIncomplete(result)

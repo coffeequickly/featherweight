@@ -7,13 +7,14 @@
 import { emit } from '@create-figma-plugin/utilities'
 
 import { catalogEntry } from '../lib/fontCatalog'
+import { embeddingForbidden } from '../lib/fontFile'
 import { fallbackFontsFor } from '../lib/glyphFallback'
 import { isIgnorable } from '../lib/ignorable'
 import { unpackFont } from './fontPack'
 import { matchFont } from '../lib/fontMatch'
 import { FontBytesHandler, FontRef, Reason, StoredFont } from '../lib/types'
 import { awaitResponse, nextRequestId } from './bridge'
-import { createProbe, FontProbe } from './fontkitAdapter'
+import { createProbe, factsOf, FontProbe } from './fontkitAdapter'
 
 const FETCH_TIMEOUT_MS = 20_000
 /** 실패한 폰트를 다시 받아 보기까지의 시간. 노드마다 20초씩 다시 기다리면 프레임 검증 30초를 넘긴다 */
@@ -155,6 +156,11 @@ export async function checkCoverage(
     }
   }
 
+  // 그리는 쪽(textLayer)이 임베드를 거절할 파일은 여기서도 거절해야 한다 — 통과시키면 글자를 숨긴
+  // 뒤 임베드가 막혀 내용 누락 방지 장치가 PDF 저장을 통째로 막는다 (2026-09-08 재현)
+  const forbidden = embeddingForbidden(factsOf(probe))
+  if (forbidden !== null) return { ok: false, reason: forbidden }
+
   const missing = missingCodePoints(probe, codePoints)
   if (missing.length === 0) return { ok: true }
 
@@ -163,9 +169,9 @@ export async function checkCoverage(
   if (options.glyphFallback) {
     for (const candidate of fallbackFontsFor(ref.style)) {
       const fallback = await probeFont(candidate)
-      if (fallback !== undefined && missingCodePoints(fallback, missing).length === 0) {
-        return { ok: true }
-      }
+      if (fallback === undefined) continue
+      if (embeddingForbidden(factsOf(fallback)) !== null) continue
+      if (missingCodePoints(fallback, missing).length === 0) return { ok: true }
     }
   }
 

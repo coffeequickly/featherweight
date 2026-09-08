@@ -13,6 +13,8 @@ type FakeFace = {
   numGlyphs?: number
   broken?: boolean
   embedding?: 'installable' | 'editable' | 'preview' | 'restricted' | 'bitmap-only'
+  /** 글리프 표가 깨져 조회가 던진다 */
+  glyphsThrow?: boolean
 }
 
 const { registry } = vi.hoisted(() => ({ registry: new Map<string, FakeFace[]>() }))
@@ -29,8 +31,10 @@ vi.mock('../src/ui/fontkitAdapter', () => {
   const faceObject = (face: FakeFace): FaceObject => ({
     _face: face,
     numGlyphs: face.numGlyphs ?? 100,
-    hasGlyphForCodePoint: (point: number) =>
-      face.glyphs === undefined || [...face.glyphs].some((c) => c.codePointAt(0) === point)
+    hasGlyphForCodePoint: (point: number) => {
+      if (face.glyphsThrow === true) throw new Error('broken glyf')
+      return face.glyphs === undefined || [...face.glyphs].some((c) => c.codePointAt(0) === point)
+    }
   })
   const lookup = (bytes: Uint8Array): { faces: FakeFace[]; name: string; index: number } => {
     const [name, index] = decode(bytes).split('#')
@@ -258,5 +262,33 @@ describe('findFontFiles — 임베드를 금지한 파일', () => {
       progress
     )
     expect(both.found.get(k('Corp', 'Regular'))?.fileName).toBe('Corp-Regular-Web.ttf')
+  })
+})
+
+describe('findFontFiles — 글리프 조회가 던지는 파일', () => {
+  it('그 후보만 빼고 계속 읽는다 — 다음 파일에서 찾는다', async () => {
+    const files = [
+      fakeFile('Nexa-Heavy-Broken.ttf', [
+        { family: 'Nexa', subfamily: 'Heavy', weight: 900, italic: false, glyphsThrow: true }
+      ]),
+      fakeFile('Nexa-Heavy.ttf', [
+        { family: 'Nexa', subfamily: 'Heavy', weight: 900, italic: false }
+      ])
+    ]
+    const result = await findFontFiles(files, [usage('Nexa', 'Heavy', 900, false, 'ab')], progress)
+    expect(result.found.get(k('Nexa', 'Heavy'))?.fileName).toBe('Nexa-Heavy.ttf')
+    expect(result.brokenFaces).toBe(1)
+    expect(result.error).toBeUndefined()
+  })
+
+  it('깨진 것뿐이면 "없음" 이 아니라 검사 미완료다', async () => {
+    const files = [
+      fakeFile('Nexa-Heavy-Broken.ttf', [
+        { family: 'Nexa', subfamily: 'Heavy', weight: 900, italic: false, glyphsThrow: true }
+      ])
+    ]
+    const result = await findFontFiles(files, [usage('Nexa', 'Heavy', 900, false, 'ab')], progress)
+    expect(result.found.size).toBe(0)
+    expect(result.reasons.get(k('Nexa', 'Heavy'))).toBe('unchecked')
   })
 })

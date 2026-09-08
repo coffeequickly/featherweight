@@ -6,9 +6,11 @@ import { CLIENT_STORAGE_LIMIT, FontUsage, StoredFont } from '../src/lib/types'
 import { ScanResult } from '../src/ui/fontFolder'
 import { SaveOutcome, SaveRequest } from '../src/ui/fontScanSave'
 import {
+  beginRetry,
   buildScanDisplay,
   clearScan,
   countOutcomes,
+  failScan,
   finishScan,
   getScanState,
   rowOutcomeFor,
@@ -261,5 +263,94 @@ describe('스캔 상태 저장소 — 닫거나 다음 스캔까지 남는다', 
     startScan()
     clearScan()
     expect(calls).toBe(2)
+  })
+})
+
+describe('다시 넣기 — 중복 실행과 늦은 응답', () => {
+  const seed = (): void => {
+    const built = buildScanDisplay(
+      result([]),
+      outcome({
+        failures: new Map([
+          [
+            fontKey(B),
+            { fileName: 'b.ttf', error: 'full', storage: true, request: request('B', 10) }
+          ]
+        ])
+      }),
+      [B],
+      []
+    )
+    finishScan(built.display, built.pending)
+  }
+
+  it('도는 중에는 다시 시작하지 않는다 — 같은 성공을 두 번 세면 1종이 2종이 된다', () => {
+    startScan()
+    seed()
+    const key = fontKey(B)
+    const first = beginRetry(key)
+    expect(first).not.toBeNull()
+    expect(beginRetry(key)).toBeNull() // 두 번째 클릭
+    expect(getScanState().retrying.has(key)).toBe(true)
+    settleRetry(key, null, first ?? 0)
+    expect(getScanState().display?.saved).toBe(1)
+    expect(getScanState().retrying.has(key)).toBe(false)
+    // 같은 응답이 또 오면 무시한다
+    settleRetry(key, null, first ?? 0)
+    expect(getScanState().display?.saved).toBe(1)
+    clearScan()
+  })
+
+  it('넣을 것이 없으면 시작하지 않는다', () => {
+    startScan()
+    seed()
+    expect(beginRetry(fontKey(C))).toBeNull()
+    clearScan()
+  })
+
+  it('새 스캔이 시작되면 앞선 재시도의 늦은 응답은 버린다', () => {
+    startScan()
+    seed()
+    const key = fontKey(B)
+    const stale = beginRetry(key)
+    expect(stale).not.toBeNull()
+    startScan() // 사용자가 폴더를 다시 골랐다
+    const built = buildScanDisplay(
+      result([]),
+      outcome({
+        failures: new Map([
+          [key, { fileName: 'b2.ttf', error: 'full', storage: true, request: request('B', 20) }]
+        ])
+      }),
+      [B],
+      []
+    )
+    finishScan(built.display, built.pending)
+    settleRetry(key, null, stale ?? 0) // 늦게 도착
+    expect(getScanState().pending.has(key)).toBe(true) // 새 스캔의 대기 항목은 그대로
+    expect(getScanState().display?.saved).toBe(0)
+    clearScan()
+  })
+
+  it('결과를 닫은 뒤 도착한 응답도 버린다', () => {
+    startScan()
+    seed()
+    const key = fontKey(B)
+    const generation = beginRetry(key)
+    clearScan()
+    settleRetry(key, null, generation ?? 0)
+    expect(getScanState().display).toBeNull()
+  })
+})
+
+describe('failScan', () => {
+  it('스캔이 통째로 실패해도 사유를 남긴다', () => {
+    startScan()
+    failScan('The folder scan stopped: boom')
+    const state = getScanState()
+    expect(state.progress).toBeNull()
+    expect(state.display?.lines).toEqual(['The folder scan stopped: boom'])
+    expect(state.display?.saved).toBe(0)
+    clearScan()
   })
 })

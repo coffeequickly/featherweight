@@ -153,7 +153,18 @@ export type FontFileFacts = {
   embedding?: 'installable' | 'editable' | 'preview' | 'restricted' | 'bitmap-only'
   /** fsType 의 "No subsetting" — 서브셋 대신 전체를 넣어야 한다 */
   noSubsetting?: boolean
+  /**
+   * 이 사실을 읽은 코드의 판(FACTS_VERSION). "값이 있다" 와 "검사를 마쳤다" 는 다르다 —
+   * OS/2 가 없는 정상 파일은 아무리 다시 읽어도 embedding 이 안 생긴다. 이 칸이 최신이면 다시 읽지 않는다.
+   */
+  read?: number
 }
+
+/**
+ * 사실 스키마의 판. factsOf 가 새 칸을 읽기 시작하면 올린다 — 그때만 옛 항목을 다시 읽는다.
+ * 1: tables/axes/weightClass/italic/defaultWeight, 2: version, 3: embedding/noSubsetting
+ */
+export const FACTS_VERSION = 3
 
 export type StoredFont = FontRef & {
   /** 자리(Figma 스타일)에서 추정한 굵기·기울기 — 파일 것이 아니다 */

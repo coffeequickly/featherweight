@@ -460,6 +460,10 @@ const MESSAGES = {
     ko: '중간에 멈춤 — 한 번에 들고 있을 폰트가 너무 많아 나머지는 하나씩 넣어 주세요'
   },
   'fonts.saveNoReply': { en: 'no reply from the plugin', ko: '플러그인이 응답하지 않음' },
+  'fonts.scanFailed': {
+    en: 'The folder scan stopped: {error}. Fonts added before it stopped are kept.',
+    ko: '폴더 스캔이 멈췄습니다: {error}. 멈추기 전에 넣은 폰트는 그대로 있습니다.'
+  },
   'fonts.add': { en: 'Add', ko: '넣기' },
   'fonts.parseError': {
     en: 'Could not read {file} as a font. It must be a static TTF/OTF.',

@@ -45,6 +45,10 @@ export type ScanState = {
   display: ScanDisplay | null
   /** 저장 못 한 것의 압축본 — 다시 넣기용 */
   pending: Map<string, SaveRequest>
+  /** 지금 다시 넣는 중인 폰트(fontKey) — 두 번 눌러 두 번 세지 않게 */
+  retrying: ReadonlySet<string>
+  /** 스캔 세대. 늦게 온 응답이 다음 스캔의 결과를 건드리지 못하게 한다 */
+  generation: number
 }
 
 /** 다시 넣기용으로 들고 있을 압축본의 합 상한 — 한도(5MB)의 몇 배면 충분하다 */
@@ -142,7 +146,13 @@ export function rowOutcomeFor(
 
 type Listener = () => void
 
-const empty = (): ScanState => ({ progress: null, display: null, pending: new Map() })
+const empty = (): ScanState => ({
+  progress: null,
+  display: null,
+  pending: new Map(),
+  retrying: new Set(),
+  generation: 0
+})
 let state: ScanState = empty()
 const listeners = new Set<Listener>()
 
@@ -162,9 +172,18 @@ export function subscribeScanState(listener: Listener): () => void {
   }
 }
 
-/** 새 스캔 — 이전 결과와 압축본을 놓는다. 이전 폴더의 결과가 새 검사 결과처럼 남으면 안 된다 */
+/**
+ * 새 스캔 — 이전 결과와 압축본을 놓고 세대를 올린다. 이전 폴더의 결과가 새 검사 결과처럼 남으면 안 되고,
+ * 먼저 시작한 다시 넣기의 늦은 응답이 새 스캔의 대기 항목을 지워서도 안 된다.
+ */
 export function startScan(): void {
-  set({ progress: { done: 0, total: 0 }, display: null, pending: new Map() })
+  set({
+    progress: { done: 0, total: 0 },
+    display: null,
+    pending: new Map(),
+    retrying: new Set(),
+    generation: state.generation + 1
+  })
 }
 
 export function setScanProgress(done: number, total: number): void {
@@ -172,7 +191,7 @@ export function setScanProgress(done: number, total: number): void {
 }
 
 export function finishScan(display: ScanDisplay, pending: Map<string, SaveRequest>): void {
-  set({ progress: null, display, pending })
+  set({ ...state, progress: null, display, pending })
 }
 
 /** 스캔이 예외로 끝났다 — 진행 표시만 거둔다 */
@@ -182,12 +201,35 @@ export function abortScan(): void {
 
 /** 사용자가 결과를 닫았다 */
 export function clearScan(): void {
-  set(empty())
+  set({ ...empty(), generation: state.generation + 1 })
 }
 
-/** 다시 넣기의 결과. null 이면 저장됐다 — 행 결과와 압축본을 지우고 넣은 수를 올린다 */
-export function settleRetry(key: string, outcome: RowOutcome | null): void {
-  if (state.display === null) return
+/**
+ * 이 폰트의 다시 넣기를 시작한다. 이미 도는 중이거나 넣을 것이 없으면 null —
+ * 버튼을 두 번 눌러 같은 성공을 두 번 세면 1종이 2종으로 집계된다.
+ * 돌려주는 세대를 settleRetry 에 그대로 넘겨야 한다.
+ */
+export function beginRetry(key: string): number | null {
+  if (!state.pending.has(key) || state.retrying.has(key)) return null
+  const retrying = new Set(state.retrying)
+  retrying.add(key)
+  set({ ...state, retrying })
+  return state.generation
+}
+
+/**
+ * 다시 넣기의 결과. null 이면 저장됐다 — 행 결과와 압축본을 지우고 넣은 수를 올린다.
+ * 세대가 다르면(그 사이 새 스캔·닫기) 조용히 버린다.
+ */
+export function settleRetry(key: string, outcome: RowOutcome | null, generation?: number): void {
+  if (generation !== undefined && generation !== state.generation) return
+  if (!state.retrying.has(key) && generation !== undefined) return // 이미 처리한 응답
+  const retrying = new Set(state.retrying)
+  retrying.delete(key)
+  if (state.display === null) {
+    set({ ...state, retrying })
+    return
+  }
   const outcomes = new Map(state.display.outcomes)
   const pending = new Map(state.pending)
   let saved = state.display.saved
@@ -199,7 +241,21 @@ export function settleRetry(key: string, outcome: RowOutcome | null): void {
     outcomes.set(key, outcome)
     if (outcome.kind !== 'unsaved' || !outcome.retry) pending.delete(key)
   }
-  set({ ...state, display: { ...state.display, saved, outcomes }, pending })
+  set({ ...state, display: { ...state.display, saved, outcomes }, pending, retrying })
+}
+
+/** 스캔이 예외로 끝났다 — 사유를 결과 상자에 남긴다 */
+export function failScan(message: string): void {
+  set({
+    ...state,
+    progress: null,
+    display: {
+      saved: 0,
+      alternatives: 0,
+      lines: [message],
+      outcomes: state.display?.outcomes ?? new Map()
+    }
+  })
 }
 
 /** 구독하는 훅 — 패널이 내려갔다 올라와도 같은 상태를 본다 */

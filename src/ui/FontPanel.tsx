@@ -37,9 +37,11 @@ import { awaitResponse, nextRequestId } from './bridge'
 import { saveFoundFonts, SaveReply, SaveRequest, scanIncompleteLine } from './fontScanSave'
 import {
   abortScan,
+  beginRetry,
   buildScanDisplay,
   clearScan,
   countOutcomes,
+  failScan,
   finishScan,
   rowOutcomeFor,
   RowOutcome,
@@ -87,6 +89,9 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
   async function retry(key: string, have: readonly StoredFont[]): Promise<readonly StoredFont[]> {
     const request = scan.pending.get(key)
     if (request === undefined) return have
+    // 같은 항목이 겹쳐 돌면 성공을 두 번 센다. 세대는 늦게 온 응답이 다음 스캔을 건드리지 못하게 한다
+    const generation = beginRetry(key)
+    if (generation === null) return have
     const failed = (error: string, storage: boolean): RowOutcome => ({
       kind: 'unsaved',
       fileName: request.font.fileName,
@@ -96,15 +101,15 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
       retry: true
     })
     if (!fitsWithin(have, request.font, request.bytes.length)) {
-      settleRetry(key, failed(t('fonts.rowNoRoom'), true))
+      settleRetry(key, failed(t('fonts.rowNoRoom'), true), generation)
       return have
     }
     const reply = await requestSave(request)
     if (reply?.ok === true) {
-      settleRetry(key, null)
+      settleRetry(key, null, generation)
       return upsertFont(have, request.font)
     }
-    settleRetry(key, failed(reply?.error ?? t('fonts.saveNoReply'), false))
+    settleRetry(key, failed(reply?.error ?? t('fonts.saveNoReply'), false), generation)
     return have
   }
 
@@ -152,7 +157,7 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
             display={scan.display}
             pendingCount={scan.pending.size}
             free={remainingBytes(stored)}
-            disabled={busy}
+            disabled={busy || scan.retrying.size > 0}
             onRetryAll={() => {
               void retryAll()
             }}
@@ -168,6 +173,7 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
             outcome={rowOutcomeFor(scan.display, font, states[index])}
             all={stored}
             disabled={busy}
+            retrying={scan.retrying.has(fontKey(font))}
             onNotice={onNotice}
             onRetry={() => {
               void retry(fontKey(font), stored)
@@ -382,7 +388,11 @@ function FolderScan({
         incomplete === null ? [] : [incomplete]
       )
       finishScan(built.display, built.pending)
-    } catch {
+    } catch (error) {
+      // 스캔이 통째로 실패해도 왜 그런지는 남긴다 — 진행 표시만 지우면 사용자는 아무것도 못 본다
+      failScan(
+        t('fonts.scanFailed', { error: error instanceof Error ? error.message : String(error) })
+      )
       abortScan()
     } finally {
       if (input.current !== null) input.current.value = ''
@@ -532,6 +542,7 @@ function FontRow({
   outcome,
   all,
   disabled,
+  retrying,
   onNotice,
   onRetry
 }: {
@@ -541,6 +552,8 @@ function FontRow({
   outcome: RowOutcome | null
   all: StoredFont[]
   disabled: boolean
+  /** 이 폰트를 다시 넣는 중 — 버튼을 잠가 두 번 세지 않는다 */
+  retrying: boolean
   onNotice: (notice: Notice) => void
   onRetry: () => void
 }): JSX.Element {
@@ -675,7 +688,7 @@ function FontRow({
       </div>
       <div class="fontRowActions">
         {canRetry ? (
-          <Button disabled={disabled} onClick={onRetry} secondary>
+          <Button disabled={disabled || retrying} onClick={onRetry} secondary>
             {t('fonts.retry')}
           </Button>
         ) : state.kind === 'catalog' ? null : (

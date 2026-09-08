@@ -9,6 +9,7 @@ vi.mock('fontkit', () => ({
   })
 }))
 
+import { FACTS_VERSION } from '../src/lib/types'
 import { factsOf, pdfLibFontkit } from '../src/ui/fontkitAdapter'
 
 type Stream = { on: (event: string, callback: (payload: unknown) => void) => Stream }
@@ -131,5 +132,14 @@ describe('factsOf — 임베드 플래그(OS/2 fsType)', () => {
     const none = factsOf({ directory: { tables: {} } } as unknown as Parameters<typeof factsOf>[0])
     expect(none.embedding).toBeUndefined()
     expect(none.noSubsetting).toBeUndefined()
+  })
+})
+
+describe('factsOf — 사실의 판(read)', () => {
+  it('읽을 때마다 지금 판을 적는다 — "값이 있다" 가 아니라 "검사를 마쳤다" 로 판단하려고', () => {
+    const bare = factsOf({ directory: { tables: {} } } as unknown as Parameters<typeof factsOf>[0])
+    expect(bare.read).toBe(FACTS_VERSION)
+    expect(bare.embedding).toBeUndefined() // OS/2 가 없는 정상 파일도 있다
+    expect(bare.version).toBeUndefined()
   })
 })
