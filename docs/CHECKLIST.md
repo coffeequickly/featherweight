@@ -237,7 +237,17 @@ for a document with nothing to outline; `report=1` for the result card).
       Helvetica Neue (Installable) and Apple SD Gothic Neo (Editable) too
 - [ ] A restricted font stored by an older version is re-read on open, flagged
       on the Fonts screen and in the pre-flight, and its text stays as outlines
-      at export with the reason in the report
+      at export with the reason in the report — the export finishes and the PDF
+      is written; it never stops with "text would be lost"
+- [ ] Retry can't be double-counted: click Retry twice quickly (or Retry N while
+      a row retry is running) and the added count rises by one per font; a retry
+      answered after a new folder scan starts does not touch the new result
+- [ ] Opening a file whose stored font has no version or embedding data does not
+      loop: the Fonts screen settles and the font list is not rewritten
+      repeatedly (watch the console/Network idle after the panel loads)
+- [ ] A font file whose glyph table is broken is skipped as one candidate: the
+      scan reads the rest of the folder, counts it under "scan incomplete", and
+      if the scan does stop, the result box says why and keeps what was added
 - [ ] Memory: scanning /System/Library/Fonts (370 files, 778 MB) with a font that
       is not there finishes in about a second and the plugin stays responsive.
       Node measurement 2026-09-08: reading every file gave peak RSS 1 GB from
