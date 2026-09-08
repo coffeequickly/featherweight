@@ -21,6 +21,7 @@
 //   - SUIT — 저장소가 woff2 만 배포한다
 //   - NanumSquare 계열 — 공식 배포가 zip 뿐이라 파일 단위 주소가 없다
 
+import { normalizeName, staticFamily } from './fontFolder'
 import { FontRef } from './types'
 
 /**
@@ -1249,9 +1250,33 @@ export const CATALOG: CatalogEntry[] = [
   )
 )
 
+/**
+ * 느슨한 이름 — 정확 일치가 먼저고, 그다음 확인된 표기 차이만 허용한다:
+ *   · 대소문자·공백·하이픈 ("Semi Bold" = "SemiBold" = "semi-bold")
+ *   · family 끝의 "Variable"/"VF" — 카탈로그는 어차피 같은 서체의 static 인스턴스를 준다
+ *   · "Regular Italic" = "Italic" — Figma 는 Regular 의 이탤릭을 "Italic" 으로만 부른다
+ * Book/Roman/Normal 같은 추정 별칭은 두지 않는다 — 같은 서체에 Book 과 Regular 가 따로 있는 경우가 있다.
+ */
+export function looseCatalogKey(family: string, style: string): string {
+  const compact = normalizeName(style)
+  return `${normalizeName(staticFamily(family))}|${compact === 'regularitalic' ? 'italic' : compact}`
+}
+
+const byExact = new Map<string, CatalogEntry>()
+const byNormalized = new Map<string, CatalogEntry>()
+for (const entry of CATALOG) {
+  const exact = `${entry.family}|${entry.style}`
+  if (!byExact.has(exact)) byExact.set(exact, entry)
+  const loose = looseCatalogKey(entry.family, entry.style)
+  if (!byNormalized.has(loose)) byNormalized.set(loose, entry)
+}
+
 /** 이 폰트를 받아올 수 있나. 없으면 사용자가 파일을 넣어야 한다. */
 export function catalogEntry(ref: FontRef): CatalogEntry | undefined {
-  return CATALOG.find((entry) => entry.family === ref.family && entry.style === ref.style)
+  return (
+    byExact.get(`${ref.family}|${ref.style}`) ??
+    byNormalized.get(looseCatalogKey(ref.family, ref.style))
+  )
 }
 
 /** 네트워크로 못 구하는 폰트만 남긴다 — UI 가 "직접 넣어라" 로 표시할 목록. */

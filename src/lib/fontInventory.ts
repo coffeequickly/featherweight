@@ -74,29 +74,71 @@ export function isItalic(style: string): boolean {
   return normalized.includes('italic') || normalized.includes('oblique')
 }
 
+/** 폰트 하나가 들고 다니는 글자 수 상한 — 한글 본문도 이 안에 든다. 넘치면 앞쪽만 */
+export const FONT_CODE_POINT_CAP = 4096
+
+/** 글자들의 코드포인트를 중복 없이, 상한까지 */
+export function sampleCodePoints(text: string, cap: number): number[] {
+  const seen = new Set<number>()
+  for (const char of text) {
+    if (seen.size >= cap) break
+    seen.add(char.codePointAt(0) ?? 0)
+  }
+  return [...seen]
+}
+
+/** 글자 수로 가중한 중앙값 — 제목 한 줄이 본문 수백 자의 크기를 끌고 가지 않게 */
+function weightedMedian(pairs: readonly (readonly [number, number])[]): number {
+  const sorted = [...pairs].sort((a, b) => a[0] - b[0])
+  const half = sorted.reduce((sum, [, count]) => sum + count, 0) / 2
+  let seen = 0
+  for (const [value, count] of sorted) {
+    seen += count
+    if (seen >= half) return value
+  }
+  return sorted[sorted.length - 1][0]
+}
+
 /** family + style 이 같으면 한 줄로 합친다. 많이 쓴 폰트가 위로. */
 export function aggregateFontUsage(segments: readonly RawFontSegment[]): FontUsage[] {
   // 집계 중에는 Set 으로 중복을 거르고, 내보낼 때 배열로 바꾼다
-  const map = new Map<string, Omit<FontUsage, 'nodeIds'> & { nodeIds: Set<string> }>()
+  const map = new Map<
+    string,
+    Omit<FontUsage, 'nodeIds' | 'codePoints' | 'size'> & {
+      nodeIds: Set<string>
+      codePoints: Set<number>
+      /** [글자 크기, 글자 수] */
+      sizes: Array<[number, number]>
+    }
+  >()
 
   for (const segment of segments) {
     const key = fontKey(segment)
-    const found = map.get(key)
+    let found = map.get(key)
     if (found === undefined) {
-      map.set(key, {
+      found = {
         family: segment.family,
         style: segment.style,
         weight: guessWeight(segment.style),
         italic: isItalic(segment.style),
-        nodeCount: 1,
-        charCount: segment.charCount,
-        nodeIds: new Set([segment.nodeId])
-      })
-      continue
+        nodeCount: 0,
+        charCount: 0,
+        nodeIds: new Set(),
+        codePoints: new Set(),
+        sizes: []
+      }
+      map.set(key, found)
+    }
+    if (segment.fontSize !== undefined && Number.isFinite(segment.fontSize)) {
+      found.sizes.push([segment.fontSize, Math.max(1, segment.charCount)])
     }
     found.nodeIds.add(segment.nodeId)
     found.nodeCount = found.nodeIds.size
     found.charCount += segment.charCount
+    for (const point of segment.codePoints ?? []) {
+      if (found.codePoints.size >= FONT_CODE_POINT_CAP) break
+      found.codePoints.add(point)
+    }
   }
 
   return [...map.values()]
@@ -107,7 +149,9 @@ export function aggregateFontUsage(segments: readonly RawFontSegment[]): FontUsa
       italic: entry.italic,
       nodeCount: entry.nodeCount,
       charCount: entry.charCount,
-      nodeIds: [...entry.nodeIds]
+      nodeIds: [...entry.nodeIds],
+      ...(entry.codePoints.size === 0 ? {} : { codePoints: [...entry.codePoints] }),
+      ...(entry.sizes.length === 0 ? {} : { size: weightedMedian(entry.sizes) })
     }))
     .sort(
       (a, b) =>

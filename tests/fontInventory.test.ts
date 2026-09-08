@@ -198,3 +198,21 @@ describe('weightName', () => {
     expect(weightName(950)).toBe('Black')
   })
 })
+
+describe('aggregateFontUsage — 글자 크기', () => {
+  it('폰트마다 글자 수로 가중한 중앙값을 든다 — 제목 한 줄이 본문을 끌고 가지 않는다', () => {
+    const out = aggregateFontUsage([
+      { family: 'Inter', style: 'Regular', nodeId: '1', charCount: 300, fontSize: 14 },
+      { family: 'Inter', style: 'Regular', nodeId: '2', charCount: 20, fontSize: 48 },
+      { family: 'Inter', style: 'Regular', nodeId: '3', charCount: 100, fontSize: 16 }
+    ])
+    expect(out[0].size).toBe(14)
+  })
+
+  it('크기를 모르는 세그먼트만 있으면 size 가 없다', () => {
+    const out = aggregateFontUsage([
+      { family: 'Inter', style: 'Regular', nodeId: '1', charCount: 10 }
+    ])
+    expect(out[0].size).toBeUndefined()
+  })
+})

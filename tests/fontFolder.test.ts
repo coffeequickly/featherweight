@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { FontFileNames, looksLikeFamily, pickFontFile, staticFamily } from '../src/lib/fontFolder'
+import {
+  FontFileNames,
+  looksLikeFamily,
+  normalizeName,
+  pickFontFile,
+  rankFontFiles,
+  staticFamily
+} from '../src/lib/fontFolder'
 
 const file = (
   fileName: string,
@@ -69,5 +76,39 @@ describe('pickFontFile', () => {
     expect(
       pickFontFile(HEAVY, [file('Nexa-Heavy.ttf', 'Nexa', 'Heavy', 900, false)])
     ).toBeUndefined()
+  })
+})
+
+describe('normalizeName — 허용한 표기 차이만 지운다', () => {
+  it('대소문자·공백·하이픈·밑줄만 무시한다', () => {
+    expect(normalizeName('Semi Bold')).toBe(normalizeName('SemiBold'))
+    expect(normalizeName('semi-bold')).toBe(normalizeName('Semi_Bold'))
+    expect(normalizeName('Nanum Gothic')).toBe(normalizeName('NanumGothic'))
+  })
+
+  it('그 밖의 글자는 남긴다 — 다른 이름이 같은 키로 뭉치면 안 된다', () => {
+    expect(normalizeName('游ゴシック')).not.toBe(normalizeName('ヒラギノ角ゴ'))
+    expect(normalizeName('游ゴシック')).not.toBe('')
+    expect(normalizeName('A.B')).not.toBe(normalizeName('AB'))
+    expect(normalizeName('Inter')).not.toBe(normalizeName('Inter Display'))
+  })
+})
+
+describe('rankFontFiles', () => {
+  const target = { family: 'Helvetica Neue', style: 'Bold', weight: 700, italic: false }
+
+  it('정확 일치 → 옛 이름 → 굵기·기울기 순으로 늘어놓고, 같은 등급은 넘어온 순서', () => {
+    const exactA = file('a.ttf', 'Helvetica Neue', 'Bold', 700)
+    const legacy = file('b.ttf', 'Helvetica Neue Bold', 'Regular', 700)
+    const byWeight = file('c.ttf', 'Helvetica Neue', 'Heavy', 700, false)
+    const exactB = file('d.ttf', 'Helvetica Neue', 'Bold', 700)
+    const other = file('e.ttf', 'Helvetica', 'Bold', 700)
+    expect(
+      rankFontFiles(target, [byWeight, legacy, exactA, other, exactB]).map((f) => f.fileName)
+    ).toEqual(['a.ttf', 'd.ttf', 'b.ttf', 'c.ttf'])
+  })
+
+  it('아무것도 안 맞으면 빈 배열', () => {
+    expect(rankFontFiles(target, [file('e.ttf', 'Helvetica', 'Bold', 700)])).toEqual([])
   })
 })

@@ -42,6 +42,12 @@ export function createProbe(bytes: Uint8Array): FontProbe {
   return asFont(fontkit.create(bytes as Buffer))
 }
 
+/** 컬렉션(TTC/OTC)이면 안의 face 들을, 단일 폰트면 null. face 는 이름표·사실을 읽는 데 쓴다 */
+export function collectionFaces(bytes: Uint8Array): FontProbe[] | null {
+  const parsed = fontkit.create(bytes as Buffer) as unknown as { fonts?: Font[] }
+  return parsed.fonts === undefined ? null : parsed.fonts
+}
+
 /**
  * 순수 판정(screenFontFile)에 넘길 사실만 뽑는다.
  * fontkit 타입을 lib 으로 새어 나가게 하지 않으려고 여기서 좁힌다.
@@ -52,16 +58,40 @@ export function factsOf(font: FontProbe): FontFacts {
     variationAxes?: Record<string, unknown>
     fvar?: { axis?: Array<{ axisTag?: string; defaultValue?: number }> } | null
     'OS/2'?: { usWeightClass?: number; fsSelection?: { italic?: boolean } } | null
+    head?: { macStyle?: { italic?: boolean } } | null
+    post?: { italicAngle?: number } | null
+    subfamilyName?: string | null
+    postscriptName?: string | null
   }
   const wght = inner.fvar?.axis?.find((axis) => axis.axisTag === 'wght')
   return {
     tables: Object.keys(inner.directory?.tables ?? {}),
     axes: Object.keys(inner.variationAxes ?? {}),
     weightClass: inner['OS/2']?.usWeightClass,
-    italic: inner['OS/2']?.fsSelection?.italic,
+    italic: italicOf(inner),
     defaultWeight: wght?.defaultValue,
     version: parseFontVersion((font as unknown as { version?: string }).version)
   }
+}
+
+/**
+ * 기울임인가 — 비트 하나만 믿지 않는다. macOS Helvetica Neue 의 "Medium Italic" face 는 OS/2·head 의
+ * italic 비트가 다 꺼져 있고 italicAngle 도 0 이라 이름만 기울임이다(실측 2026-09-08); "Thin Italic" 은
+ * head 비트만 켜져 있다. 어느 하나라도 기울임이라 하면 기울임이다. 아무 정보도 없으면 모른다(undefined).
+ */
+function italicOf(inner: {
+  'OS/2'?: { fsSelection?: { italic?: boolean } } | null
+  head?: { macStyle?: { italic?: boolean } } | null
+  post?: { italicAngle?: number } | null
+  subfamilyName?: string | null
+  postscriptName?: string | null
+}): boolean | undefined {
+  const bit = inner['OS/2']?.fsSelection?.italic
+  const macBit = inner.head?.macStyle?.italic
+  const angle = inner.post?.italicAngle
+  const named = /italic|oblique/i.test(`${inner.subfamilyName ?? ''} ${inner.postscriptName ?? ''}`)
+  if (bit === undefined && macBit === undefined && angle === undefined && !named) return undefined
+  return bit === true || macBit === true || (angle !== undefined && angle !== 0) || named
 }
 
 /**

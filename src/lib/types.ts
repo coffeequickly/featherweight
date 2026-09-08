@@ -74,7 +74,14 @@ export type RGBA = { r: number; g: number; b: number; a: number }
 export type FontRef = { family: string; style: string }
 
 /** 트리를 걸으며 모은 원자료 (TextNode 세그먼트 1개) */
-export type RawFontSegment = FontRef & { nodeId: string; charCount: number }
+export type RawFontSegment = FontRef & {
+  nodeId: string
+  charCount: number
+  /** 이 세그먼트가 쓰는 글자(코드포인트, 중복 없이, 상한 있음) — 폴더의 파일이 그 글자를 갖는지 보는 데 쓴다 */
+  codePoints?: number[]
+  /** 글자 크기(px) — 광학 크기(opsz) static 인스턴스("Inter 18pt"/"24pt") 중 가까운 것을 고르는 데 쓴다 */
+  fontSize?: number
+}
 
 /** family+style 로 합친 결과. UI 폰트 목록과 체크리스트에 쓴다. */
 export type FontUsage = FontRef & {
@@ -84,6 +91,10 @@ export type FontUsage = FontRef & {
   charCount: number
   /** 이 폰트를 쓰는 텍스트 노드들 — 폰트가 없으면 이 노드들이 아웃라인으로 나간다 */
   nodeIds: string[]
+  /** 문서가 이 폰트로 쓰는 글자(코드포인트, 상한 있음). 폴더에서 고른 파일이 이 글자를 갖는지 본다 */
+  codePoints?: number[]
+  /** 이 폰트로 쓴 글자 크기의 대표값(px, 글자 수 가중 중앙값). 광학 크기 인스턴스 중 가까운 것을 고른다 */
+  size?: number
 }
 
 export type TextSegment = {
@@ -351,8 +362,21 @@ export interface FontFactsHandler extends EventHandler {
 
 export interface FontSaveHandler extends EventHandler {
   name: 'font:save'
-  /** quiet — 묶음 저장(폴더 스캔)은 건마다 토스트를 띄우지 않는다. 요약은 보낸 쪽이 낸다. */
-  handler: (payload: { font: StoredFont; bytes: Uint8Array; quiet?: boolean }) => void
+  /**
+   * quiet — 묶음 저장(폴더 스캔)은 건마다 토스트를 띄우지 않는다. 요약은 보낸 쪽이 낸다.
+   * reqId 가 있으면 저장 결과를 font:save:result 로 돌려준다 — "추가 완료" 는 그걸 받고 센다.
+   */
+  handler: (payload: {
+    font: StoredFont
+    bytes: Uint8Array
+    quiet?: boolean
+    reqId?: string
+  }) => void
+}
+
+export interface FontSaveResultHandler extends EventHandler {
+  name: 'font:save:result'
+  handler: (payload: { reqId: string; ok: boolean; error?: string }) => void
 }
 
 export interface FontDeleteHandler extends EventHandler {

@@ -14,6 +14,7 @@ import {
   EditorHandler,
   EditorKind,
   FontBytesResultHandler,
+  FontSaveResultHandler,
   FontsHandler,
   FontUsage,
   FrameItem,
@@ -140,6 +141,10 @@ export function useMainState(): MainState {
     const offFontBytes = on<FontBytesResultHandler>('font:bytes:result', (payload) => {
       settleResponse(payload.reqId, payload)
     })
+    // 묶음 저장(폴더 스캔)은 저장 결과를 받은 뒤에야 "추가 완료" 로 센다
+    const offSaveResult = on<FontSaveResultHandler>('font:save:result', (payload) => {
+      settleResponse(payload.reqId, payload)
+    })
 
     // 메인에는 Canvas 가 없다. 리사이즈 요청이 오면 여기서 처리해 돌려준다. (PRD C3)
     const offResize = on<ImageResizeHandler>('image:resize', (payload) => {
@@ -212,6 +217,7 @@ export function useMainState(): MainState {
       offNotice()
       offSettings()
       offFontBytes()
+      offSaveResult()
       offResize()
       offCache()
       offProbe()

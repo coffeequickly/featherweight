@@ -9,7 +9,7 @@ vi.mock('fontkit', () => ({
   })
 }))
 
-import { pdfLibFontkit } from '../src/ui/fontkitAdapter'
+import { factsOf, pdfLibFontkit } from '../src/ui/fontkitAdapter'
 
 type Stream = { on: (event: string, callback: (payload: unknown) => void) => Stream }
 type FontLike = { createSubset: () => { encodeStream: () => Stream } }
@@ -63,5 +63,44 @@ describe('pdfLibFontkit — encodeStream', () => {
     expect((result.error as Error).message).toBe('loca offsets missing')
     expect(result.chunks).toEqual([])
     expect(result.ended).toBe(false)
+  })
+})
+
+describe('factsOf — 기울임 판정', () => {
+  const facts = (font: Record<string, unknown>): boolean | undefined =>
+    factsOf(font as unknown as Parameters<typeof factsOf>[0]).italic
+  const base = {
+    directory: { tables: {} },
+    'OS/2': { usWeightClass: 500, fsSelection: { italic: false } }
+  }
+
+  it('비트가 다 꺼져 있어도 이름이 Italic 이면 기울임이다 — macOS Helvetica Neue Medium Italic', () => {
+    expect(
+      facts({
+        ...base,
+        head: { macStyle: { italic: false } },
+        post: { italicAngle: 0 },
+        subfamilyName: 'Medium Italic'
+      })
+    ).toBe(true)
+  })
+
+  it('head 비트만 켜진 face(Thin Italic), italicAngle 만 있는 face 도 기울임이다', () => {
+    expect(facts({ ...base, head: { macStyle: { italic: true } }, subfamilyName: 'Thin' })).toBe(
+      true
+    )
+    expect(facts({ ...base, post: { italicAngle: -12 }, subfamilyName: 'Book' })).toBe(true)
+  })
+
+  it('아무 신호도 없으면 정자, 정보 자체가 없으면 모른다', () => {
+    expect(
+      facts({
+        ...base,
+        head: { macStyle: { italic: false } },
+        post: { italicAngle: 0 },
+        subfamilyName: 'Medium'
+      })
+    ).toBe(false)
+    expect(facts({ directory: { tables: {} } })).toBeUndefined()
   })
 })

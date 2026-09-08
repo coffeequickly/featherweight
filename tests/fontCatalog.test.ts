@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { CATALOG, CATALOG_HOSTS, catalogEntry, outsideCatalog } from '../src/lib/fontCatalog'
+import {
+  CATALOG,
+  CATALOG_HOSTS,
+  catalogEntry,
+  looseCatalogKey,
+  outsideCatalog
+} from '../src/lib/fontCatalog'
 
 describe('catalogEntry', () => {
   it('Figma 가 부르는 variable 이름으로도 찾는다', () => {
@@ -45,6 +51,24 @@ describe('catalogEntry', () => {
     expect(catalogEntry({ family: 'IBM Plex Sans KR', style: 'ExtraBold' })).toBeUndefined()
   })
 
+  it('이름 표기가 달라도 찾는다 — 공백·대소문자·Variable 접미·Regular Italic', () => {
+    const semibold = catalogEntry({ family: 'Open Sans', style: 'SemiBold' })
+    expect(semibold).toBeDefined()
+    expect(catalogEntry({ family: 'Open Sans', style: 'Semi Bold' })?.url).toBe(semibold?.url)
+    expect(catalogEntry({ family: 'open sans', style: 'semi-bold' })?.url).toBe(semibold?.url)
+    expect(catalogEntry({ family: 'Roboto', style: 'Regular Italic' })?.url).toBe(
+      catalogEntry({ family: 'Roboto', style: 'Italic' })?.url
+    )
+    expect(catalogEntry({ family: 'Noto Sans KR Variable', style: 'Bold' })?.url).toBe(
+      catalogEntry({ family: 'Noto Sans KR', style: 'Bold' })?.url
+    )
+    // 확인되지 않은 별칭은 두지 않는다 — Book/Normal 은 Regular 가 아닐 수 있다
+    expect(catalogEntry({ family: 'Lato', style: 'Normal' })).toBeUndefined()
+    expect(catalogEntry({ family: 'Lato', style: 'Book' })).toBeUndefined()
+    // 느슨해도 다른 서체를 대신 주지는 않는다
+    expect(catalogEntry({ family: 'Open Sans', style: 'Heavy' })).toBeUndefined()
+  })
+
   it('Inter 는 Figma 가 내장한 3.19 를 원저작자 태그에서 받는다', () => {
     const regular = catalogEntry({ family: 'Inter', style: 'Regular' })
     expect(regular?.url).toBe(
@@ -87,6 +111,17 @@ describe('CATALOG', () => {
   it('family+style 이 겹치지 않는다', () => {
     const keys = CATALOG.map((entry) => `${entry.family} ${entry.style}`)
     expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it('느슨한 키가 같은 항목은 같은 파일이다 — 표기만 다른 별칭끼리만 겹친다', () => {
+    const byKey = new Map<string, Set<string>>()
+    for (const entry of CATALOG) {
+      const key = looseCatalogKey(entry.family, entry.style)
+      const urls = byKey.get(key) ?? new Set<string>()
+      urls.add(entry.url)
+      byKey.set(key, urls)
+    }
+    for (const [key, urls] of byKey) expect(urls.size, key).toBe(1)
   })
 
   it('라이선스를 밝힌다', () => {

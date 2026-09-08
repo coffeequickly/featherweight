@@ -51,6 +51,7 @@ import {
   FontFileFacts,
   FontRef,
   FontSaveHandler,
+  FontSaveResultHandler,
   FontsHandler,
   FontBytesHandler,
   FontBytesResultHandler,
@@ -163,7 +164,9 @@ export default async function main(): Promise<void> {
   // 폴더에서 여러 개를 한꺼번에 넣으면 인덱스 읽기-수정-쓰기가 겹쳐 앞의 것이 사라진다 — 줄 세운다
   let fontOps: Promise<void> = Promise.resolve()
   on<FontSaveHandler>('font:save', (payload) => {
-    fontOps = fontOps.then(() => storeFont(payload.font, payload.bytes, payload.quiet === true))
+    fontOps = fontOps.then(() =>
+      storeFont(payload.font, payload.bytes, payload.quiet === true, payload.reqId)
+    )
   })
 
   on<FontDeleteHandler>('font:delete', (ref) => {
@@ -779,20 +782,30 @@ async function sendStoredFonts(): Promise<void> {
   emit<StoredFontsHandler>('fonts:stored', await listFonts())
 }
 
-async function storeFont(font: StoredFont, bytes: Uint8Array, quiet: boolean): Promise<void> {
+async function storeFont(
+  font: StoredFont,
+  bytes: Uint8Array,
+  quiet: boolean,
+  reqId?: string
+): Promise<void> {
   try {
     emit<StoredFontsHandler>('fonts:stored', await saveFont(font, bytes))
     // 잘 된 일은 캔버스 토스트 — 패널 띠는 경고 아이콘이 붙어 문제로 읽힌다.
     // 묶음 저장은 조용히 — 보낸 쪽이 한 번에 요약한다.
     if (!quiet) figma.notify(t('main.fontSaved', { family: font.family, style: font.style }))
+    if (reqId !== undefined) emit<FontSaveResultHandler>('font:save:result', { reqId, ok: true })
   } catch (error) {
     // 5MB 한도를 넘기면 setAsync 가 reject 한다.
-    emit<NoticeHandler>('notice', {
-      message: t('main.fontSaveFailed', {
-        error: error instanceof Error ? error.message : String(error)
-      }),
-      error: true
-    })
+    const message = error instanceof Error ? error.message : String(error)
+    if (reqId === undefined) {
+      emit<NoticeHandler>('notice', {
+        message: t('main.fontSaveFailed', { error: message }),
+        error: true
+      })
+    } else {
+      // 묶음 저장은 보낸 쪽이 실패를 세어 한 번에 말한다
+      emit<FontSaveResultHandler>('font:save:result', { reqId, ok: false, error: message })
+    }
     void sendStoredFonts()
   }
 }

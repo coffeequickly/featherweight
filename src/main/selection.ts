@@ -1,4 +1,4 @@
-import { aggregateFontUsage } from '../lib/fontInventory'
+import { aggregateFontUsage, sampleCodePoints } from '../lib/fontInventory'
 import { transformScale } from '../lib/imageTarget'
 import { FontUsage, FrameItem, PreflightFrame, RawFontSegment, TextReject } from '../lib/types'
 import { imageUsagesOf } from './images'
@@ -212,15 +212,20 @@ async function scanNode(
   return scan
 }
 
-/** 한 TextNode 안에서 폰트가 섞여 있을 수 있어 세그먼트 단위로 읽는다. */
+/** 한 TextNode 안에서 폰트가 섞여 있을 수 있어 세그먼트 단위로 읽는다. 크기도 같이 — 광학 크기 파일을 고를 때 쓴다 */
+/** 세그먼트 하나가 들고 가는 글자 수 상한 — 폰트별로 다시 합쳐 상한을 둔다 */
+const SEGMENT_CODE_POINT_CAP = 512
+
 function collectFonts(node: TextNode, out: RawFontSegment[]): void {
   try {
-    for (const segment of node.getStyledTextSegments(['fontName'])) {
+    for (const segment of node.getStyledTextSegments(['fontName', 'fontSize'])) {
       out.push({
         family: segment.fontName.family,
         style: segment.fontName.style,
         nodeId: node.id,
-        charCount: segment.characters.length
+        charCount: segment.characters.length,
+        codePoints: sampleCodePoints(segment.characters, SEGMENT_CODE_POINT_CAP),
+        fontSize: segment.fontSize
       })
     }
   } catch {

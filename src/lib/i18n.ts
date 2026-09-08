@@ -348,21 +348,41 @@ const MESSAGES = {
 
   // ── 폰트 화면 ───────────────────────────────────────────
   'fonts.help': {
-    en: 'Open-license fonts are downloaded automatically at export. Add a file only for fonts that cannot be fetched. Text without a font is outlined — it looks identical, but it cannot be selected or searched, and the file stays big.',
-    ko: '공개 폰트는 내보낼 때 자동으로 받아 옵니다. 구할 수 없는 폰트만 파일을 넣으면 됩니다. 폰트가 없는 텍스트는 아웃라인 처리됩니다 — 보기에는 똑같지만 선택도 검색도 안 되고 용량도 줄지 않습니다.'
+    en: 'Open-license fonts are downloaded at export. Any other font needs its file once — without it the text is outlined.',
+    ko: '공개 폰트는 내보낼 때 자동으로 받습니다. 그 밖의 폰트는 파일을 한 번 넣으면 됩니다 — 없으면 아웃라인으로 나갑니다.'
   },
-  'fonts.detailCatalog': {
-    en: (p) => `auto-downloaded · ${n(Number(p.count), 'text node', 'text nodes')}`,
-    ko: '자동으로 받아옴 · 텍스트 {count}개'
+  'fonts.detailCatalog': { en: 'auto-downloaded', ko: '자동으로 받아옴' },
+  'fonts.detailUploaded': { en: '{file} · {size}', ko: '{file} · {size}' },
+  // ── 행에 남는 폴더 스캔 결과 — "파일 없음" 대신 스캔이 알아낸 것 ────
+  'fonts.rowNoFile': { en: 'no file', ko: '파일 없음' },
+  'fonts.rowUnsaved': { en: 'found, not saved', ko: '찾았지만 저장 못 함' },
+  'fonts.rowNotInFolder': { en: 'not in that folder', ko: '폴더에 없음' },
+  'fonts.rowStyleMissing': {
+    en: 'family in the folder, not this weight',
+    ko: '폴더에 이 굵기 없음'
   },
-  'fonts.detailUploaded': {
-    en: (p) => `${p.file} · ${p.size} · ${n(Number(p.count), 'text node', 'text nodes')}`,
-    ko: '{file} · {size} · 텍스트 {count}개'
+  'fonts.rowVariableOnly': {
+    en: 'only a variable file in the folder — use its "static" folder',
+    ko: '폴더에 가변 파일뿐 — "static" 폴더를 고르세요'
   },
-  'fonts.detailMissing': {
-    en: (p) => `no file · ${n(Number(p.count), 'text node', 'text nodes')} · ${p.chars} chars`,
-    ko: '파일 없음 · 텍스트 {count}개 · {chars}자'
+  'fonts.rowUnusable': { en: "the folder's file can't be used", ko: '폴더의 파일을 쓸 수 없음' },
+  'fonts.rowUnchecked': { en: 'not found — scan incomplete', ko: '못 찾음 — 검사 미완료' },
+  'fonts.rowNoRoom': { en: 'no room', ko: '공간 부족' },
+  'fonts.rowSaveFailed': { en: 'could not save: {error}', ko: '저장 실패: {error}' },
+  'fonts.rowTooBig': { en: 'larger than the 5 MB limit', ko: '5MB 한도보다 큼' },
+  'fonts.rowRescan': { en: 'scan the folder again', ko: '폴더를 다시 스캔하세요' },
+  'fonts.retry': { en: 'Retry', ko: '다시 넣기' },
+  // ── 결과 상자 — 닫거나 다음 스캔까지 남는다 ────────────────
+  'fonts.scanBoxTitle': { en: 'Folder scan:', ko: '폴더 스캔:' },
+  'fonts.scanBoxSaved': { en: (p) => `${p.count} added`, ko: '{count}종 넣음' },
+  'fonts.scanBoxNoRoom': { en: (p) => `${p.count} out of room`, ko: '{count}종 공간 부족' },
+  'fonts.scanBoxUnsaved': { en: (p) => `${p.count} not saved`, ko: '{count}종 저장 못 함' },
+  'fonts.scanBoxNotFound': { en: (p) => `${p.count} not found`, ko: '{count}종 없음' },
+  'fonts.scanBoxStorage': {
+    en: '{need} needed, {free} free — delete stored fonts below, then',
+    ko: '필요 {need}, 남은 {free} — 아래 저장된 폰트를 지우고'
   },
+  'fonts.scanBoxRetryAll': { en: (p) => `Retry ${p.count}`, ko: '{count}종 다시 넣기' },
   'fonts.detailBuild': { en: ' · v{build}', ko: ' · v{build}' },
   'fonts.detailFigmaBuild': {
     en: ' · v{build}, the build Figma bundles',
@@ -371,10 +391,10 @@ const MESSAGES = {
   'fonts.detailVersion': { en: ' · file v{version}', ko: ' · 파일 v{version}' },
   'fonts.replace': { en: 'Replace', ko: '교체' },
   // ── 폰트 폴더에서 자동으로 찾기 ────────────────────────
-  'fonts.scanFolder': { en: 'Find in a font folder…', ko: '폰트 폴더에서 찾기…' },
+  'fonts.scanFolder': { en: 'Choose font folder…', ko: '폰트 폴더 선택…' },
   'fonts.scanHint': {
-    en: "Pick your font folder. In the dialog the files inside look greyed out — that's normal: select the folder itself and click Upload (Open on Windows). The matching .ttf/.otf files are added for you. Nothing leaves this computer.",
-    ko: '폰트 폴더를 고르세요. 선택창에서 안의 파일들이 회색으로 보이는 게 정상입니다 — 폴더 자체를 고르고 업로드(윈도우는 열기)를 누르면 맞는 .ttf/.otf 를 찾아 넣습니다. 파일은 이 컴퓨터 밖으로 나가지 않습니다.'
+    en: "Files look greyed out in the dialog — that's normal; select the folder itself. Nothing leaves this computer.",
+    ko: '개별 파일이 회색이어도 정상입니다 — 폴더 자체를 선택하세요. 파일은 이 컴퓨터 밖으로 나가지 않습니다.'
   },
   'fonts.scanning': {
     en: 'Reading fonts… {current}/{total}',
@@ -385,17 +405,53 @@ const MESSAGES = {
     ko: '폰트 {found}종을 추가했습니다'
   },
   'fonts.scanRest': {
-    en: (p) => ` · ${p.count} not in this folder`,
-    ko: ' · {count}종은 폴더에 없습니다'
+    en: (p) => `${p.count} not in this folder`,
+    ko: '{count}종은 폴더에 없습니다'
   },
-  'fonts.scanNone': {
-    en: 'No matching .ttf/.otf in that folder',
-    ko: '그 폴더에서 맞는 .ttf/.otf 를 찾지 못했습니다'
+  'fonts.scanAlternatives': {
+    en: (p) =>
+      `${p.count} had several matching files — the one that covers the document's glyphs, newest version first, was used`,
+    ko: '{count}종은 맞는 파일이 여럿이라 문서의 글자를 덮는 가장 새 판을 골랐습니다'
   },
-  'fonts.scanSkipped': {
-    en: (p) => ` · ${p.count} skipped (variable font, or no storage left)`,
-    ko: ' · {count}종은 넣지 못함 (가변 폰트이거나 저장 공간 부족)'
+  'fonts.scanSaveFailed': {
+    en: (p) => `${p.count} could not be saved (${p.error})`,
+    ko: '{count}종은 저장하지 못함 ({error})'
   },
+  'fonts.scanStyleMissing': {
+    en: (p) => `${p.count} found, but not in the needed weight or style`,
+    ko: '{count}종은 서체는 있지만 필요한 굵기·기울기가 폴더에 없음'
+  },
+  'fonts.scanVariableOnly': {
+    en: (p) =>
+      `${p.count} only as variable files — use the files in the download's "static" folder`,
+    ko: '{count}종은 가변 파일뿐 — 내려받은 폴더 안 "static" 파일을 쓰세요'
+  },
+  'fonts.scanUnusable': {
+    en: (p) => `${p.count} only in files the plugin cannot use`,
+    ko: '{count}종은 쓸 수 없는 파일뿐'
+  },
+  'fonts.scanUnchecked': {
+    en: (p) => `${p.count} not found (scan incomplete)`,
+    ko: '{count}종 못 찾음 (검사 미완료)'
+  },
+  'fonts.scanIncomplete': { en: 'scan incomplete: {detail}', ko: '검사 미완료: {detail}' },
+  'fonts.scanUnreadable': {
+    en: (p) => `${p.count} file(s) could not be read`,
+    ko: '{count}개 파일을 읽지 못함'
+  },
+  'fonts.scanBrokenFaces': {
+    en: (p) => `${p.count} face(s) inside collections could not be read`,
+    ko: '컬렉션 안의 face {count}개를 읽지 못함'
+  },
+  'fonts.scanCapFiles': {
+    en: (p) => `${p.count} file(s) not checked (limit)`,
+    ko: '{count}개 파일은 상한으로 검사하지 않음'
+  },
+  'fonts.scanCapMemory': {
+    en: 'stopped early — too much font data to hold at once; add the rest one by one',
+    ko: '중간에 멈춤 — 한 번에 들고 있을 폰트가 너무 많아 나머지는 하나씩 넣어 주세요'
+  },
+  'fonts.saveNoReply': { en: 'no reply from the plugin', ko: '플러그인이 응답하지 않음' },
   'fonts.add': { en: 'Add', ko: '넣기' },
   'fonts.parseError': {
     en: 'Could not read {file} as a font. It must be a static TTF/OTF.',
@@ -406,23 +462,17 @@ const MESSAGES = {
     ko: '이 파일을 넣을 공간이 없습니다 ({size}). 아래 "저장된 폰트" 에서 안 쓰는 것을 지워 주세요.'
   },
   'fonts.sectionThisFile': { en: 'Fonts in this file', ko: '이 파일의 폰트' },
-  'fonts.sectionAdd': { en: 'Add missing fonts', ko: '없는 폰트 넣기' },
   'fonts.storedTitle': { en: 'Stored fonts', ko: '저장된 폰트' },
-  'fonts.storageUsage': { en: '{used} of {limit}', ko: '{used} / {limit}' },
-  'fonts.storedHint': {
-    en: 'Kept by the plugin, not by the file — fonts added in other files show here too. Delete what you no longer use to free space (Figma allows 5 MB).',
-    ko: '파일이 아니라 플러그인에 저장됩니다 — 다른 파일에서 넣은 것도 여기 보입니다. 안 쓰는 것을 지우면 공간이 빕니다 (Figma 가 주는 한도는 5MB).'
-  },
+  'fonts.storageUsage': { en: 'storage {used} of {limit}', ko: '저장 공간 {used} / {limit}' },
+  'fonts.storedAside': { en: 'delete to free space', ko: '지우면 공간이 빕니다' },
   'fonts.storedInUse': { en: ' · used in this file', ko: ' · 이 파일에서 사용 중' },
   'fonts.storedNone': { en: 'Nothing stored yet', ko: '넣어 둔 폰트가 없습니다' },
-
-  // ── 진행·결과 ───────────────────────────────────────────
+  // 한 장뿐이면 "1/1" 은 아무것도 알려주지 않는다 — 여럿일 때만 숫자를 붙인다
   'progress.prepare': { en: 'Preparing…', ko: '준비 중…' },
   'progress.page': {
     en: 'Exporting page {page}/{pages}',
     ko: '{page}/{pages}쪽 내보내는 중'
   },
-  // 한 장뿐이면 "1/1" 은 아무것도 알려주지 않는다 — 여럿일 때만 숫자를 붙인다
   'progress.pageImages': {
     en: (p) =>
       Number(p.total) > 1
@@ -676,13 +726,13 @@ const MESSAGES = {
     en: 'Saved — but this file is {fileStyle}, so {slotStyle} text will export as {fileStyle}.',
     ko: '저장했습니다. 다만 이 파일은 {fileStyle} 굵기라, {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다.'
   },
-  'fonts.uploadHint': {
-    en: 'Upload a .ttf or .otf — one file per weight. Variable fonts may not apply correctly.',
-    ko: '.ttf 나 .otf 파일을 굵기마다 하나씩 올려 주세요. 가변(Variable) 폰트는 정상적으로 적용되지 않을 수 있습니다.'
-  },
   'font.ttc': {
-    en: 'Font collections (TTC) are not supported. Add a single TTF/OTF.',
-    ko: '폰트 컬렉션(TTC)은 지원하지 않습니다. 단일 TTF/OTF 파일을 넣어 주세요.'
+    en: 'This is a font collection (TTC) — add it from the Fonts screen so the right face is picked.',
+    ko: '폰트 컬렉션(TTC)입니다 — 폰트 화면에서 넣으면 맞는 face 를 골라 줍니다.'
+  },
+  'font.ttcNoFace': {
+    en: 'This collection has no {family} {style}. It contains: {faces}',
+    ko: '이 컬렉션에는 {family} {style} 이(가) 없습니다. 들어 있는 것: {faces}'
   },
 
   // ── 내보내기 실패 사유 ──────────────────────────────────
