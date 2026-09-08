@@ -57,21 +57,65 @@ export function factsOf(font: FontProbe): FontFacts {
     directory?: { tables?: Record<string, unknown> }
     variationAxes?: Record<string, unknown>
     fvar?: { axis?: Array<{ axisTag?: string; defaultValue?: number }> } | null
-    'OS/2'?: { usWeightClass?: number; fsSelection?: { italic?: boolean } } | null
+    'OS/2'?: {
+      usWeightClass?: number
+      fsSelection?: { italic?: boolean }
+      fsType?: FsType | number | null
+    } | null
     head?: { macStyle?: { italic?: boolean } } | null
     post?: { italicAngle?: number } | null
     subfamilyName?: string | null
     postscriptName?: string | null
   }
   const wght = inner.fvar?.axis?.find((axis) => axis.axisTag === 'wght')
+  const fsType = fsTypeOf(inner['OS/2']?.fsType)
   return {
     tables: Object.keys(inner.directory?.tables ?? {}),
     axes: Object.keys(inner.variationAxes ?? {}),
     weightClass: inner['OS/2']?.usWeightClass,
     italic: italicOf(inner),
     defaultWeight: wght?.defaultValue,
-    version: parseFontVersion((font as unknown as { version?: string }).version)
+    version: parseFontVersion((font as unknown as { version?: string }).version),
+    ...(fsType === undefined
+      ? {}
+      : { embedding: embeddingOf(fsType), noSubsetting: fsType.noSubsetting })
   }
+}
+
+/** fontkit 이 푼 OS/2 fsType 비트 — 판이 다르면 숫자로 올 수도 있다 */
+type FsType = {
+  noEmbedding?: boolean
+  viewOnly?: boolean
+  editable?: boolean
+  noSubsetting?: boolean
+  bitmapOnly?: boolean
+}
+
+function fsTypeOf(raw: FsType | number | null | undefined): FsType | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw === 'number') {
+    return {
+      noEmbedding: (raw & 0x0002) !== 0,
+      viewOnly: (raw & 0x0004) !== 0,
+      editable: (raw & 0x0008) !== 0,
+      noSubsetting: (raw & 0x0100) !== 0,
+      bitmapOnly: (raw & 0x0200) !== 0
+    }
+  }
+  return raw
+}
+
+/**
+ * 임베드 허용 등급. OpenType 규격: 비트 1(Restricted)·2(Preview & Print)·3(Editable)이 여럿 켜져 있으면
+ * 덜 제한적인 쪽이 적용된다 — 실측 Futura Medium 은 Restricted+Preview 라 Preview 다.
+ * 비트맵 전용은 윤곽을 넣을 수 없으니 따로 본다.
+ */
+export function embeddingOf(fsType: FsType): FontFacts['embedding'] {
+  if (fsType.bitmapOnly === true) return 'bitmap-only'
+  if (fsType.editable === true) return 'editable'
+  if (fsType.viewOnly === true) return 'preview'
+  if (fsType.noEmbedding === true) return 'restricted'
+  return 'installable'
 }
 
 /**

@@ -104,3 +104,32 @@ describe('factsOf — 기울임 판정', () => {
     expect(facts({ directory: { tables: {} } })).toBeUndefined()
   })
 })
+
+describe('factsOf — 임베드 플래그(OS/2 fsType)', () => {
+  const facts = (fsType: unknown): ReturnType<typeof factsOf> =>
+    factsOf({
+      directory: { tables: {} },
+      'OS/2': { usWeightClass: 400, fsType }
+    } as unknown as Parameters<typeof factsOf>[0])
+
+  it('여러 비트가 켜지면 덜 제한적인 쪽 — Futura Medium(Restricted+Preview) 은 Preview', () => {
+    expect(facts({ noEmbedding: true, viewOnly: true }).embedding).toBe('preview')
+    expect(facts({ noEmbedding: true }).embedding).toBe('restricted')
+    expect(facts({ editable: true }).embedding).toBe('editable')
+    expect(facts({}).embedding).toBe('installable')
+    expect(facts({ bitmapOnly: true, editable: true }).embedding).toBe('bitmap-only')
+  })
+
+  it('숫자로 와도 읽는다 — 0x0002 Restricted, 0x0006 Preview, 0x0108 Editable + No subsetting', () => {
+    expect(facts(0x0002).embedding).toBe('restricted')
+    expect(facts(0x0006).embedding).toBe('preview')
+    expect(facts(0x0108)).toMatchObject({ embedding: 'editable', noSubsetting: true })
+    expect(facts(0).noSubsetting).toBe(false)
+  })
+
+  it('OS/2 가 없으면 모른다', () => {
+    const none = factsOf({ directory: { tables: {} } } as unknown as Parameters<typeof factsOf>[0])
+    expect(none.embedding).toBeUndefined()
+    expect(none.noSubsetting).toBeUndefined()
+  })
+})

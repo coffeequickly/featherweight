@@ -114,6 +114,7 @@ export function scanDetailLines(result: ScanResult, outcome: SaveOutcome): strin
     'family-missing': 0,
     'style-missing': 0,
     'variable-only': 0,
+    restricted: 0,
     unusable: 0,
     unchecked: 0
   }
@@ -129,6 +130,7 @@ export function scanDetailLines(result: ScanResult, outcome: SaveOutcome): strin
   if (counts['variable-only'] > 0) {
     lines.push(t('fonts.scanVariableOnly', { count: counts['variable-only'] }))
   }
+  if (counts.restricted > 0) lines.push(t('fonts.scanRestricted', { count: counts.restricted }))
   if (counts.unusable > 0) lines.push(t('fonts.scanUnusable', { count: counts.unusable }))
   if (counts['family-missing'] > 0) {
     lines.push(t('fonts.scanRest', { count: counts['family-missing'] }))

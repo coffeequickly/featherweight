@@ -365,6 +365,10 @@ const MESSAGES = {
     en: 'only a variable file in the folder — use its "static" folder',
     ko: '폴더에 가변 파일뿐 — "static" 폴더를 고르세요'
   },
+  'fonts.rowRestricted': {
+    en: "the folder's file forbids embedding (license flag)",
+    ko: '폴더의 파일이 임베드를 금지함 (라이선스)'
+  },
   'fonts.rowUnusable': { en: "the folder's file can't be used", ko: '폴더의 파일을 쓸 수 없음' },
   'fonts.rowUnchecked': { en: 'not found — scan incomplete', ko: '못 찾음 — 검사 미완료' },
   'fonts.rowNoRoom': { en: 'no room', ko: '공간 부족' },
@@ -425,6 +429,10 @@ const MESSAGES = {
     en: (p) =>
       `${p.count} only as variable files — use the files in the download's "static" folder`,
     ko: '{count}종은 가변 파일뿐 — 내려받은 폴더 안 "static" 파일을 쓰세요'
+  },
+  'fonts.scanRestricted': {
+    en: (p) => `${p.count} only in files whose license forbids embedding`,
+    ko: '{count}종은 임베드를 금지한 파일뿐'
   },
   'fonts.scanUnusable': {
     en: (p) => `${p.count} only in files the plugin cannot use`,
@@ -706,6 +714,14 @@ const MESSAGES = {
     en: 'No usable glyphs in this file. Upload a .ttf or .otf.',
     ko: '이 파일에서 쓸 수 있는 글자 모양을 찾지 못했습니다. .ttf 나 .otf 파일을 올려 주세요.'
   },
+  'fontFile.restricted': {
+    en: "This font's license flag forbids embedding it in documents, so it stays as outlines. Use a font whose license allows embedding.",
+    ko: '이 폰트는 문서에 넣는 것을 금지하는 라이선스 플래그가 있어 아웃라인으로 남습니다. 임베드를 허용하는 폰트를 쓰세요.'
+  },
+  'fontFile.bitmapOnly': {
+    en: 'This font allows only bitmap embedding, so its outlines cannot go into a PDF.',
+    ko: '이 폰트는 비트맵 임베드만 허용해 글자 윤곽을 PDF 에 넣을 수 없습니다.'
+  },
   'fonts.fileVariable': {
     en: 'Variable font file · {slotStyle} text will export in a different weight · replace with the {slotStyle} .ttf/.otf',
     ko: '가변 폰트 파일 · {slotStyle} 텍스트가 다른 굵기로 나갑니다 · {slotStyle} .ttf/.otf 로 교체하세요'
@@ -717,6 +733,10 @@ const MESSAGES = {
   'fonts.fileUnusable': {
     en: 'This file cannot be embedded · replace with the {slotStyle} .ttf/.otf',
     ko: '넣을 수 없는 파일 · {slotStyle} .ttf/.otf 로 교체하세요'
+  },
+  'fonts.fileRestricted': {
+    en: "{slotStyle}: this file's license flag forbids embedding — the text stays as outlines. Replace it with a font that allows embedding.",
+    ko: '{slotStyle}: 이 파일은 임베드를 금지해 텍스트가 아웃라인으로 나갑니다 · 임베드를 허용하는 폰트로 교체하세요'
   },
   'fonts.fileMismatch': {
     en: '{fileStyle} file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} file',

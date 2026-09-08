@@ -19,7 +19,12 @@ export function problemText(problem: StoredFileProblem, slotStyle: string): stri
       ? t('fonts.fileVariable', { slotStyle })
       : t('fonts.fileVariableAs', { slotStyle, fileStyle: weightName(problem.defaultWeight) })
   }
-  if (problem.kind === 'unusable') return t('fonts.fileUnusable', { slotStyle })
+  if (problem.kind === 'unusable') {
+    return problem.reason.code === 'fontFile.restricted' ||
+      problem.reason.code === 'fontFile.bitmapOnly'
+      ? t('fonts.fileRestricted', { slotStyle })
+      : t('fonts.fileUnusable', { slotStyle })
+  }
   return t('fonts.fileMismatch', {
     slotStyle,
     fileStyle: weightName(problem.fileWeight, problem.fileItalic)

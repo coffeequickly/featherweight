@@ -237,6 +237,35 @@ describe.skipIf(!existsSync(NEUE))(
   }
 )
 
+// 임베드 플래그 실측(2026-09-08): Helvetica Neue Installable, Apple SD Gothic Neo Editable, DIN Alternate Preview,
+// Futura Medium 은 Restricted+Preview 비트가 같이 켜져 있다 — 규격대로 덜 제한적인 Preview 로 읽어 통과시킨다
+const FUTURA = '/System/Library/Fonts/Supplemental/Futura.ttc'
+const DIN = '/System/Library/Fonts/Supplemental/DIN Alternate Bold.ttf'
+
+describe.skipIf(
+  !existsSync(NEUE) || !existsSync(GOTHIC) || !existsSync(FUTURA) || !existsSync(DIN)
+)('macOS 임베드 플래그 실물', () => {
+  const faceOf = (path: string, family: string, sub: string): ReturnType<typeof factsOf> => {
+    const faces = collectionFaces(new Uint8Array(readFileSync(path))) ?? []
+    const face = faces.find(
+      (candidate) => namesOf(candidate).family === family && namesOf(candidate).subfamily === sub
+    )
+    expect(face).toBeDefined()
+    return factsOf(face as NonNullable<typeof face>)
+  }
+
+  it('Installable·Editable·Preview 는 통과한다', () => {
+    expect(faceOf(NEUE, 'Helvetica Neue', 'Regular').embedding).toBe('installable')
+    expect(faceOf(GOTHIC, 'Apple SD Gothic Neo', 'Regular').embedding).toBe('editable')
+    const futura = faceOf(FUTURA, 'Futura', 'Medium')
+    expect(futura.embedding).toBe('preview')
+    expect(screenFontFile(futura).ok).toBe(true)
+    const din = factsOf(createProbe(new Uint8Array(readFileSync(DIN))))
+    expect(din.embedding).toBe('preview')
+    expect(screenFontFile(din).ok).toBe(true)
+  })
+})
+
 describe.skipIf(!existsSync(GOTHIC))('macOS AppleSDGothicNeo.ttc — CFF 컬렉션 (로컬 실물)', () => {
   it('Regular face 를 뽑아 한글을 서브셋 임베드한다', async () => {
     const bytes = new Uint8Array(readFileSync(GOTHIC))

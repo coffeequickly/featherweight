@@ -40,9 +40,24 @@ export function screenFontFile(facts: FontFacts): FontVerdict {
     return { ok: false, reason: { code: 'fontFile.variable', params: {} } }
   }
 
+  const forbidden = embeddingForbidden(facts)
+  if (forbidden !== null) return { ok: false, reason: forbidden }
+
   if (!hasGlyf && !hasCff) return { ok: false, reason: { code: 'fontFile.noOutlines', params: {} } }
 
   return { ok: true }
+}
+
+/**
+ * 폰트 자신이 문서 임베드를 금지하는가(OS/2 fsType). Acrobat·Word·브라우저가 지키는 플래그다 —
+ * 폴더 스캔이 시스템·상용 폰트를 한꺼번에 끌어오게 된 뒤로는 우리도 지켜야 한다.
+ * Preview & Print 는 PDF 로 보고 인쇄하라는 허용이라 통과, Restricted 만 있는 것과 비트맵 전용은 거절.
+ * 플래그를 모르면(옛 항목) 막지 않는다.
+ */
+export function embeddingForbidden(facts: FontFacts): Reason | null {
+  if (facts.embedding === 'restricted') return { code: 'fontFile.restricted', params: {} }
+  if (facts.embedding === 'bitmap-only') return { code: 'fontFile.bitmapOnly', params: {} }
+  return null
 }
 
 /** "Version 3.019;git-0a5106e0b" → "3.019". 숫자가 없으면 undefined */

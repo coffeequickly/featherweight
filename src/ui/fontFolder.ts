@@ -46,7 +46,7 @@ export type FoundFont = {
 }
 
 export type ScanReason =
-  'family-missing' | 'style-missing' | 'variable-only' | 'unusable' | 'unchecked'
+  'family-missing' | 'style-missing' | 'variable-only' | 'restricted' | 'unusable' | 'unchecked'
 
 export type ScanResult = {
   found: Map<string, FoundFont>
@@ -94,6 +94,8 @@ type Candidate = FontFileNames & {
   facts: FontFacts
   usable: boolean
   variable: boolean
+  /** 파일 자신이 임베드를 금지한다(라이선스 플래그) */
+  restricted: boolean
 }
 
 /** face 마다 이름표·사실을 읽는다. 읽지 못한 face 는 세어 둔다 — 조용히 빼면 "없음" 으로 보인다 */
@@ -118,7 +120,11 @@ function candidatesOf(
         face,
         facts,
         usable: verdict.ok,
-        variable: !verdict.ok && verdict.reason.code === 'fontFile.variable'
+        variable: !verdict.ok && verdict.reason.code === 'fontFile.variable',
+        restricted:
+          !verdict.ok &&
+          (verdict.reason.code === 'fontFile.restricted' ||
+            verdict.reason.code === 'fontFile.bitmapOnly')
       })
     } catch {
       broken += 1
@@ -181,6 +187,7 @@ export function compareCandidates(a: Scored, b: Scored): number {
 type Evidence = {
   family: boolean
   variable: boolean
+  restricted: boolean
   unusable: boolean
   /** 등급별로 본 쓸 수 있는 후보 수 */
   usableByTier: [number, number, number]
@@ -221,7 +228,13 @@ export async function findFontFiles(
   const evidenceOf = (key: string): Evidence => {
     let found = evidence.get(key)
     if (found === undefined) {
-      found = { family: false, variable: false, unusable: false, usableByTier: [0, 0, 0] }
+      found = {
+        family: false,
+        variable: false,
+        restricted: false,
+        unusable: false,
+        usableByTier: [0, 0, 0]
+      }
       evidence.set(key, found)
     }
     return found
@@ -270,6 +283,7 @@ export async function findFontFiles(
       const usable = matched.filter((entry) => entry.candidate.usable)
       if (matched.length > 0 && usable.length === 0) {
         if (matched.some((entry) => entry.candidate.variable)) evidenceFor.variable = true
+        else if (matched.some((entry) => entry.candidate.restricted)) evidenceFor.restricted = true
         else evidenceFor.unusable = true
       }
       if (usable.length === 0) continue
@@ -349,11 +363,13 @@ export async function findFontFiles(
         ? 'unchecked'
         : evidenceFor?.variable
           ? 'variable-only'
-          : evidenceFor?.unusable
-            ? 'unusable'
-            : evidenceFor?.family
-              ? 'style-missing'
-              : 'family-missing'
+          : evidenceFor?.restricted
+            ? 'restricted'
+            : evidenceFor?.unusable
+              ? 'unusable'
+              : evidenceFor?.family
+                ? 'style-missing'
+                : 'family-missing'
     )
   }
   return result

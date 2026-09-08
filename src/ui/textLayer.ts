@@ -22,6 +22,7 @@ import {
 } from 'pdf-lib'
 
 import { catalogEntry } from '../lib/fontCatalog'
+import { embeddingForbidden } from '../lib/fontFile'
 import { matchFont } from '../lib/fontMatch'
 import { styleForRun } from '../lib/runStyle'
 import { codePointsOf, parseSvgText, ParseXml, SvgRun } from '../lib/svgText'
@@ -31,7 +32,7 @@ import { kernAdjustments } from '../lib/kerning'
 import { needsShaping } from '../lib/shaping'
 import { LinkSpan, linkSpansForRun } from '../lib/textLinks'
 import { FontRef, Reason, StoredFont, TextRunSource } from '../lib/types'
-import { createProbe, FontProbe, pdfLibFontkit } from './fontkitAdapter'
+import { createProbe, factsOf, FontProbe, pdfLibFontkit } from './fontkitAdapter'
 
 export type FontBytesLookup = (ref: FontRef) => Promise<Uint8Array | undefined>
 
@@ -103,7 +104,15 @@ export class FontCache {
 
     try {
       const probe = createProbe(bytes)
-      const font = await this.document.embedFont(bytes, { subset: true, features: { ...features } })
+      // 파일 자신이 임베드를 금지하면 넣지 않는다 — 옛 버전이 저장한 파일도 여기서 걸린다.
+      // "No subsetting" 이면 서브셋 대신 전체를 넣는다
+      const facts = factsOf(probe)
+      const forbidden = embeddingForbidden(facts)
+      if (forbidden !== null) return { ok: false, reason: forbidden }
+      const font = await this.document.embedFont(bytes, {
+        subset: facts.noSubsetting !== true,
+        features: { ...features }
+      })
       this.embedded.set(key, font)
       this.parsed.set(key, probe)
       return { ok: true, font, probe, covers: (points) => missingFrom(probe, points) }

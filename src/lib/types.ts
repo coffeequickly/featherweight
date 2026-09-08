@@ -146,6 +146,13 @@ export type FontFileFacts = {
   defaultWeight?: number
   /** name 테이블의 버전 숫자("3.019") — 같은 이름의 다른 판을 가려내는 데 쓴다 */
   version?: string
+  /**
+   * OS/2 fsType 의 임베드 허용. 규격대로 여러 비트가 켜져 있으면 덜 제한적인 쪽이다.
+   * 없으면(OS/2 없음·옛 항목) 모른다 — 막지 않는다.
+   */
+  embedding?: 'installable' | 'editable' | 'preview' | 'restricted' | 'bitmap-only'
+  /** fsType 의 "No subsetting" — 서브셋 대신 전체를 넣어야 한다 */
+  noSubsetting?: boolean
 }
 
 export type StoredFont = FontRef & {

@@ -12,6 +12,7 @@ type FakeFace = {
   version?: string
   numGlyphs?: number
   broken?: boolean
+  embedding?: 'installable' | 'editable' | 'preview' | 'restricted' | 'bitmap-only'
 }
 
 const { registry } = vi.hoisted(() => ({ registry: new Map<string, FakeFace[]>() }))
@@ -59,7 +60,8 @@ vi.mock('../src/ui/fontkitAdapter', () => {
         axes: face._face.variable === true ? ['wght'] : [],
         weightClass: face._face.weight,
         italic: face._face.italic,
-        version: face._face.version
+        version: face._face.version,
+        embedding: face._face.embedding
       }
     }
   }
@@ -239,5 +241,22 @@ describe('findFontFiles — 상한', () => {
     expect(result.memoryCapped).toBe(true)
     expect(result.found.size).toBe(0)
     expect(result.reasons.get(k('Montserrat', 'Regular'))).toBe('unchecked')
+  })
+})
+
+describe('findFontFiles — 임베드를 금지한 파일', () => {
+  it('금지 파일뿐이면 restricted 로 말하고, 허용 파일이 있으면 그것을 고른다', async () => {
+    const restricted = fakeFile('Corp-Regular.ttf', [regular('Corp', { embedding: 'restricted' })])
+    const only = await findFontFiles([restricted], [usage('Corp', 'Regular', 400)], progress)
+    expect(only.found.size).toBe(0)
+    expect(only.reasons.get(k('Corp', 'Regular'))).toBe('restricted')
+
+    const allowed = fakeFile('Corp-Regular-Web.ttf', [regular('Corp', { embedding: 'preview' })])
+    const both = await findFontFiles(
+      [restricted, allowed],
+      [usage('Corp', 'Regular', 400)],
+      progress
+    )
+    expect(both.found.get(k('Corp', 'Regular'))?.fileName).toBe('Corp-Regular-Web.ttf')
   })
 })

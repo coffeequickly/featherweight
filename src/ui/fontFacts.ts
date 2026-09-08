@@ -16,8 +16,14 @@ const failed = new Set<string>()
 
 export async function backfillFontFacts(stored: readonly StoredFont[]): Promise<void> {
   for (const font of stored) {
-    // 사실이 다 있으면 안 읽는다. 버전 칸이 생기기 전에 적힌 사실은 한 번 더 읽어 채운다
-    if (font.facts !== undefined && font.facts.version !== undefined) continue
+    // 사실이 다 있으면 안 읽는다. 버전·임베드 플래그 칸이 생기기 전에 적힌 사실은 한 번 더 읽어 채운다
+    if (
+      font.facts !== undefined &&
+      font.facts.version !== undefined &&
+      font.facts.embedding !== undefined
+    ) {
+      continue
+    }
     const key = fontKey(font)
     if (inFlight.has(key) || failed.has(key)) continue
     inFlight.add(key)

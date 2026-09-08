@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { FontFacts, parseFontVersion, screenFontFile, weightMismatch } from '../src/lib/fontFile'
+import {
+  embeddingForbidden,
+  FontFacts,
+  parseFontVersion,
+  screenFontFile,
+  weightMismatch
+} from '../src/lib/fontFile'
 
 const TTF: FontFacts = { tables: ['glyf', 'loca', 'cmap', 'head', 'OS/2'], axes: [] }
 
@@ -83,5 +89,32 @@ describe('parseFontVersion', () => {
   it('숫자가 없거나 비어 있으면 undefined', () => {
     expect(parseFontVersion('Version')).toBeUndefined()
     expect(parseFontVersion(undefined)).toBeUndefined()
+  })
+})
+
+describe('screenFontFile — 임베드 허용 플래그(OS/2 fsType)', () => {
+  it('Restricted 만 있는 파일과 비트맵 전용은 거절한다 — Acrobat·브라우저와 같은 규칙', () => {
+    const restricted = screenFontFile({ ...TTF, embedding: 'restricted' })
+    expect(restricted.ok).toBe(false)
+    if (!restricted.ok) expect(restricted.reason.code).toBe('fontFile.restricted')
+    const bitmap = screenFontFile({ ...TTF, embedding: 'bitmap-only' })
+    expect(bitmap.ok).toBe(false)
+    if (!bitmap.ok) expect(bitmap.reason.code).toBe('fontFile.bitmapOnly')
+  })
+
+  it('Preview & Print·Editable·Installable 은 통과 — PDF 로 보고 인쇄하라는 허용이 바로 그것이다', () => {
+    for (const embedding of ['preview', 'editable', 'installable'] as const) {
+      expect(screenFontFile({ ...TTF, embedding })).toEqual({ ok: true })
+    }
+  })
+
+  it('플래그를 모르면(옛 항목) 막지 않는다', () => {
+    expect(screenFontFile(TTF)).toEqual({ ok: true })
+    expect(embeddingForbidden(TTF)).toBeNull()
+  })
+
+  it('가변 폰트 검사가 먼저다 — 둘 다면 가변으로 말한다', () => {
+    const verdict = screenFontFile({ ...TTF, axes: ['wght'], embedding: 'restricted' })
+    if (!verdict.ok) expect(verdict.reason.code).toBe('fontFile.variable')
   })
 })

@@ -515,6 +515,8 @@ function notFoundLabel(outcome: Extract<RowOutcome, { kind: 'not-found' }>): str
       return t('fonts.rowStyleMissing')
     case 'variable-only':
       return t('fonts.rowVariableOnly')
+    case 'restricted':
+      return t('fonts.rowRestricted')
     case 'unusable':
       return t('fonts.rowUnusable')
     case 'unchecked':
