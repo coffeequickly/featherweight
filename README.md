@@ -78,7 +78,7 @@ The Fonts screen lists every font your document uses, in one of three states:
 | State | What happens |
 |---|---|
 | In catalog | Downloaded from a CDN (jsDelivr) at export time and embedded. Nothing to do |
-| Added by you | Add a static TTF or OTF once — or pick your font folder and the matching files are found for you (font collections such as macOS's `.ttc` files work; the right face is picked). Stored and embedded from then on |
+| Added by you | Add a static TTF or OTF once — or pick your font folder and the matching files are found for you (`.ttc` collections — the format macOS and Windows ship system fonts in, from Helvetica Neue to Gulim — work; the right face is picked). Stored and embedded from then on |
 | No file | **Kept as outlines** — identical look, you just don't get the size and search benefits |
 
 **Fonts are never substituted.** If a font can't be embedded, the original
