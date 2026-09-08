@@ -78,11 +78,24 @@ The Fonts screen lists every font your document uses, in one of three states:
 | State | What happens |
 |---|---|
 | In catalog | Downloaded from a CDN (jsDelivr) at export time and embedded. Nothing to do |
-| Added by you | Add a static TTF or OTF once — or pick your font folder and the matching files are found for you. Stored and embedded from then on |
+| Added by you | Add a static TTF or OTF once — or pick your font folder and the matching files are found for you (font collections such as macOS's `.ttc` files work; the right face is picked). Stored and embedded from then on |
 | No file | **Kept as outlines** — identical look, you just don't get the size and search benefits |
 
 **Fonts are never substituted.** If a font can't be embedded, the original
 outlines stay exactly as Figma drew them.
+
+Figma doesn't hand plugins the fonts installed on your computer, which is why
+anything outside the catalog needs its file once. Variable font files (one file
+holding every weight, the default download from Google Fonts) are skipped —
+use the files in the download's `static` folder. Google names the static files
+of optical-size families "Inter 18pt" or "Merriweather 24pt": the scan maps
+them to the family Figma shows and picks the size closest to your text. Width
+variants such as "Open Sans Condensed" are matched by name, never swapped for
+the normal width. After a scan each font says what was found and why it
+wasn't added; if the plugin's 5 MB of storage is full, the screen shows the
+space needed and a Retry that saves the file once you free some. When you add system or
+commercial fonts, make sure their license allows embedding in documents you
+share; most do for PDFs.
 
 Auto-downloaded families (all SIL OFL 1.1):
 

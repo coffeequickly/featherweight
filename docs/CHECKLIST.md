@@ -183,6 +183,60 @@ for a document with nothing to outline; `report=1` for the result card).
 ## Fonts & fallback
 
 - [ ] A catalog font (e.g. Nanum Gothic) is embedded with no upload needed
+- [ ] A catalog font whose style Figma spells differently ("Semi Bold" vs
+      "SemiBold", "Regular Italic" vs "Italic", a "… Variable" family) still
+      shows as "auto-downloaded"
+- [ ] macOS: "Find in a font folder…" on /System/Library/Fonts adds Helvetica
+      Neue and Apple SD Gothic Neo from their .ttc collections, and the stored
+      entry says "HelveticaNeue.ttc (Bold)"; exporting embeds them (`pdffonts`
+      shows Helvetica Neue as CID TrueType, Apple SD Gothic Neo as CID Type 0C)
+- [ ] Uploading a .ttc to a slot it doesn't contain (e.g. Helvetica.ttc for
+      "Helvetica Neue Bold") says which faces the collection has
+- [ ] A Google Fonts download folder holding both the variable file and a
+      `static` folder: the scan adds the static weights (not the variable file),
+      and a folder with only the variable file reports "only as variable files"
+- [ ] An optical-size family whose static files are all suffixed (Inter,
+      Merriweather, Newsreader, Fraunces, Bodoni Moda — "Inter 18pt" in the
+      name table) is found under the family name Figma shows; with the text at
+      14 px the 18pt file is picked, at 40 px the 28pt file
+- [ ] "Open Sans" / "Condensed Bold" (variable Open Sans installed) gets
+      `OpenSans_Condensed-Bold.ttf`, not the normal-width Bold; with no
+      Condensed file in the folder the font is reported as weight missing
+- [ ] The scan summary counts what happened per font: added, several matching
+      files (newest used), could not be saved (with the reason), weight missing,
+      variable only, unusable, not in this folder; with an unreadable file in
+      the folder the wording changes to "not found (scan incomplete)"
+- [ ] "Added N" only counts fonts the plugin confirmed saving; fill the storage
+      close to 5 MB first and the summary reports the failed saves
+- [ ] After a folder scan the result stays on the Fonts screen (a two-line box:
+      "Folder scan: 3 added · 4 out of room · 1 not found", then "X needed,
+      Y free" with "Retry N") until it is closed or the next scan starts — also
+      after switching screens and back; no toast is involved
+- [ ] Each font row is two lines and the second says what the scan found:
+      "no room · size · file" with a Retry button in place of Add; "not in that
+      folder"; "family in the folder, not this weight"; "only a variable file —
+      use its static folder"; "not found — scan incomplete". Never a bare "no
+      file" for a font the scan found; no text-node counts, no paragraphs
+      between the rows, and a long file name never hides the reason
+- [ ] With the storage nearly full: scan, delete a stored font, press Retry on
+      the row (or "Retry N" in the box) — the font is saved without picking the
+      folder again and the row switches to the file; a font larger than 5 MB
+      says so instead of offering Retry
+- [ ] Storage use ("storage X of 5.0MB" and the bar) shows at the top of the
+      Fonts screen; the folder button reads "Choose font folder…" and the line
+      under it says the greyed-out files are normal
+- [ ] Nothing stored is deleted automatically when a scan runs out of room —
+      deleting is always the user's click under "Stored fonts"
+- [ ] macOS: Helvetica Neue "Medium Italic" and "Thin Italic" from the .ttc are
+      stored without a "will export as Medium weight" warning (their italic
+      bits are unset in the file; the name decides)
+- [ ] Memory: scanning /System/Library/Fonts (370 files, 778 MB) with a font that
+      is not there finishes in about a second and the plugin stays responsive.
+      Node measurement 2026-09-08: reading every file gave peak RSS 1 GB from
+      file buffers awaiting GC (heap 21 MB, retained faces 3 MB); with files
+      over 32 MB whose names don't match skipped (4 of 370, reported as not
+      checked) the peak is 400 MB in 0.6 s. The 64 MB cap is on retained faces,
+      not on the peak
 - [ ] A font outside the catalog shows "no file" and stays as outlines — the
       checklist's Fonts row warns with the font's name and "Add fonts ›" opens
       the Fonts screen
