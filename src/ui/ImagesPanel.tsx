@@ -11,6 +11,7 @@
 import { Checkbox, Muted, RangeSlider, Text, VerticalSpace } from '@create-figma-plugin/ui'
 import { Fragment, JSX } from 'preact'
 
+import { OVERFLOW_NOTICE } from '../lib/clipRect'
 import { t } from '../lib/i18n'
 import { imageRoster } from '../lib/preflight'
 import { presetOf, PRESETS } from '../lib/presets'
@@ -41,6 +42,8 @@ type Props = {
 export function ImagesPanel({ settings, preflight, disabled, onChange }: Props): JSX.Element {
   const fit = settings.fitToSize
   const rows = preflight === null ? [] : imageRoster(preflight, settings)
+  // 프레임 밖으로 넘쳐 잘리는 것들 — 안 보이는 픽셀을 싣고 있다는 사실은 목록 아래서 한 번 더 말한다
+  const clipped = rows.filter((row) => !row.kept && row.visible < OVERFLOW_NOTICE)
   const shrink = rows.filter((row) => !row.kept).length
   const capped = rows.filter((row) => row.capped).length
 
@@ -135,11 +138,25 @@ export function ImagesPanel({ settings, preflight, disabled, onChange }: Props):
                       {row.kept ? <Muted>{t('images.listKept')}</Muted> : `→ ${row.target}px`}
                     </Text>
                   </div>
+                  {/* 프레임 밖으로 넘쳐 잘리는 그림 — 안 보이는 픽셀도 파일에 실린다 */}
+                  {row.visible < OVERFLOW_NOTICE ? (
+                    <span class="imageClipped">
+                      {t('images.listClipped', { percent: Math.round(row.visible * 100) })}
+                    </span>
+                  ) : null}
                 </div>
               ))}
             </div>
             {rows.length <= ROWS_SHOWN ? null : (
               <Says text={t('images.listMore', { count: rows.length - ROWS_SHOWN })} />
+            )}
+            {clipped.length === 0 ? null : (
+              <Says
+                text={t('images.clippedSays', {
+                  count: clipped.length,
+                  percent: Math.round(Math.min(...clipped.map((row) => row.visible)) * 100)
+                })}
+              />
             )}
           </Fragment>
         )}

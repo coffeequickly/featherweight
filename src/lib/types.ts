@@ -4,6 +4,7 @@ export const TMP_NODE_NAME = '__sheaf_tmp__'
 /** 임시 클론의 소유권 표식(pluginData 키). 이름은 사용자도 쓸 수 있지만 이 키는 우리만 쓴다 */
 export const TMP_MARK_KEY = 'sheaf.tmp'
 import type { MessageKey } from './i18n'
+import type { PixelSize } from './imageDensity'
 
 export const SETTINGS_KEY = 'sheaf.settings.v1'
 
@@ -295,6 +296,18 @@ export type ImageUsage = {
   width: number
   height: number
   scaleMode: 'FILL' | 'FIT' | 'CROP' | 'TILE'
+  /**
+   * CROP 일 때 원본의 몇 분의 몇이 이 자리에 보이는가(축별, 0~1).
+   * 없으면 온전히 보이는 것으로 본다.
+   */
+  crop?: { x: number; y: number }
+  /**
+   * 클립 안에 남는 넓이의 비(0~1). 1 이면 온전히 보인다.
+   *
+   * 프레임 밖으로 넘치는 그림은 넘친 만큼이 안 보이는데도 목표 픽셀은 노드 전체로 잡힌다 —
+   * 자르지 않고 통째로 줄이기 때문이다. 그 낭비를 화면이 말할 수 있게 재 둔다.
+   */
+  visible: number
 }
 
 export type PreflightFrame = {
@@ -317,6 +330,11 @@ export type Preflight = {
   frames: PreflightFrame[]
   /** 이미지 해시 → 원본 긴 변(px). 크기를 못 읽은 이미지는 빠진다. */
   imageEdges: Record<string, number>
+  /**
+   * 이미지 해시 → 원본 양변(px). 잘라 쓰거나 비율이 어긋난 자리의 목표를 셈하려면
+   * 긴 변만으로는 부족하다 — 밀도를 정하는 축이 짧은 변일 수 있다.
+   */
+  imageSizes?: Record<string, PixelSize>
   textRejects: TextReject[]
   /** 원본 크기를 아직 읽는 중 — imageEdges 에 빠진 것이 "못 읽음" 이 아니라 "아직" 이다 */
   sizing?: boolean

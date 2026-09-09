@@ -2,11 +2,13 @@
 //
 // export 옵션으로는 이미지 품질을 못 건드리므로(C2) export 전에 fill 자체를 바꾼다.
 
+import { intersect, Rect, visibleFraction } from '../lib/clipRect'
+import { cropFractions, PixelSize } from '../lib/imageDensity'
 import {
   ImagePlan,
   KEEP_BYTES_FLOOR,
   planImageTargets,
-  skipFloor,
+  shouldShrink,
   settleDelayMs,
   transformScale
 } from '../lib/imageTarget'
@@ -18,7 +20,7 @@ import {
   Settings
 } from '../lib/types'
 import { withTimeout } from '../lib/withTimeout'
-import { knownEdge, persistEdgeCache, readEdge, rememberEdge } from './imageSize'
+import { knownEdge, knownSize, persistEdgeCache, readSize, rememberSize } from './imageSize'
 import { awaitResponse, nextRequestId } from './bridge'
 
 export type ImageStats = {
@@ -95,6 +97,20 @@ function bytesOf(image: Image, hash: string): Promise<Uint8Array> {
 }
 
 /**
+ * 지금까지 읽어 둔 원본 크기. 선택 시점의 예고(selection.ts 의 imageEdges)가 채워 두므로
+ * 내보낼 때는 대개 다 알고 있다. 모르는 것은 빠지고, targetFor 가 옛 계산으로 물러선다.
+ */
+function knownSizes(usages: readonly ImageUsage[]): Record<string, PixelSize> {
+  const out: Record<string, PixelSize> = {}
+  for (const usage of usages) {
+    if (out[usage.imageHash] !== undefined) continue
+    const size = knownSize(usage.imageHash)
+    if (size !== undefined) out[usage.imageHash] = size
+  }
+  return out
+}
+
+/**
  * 탐색용: 이 프로필로 처리한다면 각 이미지의 목표 크기가 얼마인지.
  * 실제 처리는 하지 않는다 — UI 가 바이트만 재보게 넘길 목록이다.
  */
@@ -103,17 +119,21 @@ export function planFor(
   profile: { multiplier: number; maxEdge: number }
 ): ImagePlan[] {
   const usages = collectImageUsages(root)
-  return planImageTargets(usages, {
-    multiplier: profile.multiplier as Settings['multiplier'],
-    maxEdge: profile.maxEdge as Settings['maxEdge']
-  })
+  return planImageTargets(
+    usages,
+    {
+      multiplier: profile.multiplier as Settings['multiplier'],
+      maxEdge: profile.maxEdge as Settings['maxEdge']
+    },
+    knownSizes(usages)
+  )
 }
 
 /**
  * 이 노드 하나가 쓰는 이미지 fill 들. 선택 시점의 예고(selection.ts)와 export 가
  * 같은 눈으로 봐야 "줄임 예정" 과 실제 결과가 어긋나지 않는다.
  */
-export function imageUsagesOf(node: SceneNode): ImageUsage[] {
+export function imageUsagesOf(node: SceneNode, clip: Rect | null = null): ImageUsage[] {
   if (!hasFills(node) || !Array.isArray(node.fills)) return []
 
   const usages: ImageUsage[] = []
@@ -130,26 +150,52 @@ export function imageUsagesOf(node: SceneNode): ImageUsage[] {
       name: node.name,
       width: node.width * scale.x,
       height: node.height * scale.y,
-      scaleMode: paint.scaleMode
+      scaleMode: paint.scaleMode,
+      // 잘라 쓰면 원본의 일부만 이 자리에 들어온다 — 목표를 셈하려면 그 비가 필요하다
+      crop:
+        paint.scaleMode === 'CROP' && paint.imageTransform !== undefined
+          ? cropFractions(paint.imageTransform)
+          : undefined,
+      visible: visibleIn(node, clip)
     })
   }
 
   return usages
 }
 
-/** 클론 전체에서 이미지 fill 을 쓰는 자리를 모은다. */
+/**
+ * 이 노드가 클립 안에 얼마나 남는가. 경계를 못 읽으면 1 로 둔다 —
+ * 재지 못한 것을 "잘렸다" 고 말하면 없는 낭비를 지어내는 셈이다.
+ */
+function visibleIn(node: SceneNode, clip: Rect | null): number {
+  if (clip === null) return 1
+  const box = node.absoluteBoundingBox
+  if (box === null) return 1
+  return visibleFraction(box, clip)
+}
+
+/** 프레임이 clipsContent 를 켜 두면 그 상자가 새 클립이다 — 조상들의 클립과 겹쳐 좁힌다 */
+export function clipFor(node: SceneNode, parentClip: Rect | null): Rect | null {
+  if (!('clipsContent' in node) || node.clipsContent !== true) return parentClip
+  const box = node.absoluteBoundingBox
+  if (box === null) return parentClip
+  return parentClip === null ? box : intersect(box, parentClip)
+}
+
+/** 클론 전체에서 이미지 fill 을 쓰는 자리를 모은다. 클립은 내려가면서 좁아진다. */
 export function collectImageUsages(root: SceneNode): ImageUsage[] {
   const usages: ImageUsage[] = []
 
-  const visit = (node: SceneNode): void => {
+  const visit = (node: SceneNode, clip: Rect | null): void => {
     if (node.visible === false) return
-    usages.push(...imageUsagesOf(node))
+    usages.push(...imageUsagesOf(node, clip))
     if ('children' in node) {
-      for (const child of node.children) visit(child)
+      const inner = clipFor(node, clip)
+      for (const child of node.children) visit(child, inner)
     }
   }
 
-  visit(root)
+  visit(root, clipFor(root, null))
   return usages
 }
 
@@ -175,13 +221,11 @@ export async function shrinkImages(
     warnings: [],
     seen: [...new Set(usages.map((usage) => usage.imageHash))]
   }
-  const plans = planImageTargets(usages, settings)
+  const plans = planImageTargets(usages, settings, knownSizes(usages))
   if (plans.length === 0) return stats
 
-  // 프레임 예산 안에 드는 이미지는 손대지 않는다 — 작은 로고까지 열화시킬 이유가 없다.
-  // 프레임 자체가 스케일돼 있을 수 있으므로 여기서도 렌더 크기로 잰다.
-  const rootScale = transformScale(root.absoluteTransform)
-  const floor = skipFloor(settings, Math.max(root.width * rootScale.x, root.height * rootScale.y))
+  // 손댈지는 이미지마다 제 목표로 정한다(shouldShrink) — 프레임 예산으로 재면
+  // 작은 자리에 놓인 큰 그림이 통째로 빠져나간다.
 
   const replacement = new Map<string, string>()
 
@@ -191,7 +235,7 @@ export async function shrinkImages(
 
     const plan = plans[index]
     try {
-      const newHash = await shrinkOne(plan, floor, settings, send, stats, keepOriginal)
+      const newHash = await shrinkOne(plan, settings, send, stats, keepOriginal)
       if (newHash !== null) replacement.set(plan.imageHash, newHash)
     } catch (error) {
       stats.warnings.push({
@@ -215,7 +259,6 @@ export async function shrinkImages(
 
 async function shrinkOne(
   plan: ImagePlan,
-  floor: number,
   settings: Settings,
   send: ImageRequestSender,
   stats: ImageStats,
@@ -235,12 +278,12 @@ async function shrinkOne(
   let longEdge = knownEdge(plan.imageHash)
   if (longEdge === undefined) {
     original = await bytesOf(image, plan.imageHash)
-    const read = await readEdge(image, original)
+    const read = await readSize(image, original)
     if (read === null) throw new Error('cannot read image size')
-    rememberEdge(plan.imageHash, read)
-    longEdge = read
+    rememberSize(plan.imageHash, read)
+    longEdge = Math.max(read.width, read.height)
   }
-  const belowFloor = longEdge <= floor
+  const belowFloor = !shouldShrink(longEdge, plan.targetLongEdge, settings.minEdge)
   if (belowFloor && keepOriginal === undefined) return null
 
   // 앞 프레임에서 같은 목표·설정으로 만든 결과가 있으면 그대로 — 바이트도 안 읽고 UI 도 안 부른다

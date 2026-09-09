@@ -3,6 +3,7 @@
 // 핵심: 화면에 보이는 크기의 multiplier 배를 넘는 픽셀은 버린다.
 // 3000px 스크린샷을 600pt 박스에 넣어도 Figma 는 3000px 그대로 임베드한다.
 
+import { neededLongEdge, PixelSize } from './imageDensity'
 import { ImageUsage, Settings } from './types'
 
 // ImageUsage 는 메인↔UI 메시지에도 실리므로 types.ts 에 산다. 계산 쪽 이름은 그대로 둔다.
@@ -57,37 +58,36 @@ export function isProcessable(usage: ImageUsage): boolean {
 }
 
 /**
- * 이 크기 이하의 이미지는 아예 건드리지 않는다 — 리사이즈도, 재인코딩도.
- * 기준은 "프레임 긴 변 × 배율": 프레임 예산 안에 드는 이미지(로고 등)를
- * 다시 인코딩해 봐야 몇 KB 아끼자고 화질만 상한다. 열화는 큰 원본에서만 값어치가 있다.
- */
-export function processFloor(
-  settings: { multiplier: number; maxEdge: number },
-  frameLongEdge: number
-): number {
-  return Math.min(settings.maxEdge, Math.ceil(frameLongEdge * settings.multiplier))
-}
-
-/**
- * 실제로 손대지 않고 넘길 크기.
- *
- * 프레임 예산(processFloor)은 프레임이 작으면 같이 작아진다 — A4(595pt) 문서에서
- * 1.5배면 893px 이라, 1000px 짜리 로고가 처리 대상이 되어 열화된다. 프레임과 무관한
- * 절대 하한(minEdge)을 함께 두어 작은 그림은 어떤 문서에서도 그대로 나가게 한다.
- */
-export function skipFloor(
-  settings: { multiplier: number; maxEdge: number; minEdge: number },
-  frameLongEdge: number
-): number {
-  return Math.max(processFloor(settings, frameLongEdge), settings.minEdge)
-}
-
-/**
  * 아무리 작게 표시돼도 이 아래로는 줄이지 않는다.
- * 2383px 로고가 93pt 로 표시된다고 140px 로 뭉개면 줌·인쇄에서 바로 티가 난다 —
- * 640px 이면 로고·아이콘이 선명함을 유지하면서도 원본 대비 충분히 가볍다.
+ * 2383px 로고가 93pt 로 표시된다고 140px 로 뭉개면 줌·인쇄에서 바로 티가 난다.
+ *
+ * 2026-09-09 에 640 → 1024. 그전에는 프레임 예산 관문(옛 skipFloor)이 작은 그림을 대부분
+ * 막아서 이 하한이 실제로 쓰일 일이 드물었는데, 관문을 이미지별 기준(shouldShrink)으로
+ * 바꾸면서 상시로 작동하는 값이 됐다. 실측: 1920pt 페이지에 300pt 로 놓인 UI 스크린샷이
+ * 3600px → 640px 이 되어 잔글씨가 뭉갰다. 1024 면 그 자리가 살아나고, 그 크기대의 이미지는
+ * 장당 수십 KB 라 비용은 파일의 1% 안팎이다.
  */
-export const MIN_TARGET_LONG_EDGE = 640
+export const MIN_TARGET_LONG_EDGE = 1024
+
+/**
+ * 이 이미지를 손댈 것인가.
+ *
+ * 기준은 **그 이미지 자신의 목표**다. 예전에는 프레임 예산(skipFloor)으로 걸렀는데,
+ * 그러면 300pt 자리에 놓인 1920px 썸네일이 "프레임 예산 안" 이라며 통과했다 —
+ * 제 목표(640px)의 세 배인데도. 실측(2026-09-09, 2× 설정): 이미지 70장 중 68장이
+ * 그 관문에서 통째로 건너뛰어졌고, 넘치는 픽셀만 2.4MB 였다.
+ *
+ * 절대 하한(minEdge)은 그대로다 — 로고·아이콘은 어떤 문서에서도 안 건드린다.
+ * 이 뒤에도 가드가 셋 더 있다: 100KB 바이트 하한, 업스케일 금지(scaledSize),
+ * 줄였는데 커지면 되돌리기(keepsOriginal).
+ */
+export function shouldShrink(
+  originalLongEdge: number,
+  targetLongEdge: number,
+  minEdge: number
+): boolean {
+  return originalLongEdge > Math.max(targetLongEdge, minEdge)
+}
 
 /**
  * 원본이 이 바이트 이하면 픽셀이 커도 손대지 않는다.
@@ -95,11 +95,39 @@ export const MIN_TARGET_LONG_EDGE = 640
  */
 export const KEEP_BYTES_FLOOR = 100_000
 
+/**
+ * 밀도 보정을 적용할 최소 배수.
+ *
+ * 실측(2026-09-09, 이미지 fill 62개)에서 필요/현재 비는 두 무리로 갈렸다 — 1.00~1.04 의
+ * 반올림 오차와 1.16 이상의 진짜 부족분, 그 사이는 비어 있었다. 1.1 은 그 골짜기다.
+ * 낮게 잡으면 멀쩡한 이미지까지 목표가 흔들려 다시 인코딩되고, 높게 잡으면 ×1.2 대를 놓친다.
+ */
+export const DENSITY_MARGIN = 1.1
+
 export function targetFor(
   usage: ImageUsage,
-  settings: Pick<Settings, 'multiplier' | 'maxEdge'>
+  settings: Pick<Settings, 'multiplier' | 'maxEdge'>,
+  source?: PixelSize | null
 ): number {
-  const wanted = Math.ceil(displayedLongEdge(usage) * settings.multiplier)
+  const shown = Math.ceil(displayedLongEdge(usage) * settings.multiplier)
+  let wanted = shown
+
+  // 상자를 그대로 채우지 않는 자리(잘라 쓰거나 비율이 어긋난 FILL)는 보이는 구간이
+  // 제 밀도를 가지려면 원본이 더 커야 한다. 원본 크기를 모르면 옛 계산 그대로다.
+  const needed = neededLongEdge(
+    {
+      width: usage.width,
+      height: usage.height,
+      scaleMode: usage.scaleMode,
+      crop: usage.crop
+    },
+    source ?? null
+  )
+  if (needed !== null) {
+    const dense = Math.ceil(needed * settings.multiplier)
+    if (dense > shown * DENSITY_MARGIN) wanted = dense
+  }
+
   return Math.min(settings.maxEdge, Math.max(wanted, MIN_TARGET_LONG_EDGE))
 }
 
@@ -109,14 +137,15 @@ export function targetFor(
  */
 export function planImageTargets(
   usages: readonly ImageUsage[],
-  settings: Pick<Settings, 'multiplier' | 'maxEdge'>
+  settings: Pick<Settings, 'multiplier' | 'maxEdge'>,
+  sizes?: Record<string, PixelSize>
 ): ImagePlan[] {
   const byHash = new Map<string, ImagePlan>()
 
   for (const usage of usages) {
     if (!isProcessable(usage)) continue
 
-    const target = targetFor(usage, settings)
+    const target = targetFor(usage, settings, sizes?.[usage.imageHash])
     const found = byHash.get(usage.imageHash)
 
     if (found === undefined) {

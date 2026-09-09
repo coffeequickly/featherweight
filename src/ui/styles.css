@@ -1750,6 +1750,14 @@ button.statusCard:hover {
   white-space: nowrap;
 }
 
+/* 잘리는 그림의 표시 — 줄 오른쪽 끝, 앰버. 목록에서 눈에 걸려야 의미가 있다 */
+.imageClipped {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  white-space: nowrap;
+  color: var(--figma-color-text-warning, #b86200);
+}
+
 .imageTo {
   flex: 0 0 auto;
   min-width: 62px;

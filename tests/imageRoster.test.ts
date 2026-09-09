@@ -11,7 +11,15 @@ import { DEFAULT_SETTINGS, ImageUsage, Preflight, Settings } from '../src/lib/ty
 const SETTINGS: Settings = { ...DEFAULT_SETTINGS, multiplier: 1.5, maxEdge: 1920, minEdge: 640 }
 
 function usage(hash: string, name: string, width: number, height = width): ImageUsage {
-  return { nodeId: `node-${hash}`, imageHash: hash, name, width, height, scaleMode: 'FILL' }
+  return {
+    nodeId: `node-${hash}`,
+    imageHash: hash,
+    name,
+    width,
+    height,
+    scaleMode: 'FILL',
+    visible: 1
+  }
 }
 
 /** A4 세로 한 장 — 긴 변 842pt. 균형(1.5×)이면 기준선 1263px */
@@ -55,9 +63,9 @@ describe('imageRoster', () => {
   })
 
   it('배율을 올리면 목표가 따라 오른다', () => {
-    const doc = sheet([usage('h', '사진', 842)], { h: 4000 })
-    expect(imageRoster(doc, { ...SETTINGS, multiplier: 1 })[0].target).toBe(842)
-    expect(imageRoster(doc, { ...SETTINGS, multiplier: 4, maxEdge: 3840 })[0].target).toBe(3368)
+    const doc = sheet([usage('h', '사진', 1200)], { h: 6000 })
+    expect(imageRoster(doc, { ...SETTINGS, multiplier: 1 })[0].target).toBe(1200)
+    expect(imageRoster(doc, { ...SETTINGS, multiplier: 3, maxEdge: 3840 })[0].target).toBe(3600)
   })
 
   it('한 장 상한이 배율을 이기면 그 사실을 표시한다', () => {

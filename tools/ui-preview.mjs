@@ -433,14 +433,14 @@ function send(name, ...args) {
 /** 픽스처 프레임 i 가 쓰는 이미지들 — 표지는 큰 사진+로고, 프로젝트 장은 스크린샷 넷+아이콘 넷.
     레이어 이름은 화면 언어를 따른다 — 영문 캡처(마케팅 보드)에 한글 이름이 섞이면 안 된다 */
 function imagesFor(i) {
-  const use = (hash, name, width, height) => ({ nodeId: 'n-' + hash, imageHash: hash, name, width, height, scaleMode: 'FILL' })
+  const use = (hash, name, width, height, visible = 1) => ({ nodeId: 'n-' + hash, imageHash: hash, name, width, height, scaleMode: 'FILL', visible })
   const ko = LANG.toLowerCase().startsWith('ko')
   const cover = ko ? '\ud45c\uc9c0 \ubc30\uacbd' : 'Cover photo'
   const logo = ko ? '\ub85c\uace0' : 'Logo'
   const shot = ko ? '\ud654\uba74 \ucea1\ucc98 0' : 'Screenshot 0'
   const icon = ko ? '\uc544\uc774\ucf58 0' : 'Icon 0'
   switch (i % 3) {
-    case 0: return [use('cover', cover, 595, 397), use('logo', logo, 120, 40)]
+    case 0: return [use('cover', cover, 1280, 853, 0.47), use('logo', logo, 120, 40)]
     case 1: return [use('logo', logo, 120, 40)]
     default: return [0, 1, 2, 3].flatMap((k) => [
       use('shot' + k, shot + (k + 1), 260, 170),

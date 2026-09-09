@@ -1,11 +1,11 @@
 // 내보내기 전 체크리스트의 계산. Figma·DOM 의존 금지.
 //
 // 메인이 보낸 사실(Preflight)과 지금 설정을 합쳐 "무슨 일이 일어날지" 를 센다.
-// 실제 export 와 같은 규칙(skipFloor · planImageTargets · needsDownscale)을 쓴다 —
+// 실제 export 와 같은 규칙(shouldShrink · planImageTargets)을 쓴다 —
 // 규칙이 갈라지면 예고와 결과가 어긋나고, 그 순간 예고는 믿을 수 없는 것이 된다.
 
 import { missingFonts } from './fontStatus'
-import { MIN_TARGET_LONG_EDGE, needsDownscale, planImageTargets, skipFloor } from './imageTarget'
+import { MIN_TARGET_LONG_EDGE, planImageTargets, shouldShrink } from './imageTarget'
 import { FontUsage, FrameItem, Preflight, Reason, Settings, StoredFont, TextReject } from './types'
 
 export type ImageForecast = {
@@ -33,11 +33,10 @@ export function forecastImages(preflight: Preflight, settings: Settings): ImageF
   for (const frame of preflight.frames) {
     for (const usage of frame.images) all.add(usage.imageHash)
 
-    const floor = skipFloor(settings, frame.longEdge)
-    for (const plan of planImageTargets(frame.images, settings)) {
+    for (const plan of planImageTargets(frame.images, settings, preflight.imageSizes)) {
       const edge = preflight.imageEdges[plan.imageHash]
       if (edge === undefined) continue
-      if (edge > floor && needsDownscale(edge, plan.targetLongEdge)) shrink.add(plan.imageHash)
+      if (shouldShrink(edge, plan.targetLongEdge, settings.minEdge)) shrink.add(plan.imageHash)
     }
   }
 
@@ -67,6 +66,11 @@ export type ImageRow = {
    * 이때는 고른 배율이 그대로 적용되지 않는다 — 화면이 그 사실을 말해야 한다.
    */
   capped: boolean
+  /**
+   * 프레임 클립 안에 남는 넓이의 비(0~1). 1 이면 온전히 보인다.
+   * 이보다 작으면 그만큼의 픽셀이 화면에 나오지 않고도 파일에 실린다.
+   */
+  visible: number
 }
 
 /**
@@ -83,20 +87,20 @@ export type ImageRow = {
  */
 export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[] {
   /** 해시별로 가장 큰 목표와, 그 목표를 만든 자리의 이름·표시 크기·기준선 */
-  const best = new Map<string, { name: string; shown: number; target: number; floor: number }>()
+  const best = new Map<string, { name: string; shown: number; target: number; visible: number }>()
 
   for (const frame of preflight.frames) {
-    const floor = skipFloor(settings, frame.longEdge)
-    const nameOf = new Map<string, { name: string; edge: number }>()
+    const nameOf = new Map<string, { name: string; edge: number; visible: number }>()
     for (const usage of frame.images) {
       const edge = Math.max(usage.width, usage.height)
       const found = nameOf.get(usage.imageHash)
+      // 목표를 정하는 것은 가장 크게 쓰는 자리다 — 잘린 비도 그 자리의 것을 쓴다
       if (found === undefined || edge > found.edge) {
-        nameOf.set(usage.imageHash, { name: usage.name, edge })
+        nameOf.set(usage.imageHash, { name: usage.name, edge, visible: usage.visible })
       }
     }
 
-    for (const plan of planImageTargets(frame.images, settings)) {
+    for (const plan of planImageTargets(frame.images, settings, preflight.imageSizes)) {
       const found = best.get(plan.imageHash)
       if (found !== undefined && found.target >= plan.targetLongEdge) continue
       const at = nameOf.get(plan.imageHash)
@@ -104,19 +108,27 @@ export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[
         name: at?.name ?? '',
         shown: at?.edge ?? 0,
         target: plan.targetLongEdge,
-        floor
+        visible: at?.visible ?? 1
       })
     }
   }
 
   const rows: ImageRow[] = []
-  for (const [imageHash, { name, shown, target, floor }] of best) {
+  for (const [imageHash, { name, shown, target, visible }] of best) {
     const edge = preflight.imageEdges[imageHash]
     const original = edge === undefined ? null : edge
-    // 기준선 이하는 어떤 문서에서도 손대지 않는다 — 로고·아이콘을 지키는 자리다
-    const kept = original === null ? false : !(original > floor && needsDownscale(original, target))
+    // 제 목표보다 크고 절대 하한도 넘을 때만 손댄다 — 로고·아이콘은 어떤 문서에서도 그대로
+    const kept = original === null ? false : !shouldShrink(original, target, settings.minEdge)
     const wanted = Math.max(Math.ceil(shown * settings.multiplier), MIN_TARGET_LONG_EDGE)
-    rows.push({ imageHash, name, original, target, kept, capped: settings.maxEdge < wanted })
+    rows.push({
+      imageHash,
+      name,
+      original,
+      target,
+      kept,
+      capped: settings.maxEdge < wanted,
+      visible
+    })
   }
 
   return rows.sort((a, b) => {

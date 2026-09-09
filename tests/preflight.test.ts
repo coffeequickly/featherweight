@@ -9,7 +9,15 @@ function usage(
   height: number,
   scaleMode: ImageUsage['scaleMode'] = 'FILL'
 ): ImageUsage {
-  return { nodeId: `node-${hash}`, imageHash: hash, name: hash, width, height, scaleMode }
+  return {
+    nodeId: `node-${hash}`,
+    imageHash: hash,
+    name: hash,
+    width,
+    height,
+    scaleMode,
+    visible: 1
+  }
 }
 
 function frame(id: string, longEdge: number, images: ImageUsage[]): Preflight['frames'][number] {
@@ -75,14 +83,15 @@ describe('forecastImages', () => {
   })
 
   it('하한(minEdge)을 올리면 그 아래 이미지는 어떤 프레임에서도 그대로다', () => {
-    // 작은 프레임(300pt)이라 예산은 450 — 하한 640 이 대신 기준이 된다
+    // 300pt 자리라 목표는 하한(MIN_TARGET_LONG_EDGE)이 정한다. 1500px 원본은 그보다 커서 줄고,
+    // minEdge 를 1600 으로 올리면 그 아래라 어떤 프레임에서도 손대지 않는다.
     const preflight: Preflight = {
       frames: [frame('f1', 300, [usage('photo', 300, 200)])],
-      imageEdges: { photo: 1000 },
+      imageEdges: { photo: 1500 },
       textRejects: []
     }
     expect(forecastImages(preflight, DEFAULT_SETTINGS).shrink).toBe(1)
-    expect(forecastImages(preflight, { ...DEFAULT_SETTINGS, minEdge: 1024 })).toEqual({
+    expect(forecastImages(preflight, { ...DEFAULT_SETTINGS, minEdge: 1600 })).toEqual({
       total: 1,
       shrink: 0,
       tiny: 1,

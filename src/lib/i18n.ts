@@ -321,6 +321,24 @@ const MESSAGES = {
     ko: '{total}장 중 {shrink}장이 줄어듭니다'
   },
   'images.listKept': { en: 'unchanged', ko: '그대로' },
+  /** 프레임 밖으로 넘쳐 잘리는 그림 — 목록 행에 붙는 짧은 표시 */
+  'images.listClipped': { en: '{percent}% shown', ko: '{percent}%만 보임' },
+  /**
+   * 자르지 않고 통째로 줄이기 때문에 안 보이는 픽셀도 실린다. 고칠 곳은 Figma 쪽이다 —
+   * 우리가 잘라 넣는 것은 노드 기하까지 바꾸는 일이라 아직 하지 않는다(개선 계획 37).
+   */
+  'images.clippedSays': {
+    en: (p) =>
+      (Number(p.count) === 1
+        ? `One image extends past the frame and is cut off. Only ${p.percent}% of it is shown.`
+        : `${p.count} images extend past the frame and are cut off. As little as ${p.percent}% of one is shown.`) +
+      ' The hidden part still takes up pixels in the PDF, because the whole image is scaled rather than cropped. Cropping it in Figma makes both files smaller.',
+    ko: (p) =>
+      (Number(p.count) === 1
+        ? `이미지 1장이 프레임 밖으로 넘쳐 잘립니다. ${p.percent}%만 보입니다.`
+        : `이미지 ${p.count}장이 프레임 밖으로 넘쳐 잘립니다. 적게는 ${p.percent}%만 보입니다.`) +
+      ' 이미지를 자르지 않고 통째로 줄이기 때문에 안 보이는 부분도 PDF에 그대로 실립니다. Figma에서 잘라 두면 원본 파일도 함께 가벼워집니다.'
+  },
   'images.listUnsized': { en: 'reading size', ko: '크기 읽는 중' },
   'images.listMore': {
     en: (p) => `and ${n(Number(p.count), 'more image', 'more images')}`,

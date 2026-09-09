@@ -18,7 +18,8 @@ import {
   sameProfile,
   sharperVariants
 } from './lib/fitToSize'
-import { skipFloor, transformScale } from './lib/imageTarget'
+import { PixelSize } from './lib/imageDensity'
+import { shouldShrink } from './lib/imageTarget'
 import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
 import { exportFrame, removeLeftoverClones } from './main/exporter'
@@ -513,18 +514,13 @@ async function probeItemsFor(
     if (node === null || node.removed || !('absoluteTransform' in node)) continue
 
     const frame = node as SceneNode
-    const scale = transformScale(frame.absoluteTransform)
-    // 탐색도 실제 export 와 같은 기준을 써야 예측이 맞는다
-    const floor = skipFloor(
-      { ...profile, minEdge },
-      Math.max(frame.width * scale.x, frame.height * scale.y)
-    )
 
     for (const plan of planFor(frame, profile)) {
       const info = seen.get(plan.imageHash)
       if (info === undefined) continue // 기준 패스에서 못 본 이미지 — 셀 근거가 없다
 
-      const skip = info.longEdge <= floor
+      // 탐색도 실제 export 와 같은 기준을 써야 예측이 맞는다
+      const skip = !shouldShrink(info.longEdge, plan.targetLongEdge, minEdge)
       const found = byHash.get(plan.imageHash)
       if (found === undefined) {
         byHash.set(plan.imageHash, {
@@ -695,10 +691,15 @@ async function sendScan(nodes: ExportableNode[], isStale: () => boolean): Promis
   emit<FontsHandler>('fonts', scan.fonts)
 
   const hashes = scan.frames.flatMap((frame) => frame.images.map((usage) => usage.imageHash))
-  const preflightWith = (edges: Record<string, number>, sizing: boolean): void => {
+  const preflightWith = (sizes: Record<string, PixelSize>, sizing: boolean): void => {
+    const edges: Record<string, number> = {}
+    for (const [hash, size] of Object.entries(sizes)) {
+      edges[hash] = Math.max(size.width, size.height)
+    }
     emit<PreflightHandler>('preflight', {
       frames: scan.frames,
       imageEdges: edges,
+      imageSizes: sizes,
       textRejects: scan.textRejects,
       sizing
     })
