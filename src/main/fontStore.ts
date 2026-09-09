@@ -60,6 +60,22 @@ export function deleteFont(ref: FontRef): Promise<StoredFont[]> {
 }
 
 /**
+ * 저장소를 통째로 비운다.
+ *
+ * 인덱스가 가리키는 것만 지우면 부족하다 — 인덱스 쓰기가 밀려 남은 조각이 그대로 한도를
+ * 갉아먹어서, 비웠는데 자리가 안 돌아온다. 접두사로 걸리는 키를 전부 지운다.
+ */
+export function clearFonts(): Promise<StoredFont[]> {
+  return queue(async () => {
+    for (const key of await figma.clientStorage.keysAsync()) {
+      if (key.startsWith(FONT_KEY_PREFIX)) await figma.clientStorage.deleteAsync(key)
+    }
+    await figma.clientStorage.setAsync(FONT_INDEX_KEY, [])
+    return []
+  })
+}
+
+/**
  * 인덱스가 가리키지 않는 폰트 바이트를 지운다.
  * 인덱스 쓰기가 밀려서 항목이 빠지면 바이트만 남아 5MB 한도를 조용히 갉아먹는다.
  * 인덱스가 진실이므로 참조 없는 키는 버린다 — 자동 불러오기가 다시 채운다.

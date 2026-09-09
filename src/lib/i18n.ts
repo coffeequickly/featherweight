@@ -18,11 +18,10 @@ const n = (count: number, one: string, other: string): string =>
 
 const MESSAGES = {
   // ── UI 골격 ─────────────────────────────────────────────
-  // 정렬 기준 넷. 방향은 따로 — 여덟 조합을 칸으로 늘어놓으면 고를 수 없다
+  // 정렬 기준 셋. 방향은 따로 — 여섯 조합을 칸으로 늘어놓으면 고를 수 없다
   'app.sortPosition': { en: 'Canvas position', ko: '캔버스 위치' },
   'app.sortName': { en: 'Name', ko: '이름' },
   'app.sortLayer': { en: 'Layer order', ko: '레이어 순서' },
-  'app.sortSelection': { en: 'Selection order', ko: '고른 순서' },
   'app.sortManual': { en: 'Custom', ko: '직접' },
   'app.sortLabel': { en: 'Sort by', ko: '기준' },
   'app.sortFlip': { en: 'Reverse the order', ko: '순서 뒤집기' },
@@ -559,6 +558,14 @@ const MESSAGES = {
   },
   /** 목록 제목. 설명을 붙이려다 번역투가 됐다 — 줄마다 "이 문서에서 사용 중" 이 이미 말한다 */
   'storage.listTitle': { en: 'Saved fonts', ko: '저장 중인 폰트' },
+  'storage.clear': { en: 'Delete all', ko: '전부 비우기' },
+  /** 되돌릴 수 없다 — 무엇이 사라지는지 세어서 말하고, 이 문서가 받을 영향까지 말한다 */
+  'storage.clearAsk': {
+    en: (p) =>
+      `This deletes all ${p.count} saved font files, including the ones this document uses.`,
+    ko: '저장한 폰트 파일 {count}개를 모두 지웁니다. 이 문서에서 쓰는 파일도 함께 지워집니다.'
+  },
+  'storage.clearGo': { en: 'Delete all', ko: '비우기' },
 
   'fonts.storageSection': { en: 'Font storage', ko: '폰트 저장소' },
   'fonts.storageUsage': { en: 'Storage {used} of {limit}', ko: '저장 공간 {used} / {limit}' },
@@ -646,9 +653,22 @@ const MESSAGES = {
     ko: '{total}장 중 {count}장 줄임'
   },
   'result.imagesNone': { en: 'No images', ko: '이미지 없음' },
-  'result.imageBytes': {
-    en: 'Images in the PDF: {size}',
-    ko: 'PDF에 담긴 이미지 {size}'
+  'result.imagesShrunk': {
+    en: (p) => `${n(Number(p.count), 'image', 'images')} downscaled`,
+    ko: '{count}장을 줄였습니다'
+  },
+  'result.imagesKept': {
+    en: (p) => `${n(Number(p.count), 'image', 'images')} exported unchanged`,
+    ko: '{count}장은 그대로 내보냈습니다'
+  },
+  /** 파일 안에서 이미지가 차지하는 몫 — 더 줄일 값어치가 있는지 판단할 근거다 */
+  'result.imageShare': {
+    en: 'Images in the PDF: {size}, {percent}% of the file',
+    ko: 'PDF에 담긴 이미지 {size} · 파일의 {percent}%'
+  },
+  'result.imagesWarned': {
+    en: (p) => `${n(Number(p.count), 'image', 'images')} had trouble`,
+    ko: '{count}장에서 문제가 있었습니다'
   },
   /** 내보내기가 실패했을 때 — 토스트는 사라지므로 원문은 여기 남는다 */
   'result.failed': { en: 'The last export failed', ko: '마지막 내보내기가 실패했습니다' },
@@ -720,6 +740,10 @@ const MESSAGES = {
   'main.fontSaveFailed': {
     en: 'Could not save the font file. Details: {error}',
     ko: '폰트 파일을 저장하지 못했습니다. 상세 오류: {error}'
+  },
+  'main.fontsCleared': {
+    en: 'All saved font files were deleted.',
+    ko: '저장한 폰트 파일을 모두 지웠습니다.'
   },
   'main.fontDeleteFailed': {
     en: 'Could not delete the saved font file. Details: {error}',

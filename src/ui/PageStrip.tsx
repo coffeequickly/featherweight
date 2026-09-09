@@ -52,12 +52,12 @@ export function PageStrip({ items, onGo }: Props): JSX.Element | null {
 
 function Page({ item, index }: { item: FrameItem; index: number }): JSX.Element {
   const url = useThumbUrl(item.thumb)
-  // 가로세로 비를 지켜야 어느 것이 세로 문서이고 어느 것이 슬라이드인지 보인다
-  const ratio = item.height > 0 ? item.width / item.height : 1
 
   return (
     <div class="pageCell" title={item.name}>
-      <div class="pageThumb" style={`aspect-ratio: ${ratio}`}>
+      {/* 정사각 칸에 비율을 지켜 담는다 — 칸마다 높이가 다르면 줄이 들쭉날쭉해진다.
+          세로 문서와 슬라이드는 칸 안에서 남는 여백으로 구분된다 */}
+      <div class="pageThumb">
         {url === null ? null : <img class="pageThumbImg" src={url} alt="" />}
       </div>
       <div class="pageNo">

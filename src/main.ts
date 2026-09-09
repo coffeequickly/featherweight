@@ -31,6 +31,7 @@ import {
 } from './main/images'
 import { loadEdgeCache } from './main/imageSize'
 import {
+  clearFonts,
   deleteFont,
   listFonts,
   pruneOrphanFonts,
@@ -46,6 +47,7 @@ import {
   ErrorHandler,
   ExportHandler,
   ExportRequest,
+  FontClearHandler,
   FontDeleteHandler,
   FontFactsHandler,
   FontFileFacts,
@@ -173,13 +175,17 @@ export default async function main(): Promise<void> {
     void dropFont(ref)
   })
 
+  on<FontClearHandler>('fonts:clear', () => {
+    void dropAllFonts()
+  })
+
   // 옛 버전이 넣은 파일의 사실(굵기·가변 여부)을 UI 가 읽어 보내면 인덱스에 남긴다
   on<FontFactsHandler>('font:facts', (payload) => {
     fontOps = fontOps.then(() => recordFontFacts(payload.ref, payload.facts))
   })
 
-  on<FrameThumbsRequestHandler>('frames:thumbs:request', (limit) => {
-    void sendThumbs(limit)
+  on<FrameThumbsRequestHandler>('frames:thumbs:request', (ids) => {
+    void sendThumbs(ids)
   })
 
   on<FrameFocusHandler>('frame:focus', (id) => {
@@ -763,16 +769,23 @@ function touchesSelection(change: NodeChange, selected: ReadonlySet<string>): bo
 }
 
 /**
- * 썸네일이 필요한 화면이 열릴 때만 — 그때의 집합으로 그린다.
- * limit 이 있으면 앞에서부터 그만큼만. exportAsync 는 장당 비싸다.
+ * UI 가 그리겠다고 한 프레임만, 그릴 차례대로. exportAsync 는 장당 비싸다.
+ *
+ * 선택 배열을 앞에서 잘라내면 안 된다 — 그 배열은 Figma 가 준 순서고 UI 는 정렬해서
+ * 보여 주므로, 화면에 있는 프레임이 통째로 안 그려진다.
  */
-async function sendThumbs(limit?: number): Promise<void> {
+async function sendThumbs(ids: readonly string[]): Promise<void> {
   const generation = selectionGeneration
   const isStale = (): boolean => generation !== selectionGeneration
-  const nodes = limit === undefined ? selectionNodes : selectionNodes.slice(0, limit)
-  const thumbs = await renderThumbs(nodes, isStale)
-  if (isStale() || thumbs.length === 0) return
-  emit<FrameThumbsHandler>('frames:thumbs', thumbs)
+  const byId = new Map(selectionNodes.map((node) => [node.id, node]))
+  const nodes = ids
+    .map((id) => byId.get(id))
+    .filter((node): node is ExportableNode => node !== undefined)
+  // 그린 것부터 보낸다 — 전부 기다리면 큰 문서에서 목록이 한참 비어 있다
+  await renderThumbs(nodes, isStale, (batch) => {
+    if (isStale()) return
+    emit<FrameThumbsHandler>('frames:thumbs', batch)
+  })
 }
 
 /** 인덱스에서 빠진 폰트 바이트가 한도만 차지하고 있으면 지운다. */
@@ -830,6 +843,20 @@ async function recordFontFacts(ref: FontRef, facts: FontFileFacts): Promise<void
 async function dropFont(ref: FontRef): Promise<void> {
   try {
     emit<StoredFontsHandler>('fonts:stored', await deleteFont(ref))
+  } catch (error) {
+    emit<NoticeHandler>('notice', {
+      message: t('main.fontDeleteFailed', {
+        error: error instanceof Error ? error.message : String(error)
+      }),
+      error: true
+    })
+  }
+}
+
+async function dropAllFonts(): Promise<void> {
+  try {
+    emit<StoredFontsHandler>('fonts:stored', await clearFonts())
+    figma.notify(t('main.fontsCleared'))
   } catch (error) {
     emit<NoticeHandler>('notice', {
       message: t('main.fontDeleteFailed', {

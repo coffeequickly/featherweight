@@ -80,10 +80,7 @@ export function sortByLayer<T extends Positioned>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => a.layerIndex - b.layerIndex || a.y - b.y || a.x - b.x)
 }
 
-/**
- * 기준 하나와 방향 하나. 'selection' 은 메인이 보낸 순서 그대로라 정렬하지 않는다 —
- * 사용자가 고른 차례가 곧 순서다.
- */
+/** 기준 하나와 방향 하나. */
 export function sortItems<T extends Positioned>(
   items: readonly T[],
   mode: SortMode,
@@ -94,8 +91,6 @@ export function sortItems<T extends Positioned>(
       ? sortByName(items)
       : mode === 'layer'
         ? sortByLayer(items)
-        : mode === 'selection'
-          ? [...items]
-          : sortByPosition(items)
+        : sortByPosition(items)
   return reversed ? sorted.reverse() : sorted
 }

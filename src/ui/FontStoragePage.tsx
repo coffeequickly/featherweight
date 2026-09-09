@@ -6,14 +6,28 @@
 // 이 문서에서 쓰는 것도 같이 보여 준다. 안 쓰는 것만 보여 주면 "4.2MB 가 어디서 왔지" 가
 // 답이 없다. 대신 쓰는 것에는 표시를 달아, 지우면 이 문서가 아웃라인으로 나간다는 걸 알린다.
 
-import { IconButton, IconTrash24, Muted, Text, VerticalSpace } from '@create-figma-plugin/ui'
+import {
+  Button,
+  IconButton,
+  IconTrash24,
+  Muted,
+  Text,
+  VerticalSpace
+} from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
+import { useState } from 'preact/hooks'
 
 import { fontKey } from '../lib/fontInventory'
 import { formatBytes, usedBytes } from '../lib/fontStore'
 import { t } from '../lib/i18n'
-import { CLIENT_STORAGE_LIMIT, FontDeleteHandler, FontUsage, StoredFont } from '../lib/types'
+import {
+  CLIENT_STORAGE_LIMIT,
+  FontClearHandler,
+  FontDeleteHandler,
+  FontUsage,
+  StoredFont
+} from '../lib/types'
 
 type Props = {
   stored: StoredFont[]
@@ -22,6 +36,8 @@ type Props = {
 }
 
 export function FontStoragePage({ stored, fonts, disabled }: Props): JSX.Element {
+  // 되돌릴 수 없는 일이라 두 번 누르게 한다. 플러그인 iframe 에서 confirm() 은 창을 얼린다
+  const [asking, setAsking] = useState(false)
   const inUse = new Set(fonts.map((font) => fontKey(font)))
   const used = usedBytes(stored)
   const share = Math.min(1, used / CLIENT_STORAGE_LIMIT)
@@ -44,6 +60,11 @@ export function FontStoragePage({ stored, fonts, disabled }: Props): JSX.Element
             })}
           </Muted>
         </Text>
+        {rows.length === 0 || asking ? null : (
+          <button type="button" class="linkButton danger" onClick={() => setAsking(true)}>
+            {t('storage.clear')}
+          </button>
+        )}
       </div>
       <div class="storageBar">
         <div
@@ -51,6 +72,28 @@ export function FontStoragePage({ stored, fonts, disabled }: Props): JSX.Element
           style={`width: ${share * 100}%`}
         />
       </div>
+      {asking ? (
+        <div class="storageAsk">
+          <div class="storageAskText">
+            <Text>{t('storage.clearAsk', { count: rows.length })}</Text>
+          </div>
+          <div class="storageAskButtons">
+            <Button
+              danger
+              disabled={disabled}
+              onClick={() => {
+                emit<FontClearHandler>('fonts:clear')
+                setAsking(false)
+              }}
+            >
+              {t('storage.clearGo')}
+            </Button>
+            <Button onClick={() => setAsking(false)} secondary>
+              {t('app.cancel')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {rows.length === 0 ? (
         <Fragment>
           <VerticalSpace space="medium" />
@@ -78,12 +121,17 @@ export function FontStoragePage({ stored, fonts, disabled }: Props): JSX.Element
                   <div class="storageRowMeta ellipsis">
                     <Text>
                       <Muted>
-                        {font.fileName} · {formatBytes(font.byteLength)} ·{' '}
-                        {t(mine ? 'storage.inUse' : 'storage.unused')}
+                        {font.fileName} · {formatBytes(font.byteLength)}
                       </Muted>
                     </Text>
                   </div>
                 </div>
+                {/* 쓰는지 여부는 지우기 버튼 옆에 둔다 — 지울지 말지를 그 자리에서 판단한다 */}
+                <span class="storageRowUse">
+                  <Text>
+                    <Muted>{t(mine ? 'storage.inUse' : 'storage.unused')}</Muted>
+                  </Text>
+                </span>
                 <IconButton
                   aria-label={t('fonts.deleteFor', { font: `${font.family} ${font.style}` })}
                   disabled={disabled}

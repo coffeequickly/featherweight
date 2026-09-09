@@ -121,10 +121,6 @@ describe('sortItems', () => {
     item('c', '03 C', 400, 0, 100, 0)
   ]
 
-  it("'selection' 은 정렬하지 않는다 — 고른 차례가 곧 순서다", () => {
-    expect(sortItems(rows, 'selection').map((row) => row.id)).toEqual(['b', 'a', 'c'])
-  })
-
   it('뒤집기는 기준과 별개다', () => {
     expect(sortItems(rows, 'name').map((row) => row.id)).toEqual(['a', 'b', 'c'])
     expect(sortItems(rows, 'name', true).map((row) => row.id)).toEqual(['c', 'b', 'a'])

@@ -64,14 +64,18 @@ const FIGMA_VARS_DARK = `
   --figma-color-icon: #cccccc;
   --figma-color-icon-secondary: #8c8c8c;
   --figma-color-bg-warning-tertiary: #4a3a12;
+  --figma-color-bg-warning-secondary: #5c4917;
   --figma-color-text-warning: #f3c11b;
+  --figma-color-text-danger: #ff8a80;
   /* 아래는 문서에 다크 값이 없어 근사값이다 — 실제 색은 Figma 안에서 본다 */
   --figma-color-text-brand: #7cc4f8;
   --figma-color-icon-brand: #7cc4f8;
   --figma-color-border-brand: #7cc4f8;
+  --figma-color-border-brand-strong: #4aa8f0;
   --figma-color-bg-brand-tertiary: #1e3a55;
   --figma-color-icon-success: #79d297;
   --figma-color-icon-warning: #ffcd29;
+  --figma-color-text-success: #79d297;
 }
 body { margin: 0; background: var(--figma-color-bg); }
 `
@@ -292,6 +296,7 @@ function page(uiScript, query) {
 const FIXTURE = ${JSON.stringify(FIXTURE)}
 const UI_SCRIPT = ${JSON.stringify(uiScript)}
 const VARS = ${JSON.stringify(dark ? FIGMA_VARS_DARK : FIGMA_VARS)}\nconst FRAME_COUNT = ${frames === null ? 'null' : Number(frames)}
+const LANG = ${JSON.stringify(lang)}
 const ALL_FONTS_READY = ${allFontsReady}
 const BAD_FILE = ${badFile}
 const FIT_TO_SIZE = ${fitToSize}
@@ -403,7 +408,7 @@ async function fakeThumb(frame, index) {
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, w, h)
   ctx.fillStyle = '#dfe3ea'
@@ -425,15 +430,21 @@ function send(name, ...args) {
   iframe.contentWindow.postMessage({ pluginMessage: [name, ...args] }, '*')
 }
 
-/** 픽스처 프레임 i 가 쓰는 이미지들 — 표지는 큰 사진+로고, 프로젝트 장은 스크린샷 넷+아이콘 넷 */
+/** 픽스처 프레임 i 가 쓰는 이미지들 — 표지는 큰 사진+로고, 프로젝트 장은 스크린샷 넷+아이콘 넷.
+    레이어 이름은 화면 언어를 따른다 — 영문 캡처(마케팅 보드)에 한글 이름이 섞이면 안 된다 */
 function imagesFor(i) {
   const use = (hash, name, width, height) => ({ nodeId: 'n-' + hash, imageHash: hash, name, width, height, scaleMode: 'FILL' })
+  const ko = LANG.toLowerCase().startsWith('ko')
+  const cover = ko ? '\ud45c\uc9c0 \ubc30\uacbd' : 'Cover photo'
+  const logo = ko ? '\ub85c\uace0' : 'Logo'
+  const shot = ko ? '\ud654\uba74 \ucea1\ucc98 0' : 'Screenshot 0'
+  const icon = ko ? '\uc544\uc774\ucf58 0' : 'Icon 0'
   switch (i % 3) {
-    case 0: return [use('cover', '\ud45c\uc9c0 \ubc30\uacbd', 595, 397), use('logo', '\ub85c\uace0', 120, 40)]
-    case 1: return [use('logo', '\ub85c\uace0', 120, 40)]
+    case 0: return [use('cover', cover, 595, 397), use('logo', logo, 120, 40)]
+    case 1: return [use('logo', logo, 120, 40)]
     default: return [0, 1, 2, 3].flatMap((k) => [
-      use('shot' + k, '\ud654\uba74 \ucea1\ucc98 0' + (k + 1), 260, 170),
-      use('icon' + k, '\uc544\uc774\ucf58 0' + (k + 1), 48, 48)
+      use('shot' + k, shot + (k + 1), 260, 170),
+      use('icon' + k, icon + (k + 1), 48, 48)
     ])
   }
 }

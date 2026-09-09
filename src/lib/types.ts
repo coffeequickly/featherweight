@@ -61,10 +61,13 @@ export const DEFAULT_SETTINGS: Settings = {
 }
 
 /**
- * 정렬 기준. 방향(뒤집기)은 따로 둔다 — 넷 × 둘을 여덟 칸으로 늘어놓으면 고를 수 없다.
- * 'selection' 은 메인이 보낸 순서 그대로다(Figma 가 준 선택 순서).
+ * 정렬 기준. 방향(뒤집기)은 따로 둔다 — 셋 × 둘을 여섯 칸으로 늘어놓으면 고를 수 없다.
+ *
+ * "고른 순서" 는 없다. figma.currentPage.selection 은 클릭한 차례를 보존하지 않아서
+ * (실기 확인: 1·2·3·4·5 를 차례로 골랐는데 1·4·5·2·3 이 왔다) 지킬 수 없는 약속이었다.
+ * 순서를 직접 정하는 길은 정렬 탭에서 행을 끌어 옮기는 쪽이고, 그 상태는 "직접" 칩이 말한다.
  */
-export type SortMode = 'position' | 'name' | 'layer' | 'selection'
+export type SortMode = 'position' | 'name' | 'layer'
 
 export type FrameItem = {
   id: string
@@ -259,10 +262,11 @@ export interface FrameThumbsHandler extends EventHandler {
 export interface FrameThumbsRequestHandler extends EventHandler {
   name: 'frames:thumbs:request'
   /**
-   * limit 은 앞에서부터 몇 장까지 그릴지. 시작 탭은 확인용으로 몇 장만 보여주므로
-   * 서른 장을 다 그리면 여는 속도만 버린다 — 전체는 정렬 탭이 요청한다.
+   * 그릴 프레임의 id. 개수가 아니라 id 여야 한다 — 메인의 선택 배열은 Figma 가 준 순서고
+   * UI 는 그것을 정렬해 보여 주므로, "앞에서 넷" 이 서로 다른 넷을 가리킨다.
+   * 실기에서 시작 탭의 세 번째 칸이 계속 비어 있었던 이유다.
    */
-  handler: (limit?: number) => void
+  handler: (ids: string[]) => void
 }
 
 /**
@@ -420,6 +424,12 @@ export interface FontSaveResultHandler extends EventHandler {
 export interface FontDeleteHandler extends EventHandler {
   name: 'font:delete'
   handler: (ref: FontRef) => void
+}
+
+/** 저장소 전체 비우기. 한도(5MB)가 빡빡해 한 종씩 지우는 것만으로는 답이 안 될 때가 있다 */
+export interface FontClearHandler extends EventHandler {
+  name: 'fonts:clear'
+  handler: () => void
 }
 
 export interface NoticeHandler extends EventHandler {

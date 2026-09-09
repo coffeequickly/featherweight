@@ -162,20 +162,27 @@ function AppBody(): JSX.Element {
   }
 
   /**
-   * 썸네일은 필요한 탭에서만, 선택이 바뀌면 다시. 시작 탭은 확인용이라 앞 몇 장이면 되고
-   * 전체는 정렬 탭이 요청한다 — 장당 exportAsync 라 서른 장을 다 그리면 여는 속도를 버린다.
+   * 썸네일은 필요한 탭에서만, 그리고 그 탭이 실제로 그릴 프레임만. 시작 탭은 확인용이라
+   * 앞 몇 장이면 되고 전체는 정렬 탭이 요청한다 — 장당 exportAsync 라 서른 장을 다 그리면
+   * 여는 속도를 버린다.
+   *
+   * 개수가 아니라 id 로 요청한다. 메인의 선택 배열은 Figma 가 준 순서라 우리가 정렬해
+   * 보여 주는 것과 다르고, "앞에서 넷" 이 서로 다른 넷을 가리켰다.
    */
-  const thumbsFor = useRef<{ serial: number; limit: number | null }>({ serial: -1, limit: 0 })
+  const thumbsAsked = useRef<{ serial: number; ids: Set<string> }>({ serial: -1, ids: new Set() })
   useEffect(() => {
-    const limit = tab === 'order' ? null : tab === 'start' ? PAGES_SHOWN : 0
-    if (limit === 0) return
-    const done = thumbsFor.current
-    // 정렬 탭이 이미 전체를 받아 왔으면 시작 탭 때문에 다시 그리지 않는다
-    if (done.serial === main.selectionSerial && (done.limit === null || done.limit >= (limit ?? 0)))
-      return
-    thumbsFor.current = { serial: main.selectionSerial, limit }
-    emit<FrameThumbsRequestHandler>('frames:thumbs:request', limit ?? undefined)
-  }, [tab, main.selectionSerial])
+    const wanted =
+      tab === 'order' ? order.visible : tab === 'start' ? order.visible.slice(0, PAGES_SHOWN) : []
+    if (wanted.length === 0) return
+    if (thumbsAsked.current.serial !== main.selectionSerial) {
+      thumbsAsked.current = { serial: main.selectionSerial, ids: new Set() }
+    }
+    const asked = thumbsAsked.current.ids
+    const ids = wanted.map((item) => item.id).filter((id) => !asked.has(id))
+    if (ids.length === 0) return
+    for (const id of ids) asked.add(id)
+    emit<FrameThumbsRequestHandler>('frames:thumbs:request', ids)
+  }, [tab, main.selectionSerial, order.visible])
 
   /**
    * 내보내고 나면 결과 탭이 받는다 — 고치고 다시 내보내는 왕복이 여기서 돈다.

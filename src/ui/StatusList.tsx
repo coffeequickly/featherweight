@@ -68,8 +68,8 @@ function IssueCard({
 }): JSX.Element {
   const { head, detail, go, goLabel } = describe(issue)
 
-  return (
-    <div class="statusCard" onClick={go === null ? undefined : () => onGo(go)}>
+  const inside = (
+    <Fragment>
       <div class="statusCardIcon">
         <IconWarning16 />
       </div>
@@ -80,7 +80,15 @@ function IssueCard({
         {detail === null ? null : <div class="statusCardDetail">{detail}</div>}
       </div>
       {go === null ? null : <span class="statusCardGo">{goLabel}</span>}
-    </div>
+    </Fragment>
+  )
+
+  // 갈 곳이 있으면 진짜 버튼이다 — 클릭 가능한 div 는 Tab 이 건너뛰고 커서도 안 바뀐다
+  if (go === null) return <div class="statusCard">{inside}</div>
+  return (
+    <button type="button" class="statusCard" onClick={() => onGo(go)}>
+      {inside}
+    </button>
   )
 }
 

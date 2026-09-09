@@ -19,7 +19,7 @@ export function FontFamilyRow({ row, onOpen }: { row: Row; onOpen: () => void })
   const { shown, rest } = visibleStyles(row, BADGES_SHOWN)
 
   return (
-    <button type="button" class="famRow" onClick={onOpen}>
+    <button type="button" class={`famRow${row.problems > 0 ? ' famRowWarn' : ''}`} onClick={onOpen}>
       <div class="famBody">
         <div class="famHead">
           <span class="famName ellipsis">

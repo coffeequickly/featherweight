@@ -37,7 +37,6 @@ export function FramesScreen({ order, disabled }: Props): JSX.Element {
           <option value="position">{t('app.sortPosition')}</option>
           <option value="name">{t('app.sortName')}</option>
           <option value="layer">{t('app.sortLayer')}</option>
-          <option value="selection">{t('app.sortSelection')}</option>
         </select>
         {order.reordered ? (
           <span class="sortManual">

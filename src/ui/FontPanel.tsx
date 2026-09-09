@@ -5,8 +5,7 @@ import {
   IconFolder16,
   IconWarning16,
   Muted,
-  Text,
-  VerticalSpace
+  Text
 } from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
@@ -242,26 +241,6 @@ export function FontPanel({
   )
 }
 
-/** 처음 한 번만 읽는 설명 — 늘 펼쳐 두면 매번 읽어야 할 것처럼 보인다 */
-function Help(): JSX.Element {
-  const [open, setOpen] = useState(false)
-  return (
-    <Fragment>
-      <button aria-expanded={open} class="linkButton" onClick={() => setOpen(!open)} type="button">
-        {t('fonts.whyFile')}
-      </button>
-      {open ? (
-        <Fragment>
-          <VerticalSpace space="extraSmall" />
-          <Text>
-            <Muted>{t('fonts.help')}</Muted>
-          </Text>
-        </Fragment>
-      ) : null}
-    </Fragment>
-  )
-}
-
 /**
  * 마지막 폴더 스캔이 어떻게 됐나 — 닫거나 다음 스캔까지 남는다. 두 줄: 넣은 수·공간 부족·없음, 그리고
  * 공간이 모자라면 필요한 양과 남은 양에 "다시 넣기". 이유별 집계는 행이 말하므로 검사 미완료만 덧붙인다.
@@ -364,6 +343,8 @@ function FolderScan({
   progress: { done: number; total: number } | null
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null)
+  /** 처음 한 번만 읽는 설명 — 늘 펼쳐 두면 매번 읽어야 할 것처럼 보인다 */
+  const [helpOpen, setHelpOpen] = useState(false)
 
   // 넣을 것이 없으면 버튼도 안내도 필요 없다 — 도움말 링크만 남긴다
   const idle = missing.length === 0
@@ -443,20 +424,36 @@ function FolderScan({
           </Button>
         )}
         {progress === null ? (
-          <Help />
+          <button
+            aria-expanded={helpOpen}
+            class="linkButton"
+            onClick={() => setHelpOpen(!helpOpen)}
+            type="button"
+          >
+            {t('fonts.whyFile')}
+          </button>
         ) : (
           <Text>
             <Muted>{t('fonts.scanning', { current: progress.done, total: progress.total })}</Muted>
           </Text>
         )}
       </div>
+      {/* 설명은 줄 밖에 둔다. Fragment 는 DOM 을 만들지 않아서, 링크와 함께 줄 안에 두면
+          문단이 그대로 flex 아이템이 되어 폴더 버튼을 짓눌렀다 — 실기에서 버튼 글자가
+          세로로 접혔다 */}
+      {helpOpen ? (
+        <div class="scanHelp">
+          <Text>
+            <Muted>{t('fonts.help')}</Muted>
+          </Text>
+        </div>
+      ) : null}
       {idle ? null : (
-        <Fragment>
-          <VerticalSpace space="extraSmall" />
+        <div class="scanHelp">
           <Text>
             <Muted>{t('fonts.scanHint')}</Muted>
           </Text>
-        </Fragment>
+        </div>
       )}
       <input
         ref={input}

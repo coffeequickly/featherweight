@@ -65,18 +65,24 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
   const embedded = report.textDrawn
   const total = embedded + outlined
 
-  // 같은 사유가 노드마다 하나씩 나온다 — 묶어서 세고, 누르면 캔버스에서 그 레이어를 보여준다
+  // 같은 사유가 노드마다 하나씩 나온다 — 묶어서 세고, 누르면 캔버스에서 그 레이어를 보여준다.
+  // 이미지 경고는 여기 섞지 않는다 — 텍스트가 아웃라인이 된 사유와 도메인이 다르다.
   const reasons = groupReasons([
     ...report.skipped.map((skip) => ({
       reason: t('report.skipped', { name: skip.name, reason: formatReason(skip.reason) }),
       id: skip.id
     })),
-    ...report.imageWarnings.map((item) => ({ reason: formatReason(item.reason), id: item.nodeId })),
     ...unifyMissingGlyphs(report.fallbacks).map((item) => ({
       reason: formatReason(item.reason),
       id: item.nodeId
     }))
   ])
+  const imageReasons = groupReasons(
+    report.imageWarnings.map((item) => ({ reason: formatReason(item.reason), id: item.nodeId }))
+  )
+  const imagesKept = Math.max(0, report.images.count - report.imagesProcessed)
+  const imageShare =
+    report.byteLength > 0 ? Math.round((report.images.bytes / report.byteLength) * 100) : 0
 
   return (
     <Fragment>
@@ -209,23 +215,94 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
 
       <Fold
         title={t('result.sectionImages')}
+        defaultOpen={imageReasons.length > 0}
         summary={
-          <Muted>
-            {report.images.count === 0
-              ? t('result.imagesNone')
-              : t('result.imagesAside', {
-                  count: report.imagesProcessed,
-                  total: report.images.count
-                })}
-          </Muted>
+          imageReasons.length > 0 ? (
+            <span class="foldWarn">
+              {t('result.imagesWarned', { count: report.imageWarnings.length })}
+            </span>
+          ) : (
+            <Muted>
+              {report.images.count === 0
+                ? t('result.imagesNone')
+                : t('result.imagesAside', {
+                    count: report.imagesProcessed,
+                    total: report.images.count
+                  })}
+            </Muted>
+          )
         }
       >
         {report.images.count === 0 ? null : (
-          <div class="resultLine">
-            <Text>
-              <Muted>{t('result.imageBytes', { size: formatBytes(report.images.bytes) })}</Muted>
-            </Text>
-          </div>
+          <Fragment>
+            {report.imagesProcessed === 0 ? null : (
+              <div class="outcome">
+                <div class="outcomeHead">
+                  <span class="outcomeIcon outcomeOk">
+                    <IconCheck16 />
+                  </span>
+                  <Text>{t('result.imagesShrunk', { count: report.imagesProcessed })}</Text>
+                </div>
+                <div class="outcomeChildren">
+                  <div class="outcomeNote">
+                    <Text>
+                      <Muted>
+                        {t('result.imageShare', {
+                          size: formatBytes(report.images.bytes),
+                          percent: imageShare
+                        })}
+                      </Muted>
+                    </Text>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {imagesKept === 0 ? null : (
+              <div class="outcome">
+                <div class="outcomeHead">
+                  <span class="outcomeIcon outcomeOk">
+                    <IconCheck16 />
+                  </span>
+                  <Text>{t('result.imagesKept', { count: imagesKept })}</Text>
+                </div>
+              </div>
+            )}
+
+            {imageReasons.length === 0 ? null : (
+              <div class="outcome">
+                <div class="outcomeHead">
+                  <span class="outcomeIcon outcomeWarn">
+                    <IconWarning16 />
+                  </span>
+                  <Text>{t('result.imagesWarned', { count: report.imageWarnings.length })}</Text>
+                </div>
+                <div class="outcomeChildren">
+                  {imageReasons.map((item) => (
+                    <button
+                      key={item.reason}
+                      type="button"
+                      class="reasonRow"
+                      title={t('report.clickHint')}
+                      onClick={() => emit<NodesFocusHandler>('nodes:focus', item.ids)}
+                    >
+                      <span class="reasonWhy">
+                        <Text>{item.reason}</Text>
+                      </span>
+                      <span class="reasonCount">
+                        <Text>
+                          <Muted>{t('result.countUnit', { count: item.count })}</Muted>
+                        </Text>
+                      </span>
+                      <span class="reasonGo">
+                        <IconChevronRight16 />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Fragment>
         )}
       </Fold>
 

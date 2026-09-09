@@ -56,7 +56,10 @@ export async function resizeImage(request: ResizeRequest): Promise<ResizeResult>
     if (mustResize) bitmap = await stepDown(bitmap, size.width, size.height)
 
     const canvas = new OffscreenCanvas(size.width, size.height)
-    const context = canvas.getContext('2d')
+    // 알파를 확인할 때만 getImageData 로 픽셀을 되읽는다. 그 canvas 는 CPU 쪽에 두는 편이
+    // 낫다 — GPU 텍스처에서 되읽으면 장마다 동기 전송이 걸린다(Chrome 이 콘솔로 경고한다).
+    const willReadFrequently = sourcePng && reencodeOpaquePng
+    const context = canvas.getContext('2d', { willReadFrequently })
     if (context === null) return { ok: false, reason: t('resize.noContext') }
     context.drawImage(bitmap, 0, 0, size.width, size.height)
     bitmap.close()
