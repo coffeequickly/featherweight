@@ -63,13 +63,29 @@ Options tab is the build you mean to ship.
       a long frame name ends in "…" and never overflows or clips its descenders;
       clicking a row reveals that frame on the canvas (selection unchanged);
       ✕ excludes and the excluded list restores individually
-- [ ] Images: resolution is 1× / 1.5× / 2× / 3× / 4× with a line saying what it
-      means ("Stays sharp when zoomed to 150%. That is 108 DPI in print."). A
-      1.4 install that had 2048 / 4096 / 1600 stored comes up on the nearest
-      step, not unselected
+- [ ] Images opens on the same four presets as Start, as one row of chips. When
+      the values match no preset a fifth **Custom** chip lights up instead of
+      leaving every chip dark; the row keeps its height either way
+- [ ] Under **Advanced** sit three bars — Largest (px) · Smallest (px) · Scale
+      (×) — each showing its own value and the ends of its own ladder. Folded,
+      the header still reads all three. A line says what the scale means
+      ("Stays sharp when zoomed to 150%. That is 108 DPI in print.")
+- [ ] Every bar responds across its whole range. Dragging Largest below Smallest
+      is impossible — the ladder itself is trimmed, and the other bar never
+      moves on its own. A stored pair that crosses (an old install with 1600
+      min and 1280 max) is unfolded on load, not carried in
+- [ ] Above the bars, four of this document's images are drawn to their real
+      aspect: dashed = the size now, filled = the size exported, hatched = left
+      alone. The line-up does **not** change when the bars move or while sizes
+      are still loading — only the boxes do
+- [ ] A selection with no images shows no diagram box at all; one whose sizes
+      are still being read keeps the box at its full height and says so
 - [ ] Images lists this document's images — name, the size it starts at, the
-      size it ends up — and moving the resolution moves the whole column. An
-      image the per-image cap decides (not the scale) is called out
+      size it ends up — and moving a bar moves the whole column. Clicking a row
+      reveals those layers on the canvas. An image the Largest cap decides (not
+      the scale) is called out, and the warning names the bar to raise
+- [ ] Picking Target size here shows the MB field right below the chips — no
+      trip back to Start to set the number
 - [ ] Options: hyperlinks and fallback characters as plain toggles; "Export all
       text as outlines" sits apart under "Use with care", is **off** by default,
       and turning it on says the Fonts tab no longer applies — Start then shows
@@ -295,6 +311,15 @@ for a document with nothing to outline; `report=1` for the result card).
       `pdfimages -list` shows the original dimensions and encoding
 - [ ] An oversized screenshot is downscaled; no image exceeds its target
 - [ ] Transparent PNGs stay PNG (no black boxes)
+- [ ] A cropped or aspect-mismatched fill keeps the density its visible part
+      needs — `pdfimages -list` x-ppi for it is no lower than for a plainly
+      placed image at the same scale
+- [ ] At 2× on an image-heavy deck the file is smaller than the same export
+      from the previous release, and the text is byte-identical (same word
+      count from `pdftotext`, same font object count from `pdffonts`)
+- [ ] At 1× the file is no larger than the previous release's 1× — the Balanced
+      preset's floor is 640, and a floor above that silently overrides the scale
+      bar for anything placed small
 
 ## Fit to Size
 

@@ -80,22 +80,29 @@ PDF 크기 = 고정분(텍스트·폰트·벡터·구조) + Σ이미지 바이�
 목표를 맞추려고 무한정 낮추지 않는다. v1 하한:
 
 ```
-quality   ≥ 0.60
+quality    ≥ 0.60
 multiplier ≥ 1.0
-maxEdge   ≥ 1024
+maxEdge    ≥ 1024
+minEdge    ≥ 640
 ```
 
 "몰래 품질을 망치지 않는다"는 기존 원칙의 연장이다. 못 맞추면 못 맞춘다고 말한다.
 
 ## 프로필
 
-`Settings`의 `multiplier`/`maxEdge`는 UI 세그먼트와 묶인 union 타입이다.
+`Settings`의 `multiplier`/`maxEdge`/`minEdge`는 UI 눈금과 묶인 union 타입이다.
 탐색용 연속값을 그 타입에 밀어 넣지 않고, 별도 `CompressionProfile`을 쓴다.
+
+프로필은 하한(`minEdge`)까지 제 것으로 들고 내려간다. 예전에는 사용자의 `settings.minEdge`
+를 빌려 썼는데, 그때는 `targetFor` 가 그 값을 무시하고 640 을 하드코딩해서 아무 일도 없었다.
+하한이 실제로 동작하게 된 뒤로는 최소를 올려 둔 사용자에게만 탐색의 바닥이 얕아진다 —
+화질을 알아서 정해 달라고 맡긴 모드에서 사용자 설정이 바닥을 막으면 안 된다.
 
 ```ts
 type CompressionProfile = {
   multiplier: number
   maxEdge: number
+  minEdge: number
   quality: number
   reencodeOpaquePng: boolean
 }

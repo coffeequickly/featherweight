@@ -18,7 +18,13 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
-const TARGET = process.env.SHEAF_INSTALL_DIR ?? join(homedir(), 'figma-plugins', 'sheaf')
+// 개발용 복사 위치. 옛 이름(`sheaf`)을 쓰다가 저장소 이름에 맞췄다 — 이건 로컬 폴더라
+// 바꿔도 잃을 것이 없다(clientStorage 의 `sheaf.*` 키와 달리). 옛 폴더가 남아 있으면
+// Figma 에서 한 번 다시 import 해야 한다.
+const TARGET =
+  process.env.FEATHERWEIGHT_INSTALL_DIR ??
+  process.env.SHEAF_INSTALL_DIR ??
+  join(homedir(), 'figma-plugins', 'featherweight')
 
 async function exists(path) {
   try {
