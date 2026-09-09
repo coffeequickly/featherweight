@@ -87,9 +87,3 @@ export async function readSize(image: Image, bytes?: Uint8Array): Promise<PixelS
     return null
   }
 }
-
-/** 긴 변만 필요한 자리 — 옛 이름을 유지해 부르는 쪽을 안 바꾼다 */
-export async function readEdge(image: Image, bytes?: Uint8Array): Promise<number | null> {
-  const size = await readSize(image, bytes)
-  return size === null ? null : Math.max(size.width, size.height)
-}

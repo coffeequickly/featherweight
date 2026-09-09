@@ -58,16 +58,10 @@ export function isProcessable(usage: ImageUsage): boolean {
 }
 
 /**
- * 아무리 작게 표시돼도 이 아래로는 줄이지 않는다.
- * 2383px 로고가 93pt 로 표시된다고 140px 로 뭉개면 줌·인쇄에서 바로 티가 난다.
- *
- * 2026-09-09 에 640 → 1024. 그전에는 프레임 예산 관문(옛 skipFloor)이 작은 그림을 대부분
- * 막아서 이 하한이 실제로 쓰일 일이 드물었는데, 관문을 이미지별 기준(shouldShrink)으로
- * 바꾸면서 상시로 작동하는 값이 됐다. 실측: 1920pt 페이지에 300pt 로 놓인 UI 스크린샷이
- * 3600px → 640px 이 되어 잔글씨가 뭉갰다. 1024 면 그 자리가 살아나고, 그 크기대의 이미지는
- * 장당 수십 KB 라 비용은 파일의 1% 안팎이다.
+ * 하한은 사용자가 정한다(설정의 minEdge, 이미지 탭의 "가장 작게 남길 크기" 바).
+ * 예전에는 코드 상수(MIN_TARGET_LONG_EDGE)와 설정값이 따로 있어 그림과 결과가 어긋났다 —
+ * 화면이 640 이라고 적어 놓고 1024 로 내보냈다. 값을 하나로 합쳤다.
  */
-export const MIN_TARGET_LONG_EDGE = 1024
 
 /**
  * 이 이미지를 손댈 것인가.
@@ -81,12 +75,8 @@ export const MIN_TARGET_LONG_EDGE = 1024
  * 이 뒤에도 가드가 셋 더 있다: 100KB 바이트 하한, 업스케일 금지(scaledSize),
  * 줄였는데 커지면 되돌리기(keepsOriginal).
  */
-export function shouldShrink(
-  originalLongEdge: number,
-  targetLongEdge: number,
-  minEdge: number
-): boolean {
-  return originalLongEdge > Math.max(targetLongEdge, minEdge)
+export function shouldShrink(originalLongEdge: number, targetLongEdge: number): boolean {
+  return originalLongEdge > targetLongEdge
 }
 
 /**
@@ -106,7 +96,7 @@ export const DENSITY_MARGIN = 1.1
 
 export function targetFor(
   usage: ImageUsage,
-  settings: Pick<Settings, 'multiplier' | 'maxEdge'>,
+  settings: Pick<Settings, 'multiplier' | 'maxEdge' | 'minEdge'>,
   source?: PixelSize | null
 ): number {
   const shown = Math.ceil(displayedLongEdge(usage) * settings.multiplier)
@@ -128,7 +118,7 @@ export function targetFor(
     if (dense > shown * DENSITY_MARGIN) wanted = dense
   }
 
-  return Math.min(settings.maxEdge, Math.max(wanted, MIN_TARGET_LONG_EDGE))
+  return Math.min(settings.maxEdge, Math.max(wanted, settings.minEdge))
 }
 
 /**
@@ -137,7 +127,7 @@ export function targetFor(
  */
 export function planImageTargets(
   usages: readonly ImageUsage[],
-  settings: Pick<Settings, 'multiplier' | 'maxEdge'>,
+  settings: Pick<Settings, 'multiplier' | 'maxEdge' | 'minEdge'>,
   sizes?: Record<string, PixelSize>
 ): ImagePlan[] {
   const byHash = new Map<string, ImagePlan>()
@@ -162,11 +152,6 @@ export function planImageTargets(
   }
 
   return [...byHash.values()]
-}
-
-/** 원본이 이미 목표보다 작으면 키우지 않는다. */
-export function needsDownscale(originalLongEdge: number, targetLongEdge: number): boolean {
-  return originalLongEdge > targetLongEdge
 }
 
 /**

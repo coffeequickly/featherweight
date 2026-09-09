@@ -81,7 +81,6 @@ import {
   ProgressHandler,
   Reason,
   ToastHandler,
-  ResizeWindowHandler,
   StoredFont,
   StoredFontsHandler,
   TextRunSource,
@@ -214,13 +213,12 @@ export default async function main(): Promise<void> {
     scheduleSelection()
   })
 
-  on<ResizeWindowHandler>('resize:window', (size) => {
-    figma.ui.resize(size.width, size.height)
-  })
-
   // 같은 프레임의 글자·폰트·이미지를 고치면 체크리스트가 따라 바뀐다 (선택 목록은 그대로)
   watchContentChanges()
 
+  // 크기 고정. 줄이면 상태 카드의 사유 줄과 정상 줄이 두 줄로 접히면서 오른쪽 링크와 겹친다
+  // (실기 392px 에서 재현). 탭 여섯과 프리셋 타일 넷이 서로 다른 최소 폭을 요구해서,
+  // 하나의 폭에 맞춰 설계하고 그 폭을 지키는 편이 정직하다.
   showUI({ width: WINDOW_WIDTH, height: WINDOW_HEIGHT })
 }
 
@@ -405,7 +403,7 @@ async function runFitExport(order: string[], settings: Settings, outName: string
   const baselineBytes: ImageBytes = { total: measured.imageBytes, jpeg: measured.imageJpegBytes }
   const ratio = calibrationRatio(measured.pdfImageBytes, baselineBytes)
 
-  const probes = await runProbes(order, fixed, targetBytes, baselineBytes, settings.minEdge, ratio)
+  const probes = await runProbes(order, fixed, targetBytes, baselineBytes, ratio)
   const outcome = chooseProfile(probes, fixed, targetBytes, baselineBytes, ratio)
   const fit: FitReport = {
     targetBytes,
@@ -444,7 +442,6 @@ async function runProbes(
   fixed: number,
   targetBytes: number,
   baselineBytes: ImageBytes,
-  minEdge: Settings['minEdge'],
   ratio: number
 ): Promise<Probe[]> {
   const probes: Probe[] = []
@@ -459,7 +456,7 @@ async function runProbes(
   const probe = async (profile: CompressionProfile): Promise<boolean | null> => {
     step += 1
     reportProgress(t('progress.probe', { current: step, total }), step / total, FIT_PROBE)
-    const items = await probeItemsFor(order, profile, minEdge)
+    const items = await probeItemsFor(order, profile)
     if (items.length === 0) return null // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
 
     const reqId = nextRequestId('probe')
@@ -501,10 +498,14 @@ async function runProbes(
   return probes
 }
 
+/**
+ * 하한은 프로필이 들고 있다 — 예전에는 사용자의 `settings.minEdge` 를 넘겼는데,
+ * 그러면 최소를 올려 둔 사용자에게만 목표 용량이 덜 줄어든다. 화질을 알아서 정해 달라고
+ * 맡긴 모드에서 사용자 설정이 탐색의 바닥을 막으면 안 된다.
+ */
 async function probeItemsFor(
   order: string[],
-  profile: CompressionProfile,
-  minEdge: Settings['minEdge']
+  profile: CompressionProfile
 ): Promise<ImageProbeItem[]> {
   const seen = seenImageInfo()
   const byHash = new Map<string, ImageProbeItem>()
@@ -520,7 +521,7 @@ async function probeItemsFor(
       if (info === undefined) continue // 기준 패스에서 못 본 이미지 — 셀 근거가 없다
 
       // 탐색도 실제 export 와 같은 기준을 써야 예측이 맞는다
-      const skip = !shouldShrink(info.longEdge, plan.targetLongEdge, minEdge)
+      const skip = !shouldShrink(info.longEdge, plan.targetLongEdge)
       const found = byHash.get(plan.imageHash)
       if (found === undefined) {
         byHash.set(plan.imageHash, {

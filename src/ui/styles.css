@@ -3,12 +3,13 @@
 
 /* create-figma-plugin 기본은 Inter(라틴) 기준이다.
    - 글꼴: 시스템 UI 스택으로 — 한글이 폴백 혼합 없이 OS 네이티브로 나온다
-   - 줄높이: 16px 는 한글 글리프에 빠듯해 위아래가 깎여 보인다. 살짝 키운다 */
+   - 줄높이: 16px 는 한글 글리프에 빠듯해 위아래가 깎여 보인다. 살짝 키운다.
+     18px 도 여러 줄로 접히는 설명문에서는 답답하다는 지적이 두 번 나왔다 — 19px 로 둔다 */
 :root {
   --font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Apple SD Gothic Neo',
     'Malgun Gothic', sans-serif;
-  --line-height-16: 18px;
+  --line-height-16: 19px;
 }
 
 /* ── 다크 고정 ──────────────────────────────────────────────
@@ -1570,7 +1571,9 @@ button:not([disabled]) *,
   align-items: flex-start;
   width: 100%;
   margin: 6px 0 0;
-  padding: 9px 10px;
+  /* 눈에 보이는 여백은 패딩 + 줄상자의 반허공이다. 머리글이 19px 줄상자를 가지므로
+     위아래로 4px 씩이 더 붙는다 — 7px 을 주면 광학적으로 약 11px 이 되어 좌우 10px 과 맞는다 */
+  padding: 7px 10px;
   border: 0;
   border-radius: 6px;
   background: var(--figma-color-bg-warning-tertiary, #fff1c2);
@@ -1603,8 +1606,9 @@ button.statusCard:hover {
   min-width: 0;
 }
 
-.statusCardHead * {
+.statusCardHead {
   font-weight: 600;
+  line-height: var(--line-height-16);
 }
 
 .statusCardDetail {
@@ -1613,10 +1617,14 @@ button.statusCard:hover {
 }
 
 .statusCardGo {
+  display: flex;
   flex: 0 0 auto;
-  white-space: nowrap;
-  font-weight: 600;
   align-self: center;
+  color: var(--figma-color-icon-secondary);
+}
+
+.statusCard:hover .statusCardGo {
+  color: var(--figma-color-icon);
 }
 
 .statusFine {
@@ -1692,35 +1700,102 @@ button.statusCard:hover {
 /* ── 이미지 탭 ─────────────────────────────── */
 
 /* 맨 위 한 줄 — 지금 값이 프리셋 그대로인지, 직접 만진 것인지 */
-.panelState {
+/* 목표 용량 모드일 때 칩 줄 아래 붙는 MB 입력 */
+.fitRow {
+  display: flex;
+  margin-top: 10px;
+}
+
+/* 이미지 탭 맨 위의 작은 프리셋 줄. 시작 탭은 타일(정사각·아이콘 16px·설명 한 줄)이지만
+   여기서는 출발점을 고르는 손잡이라 한 줄로 눕힌다. 칩 높이를 못 박아 두는 이유는,
+   "직접 설정" 칩이 붙었다 떨어졌다 해도 아래 것들이 출렁이면 안 되기 때문이다. */
+.presetRow {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.presetChip {
+  flex: 1 1 0;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding: 6px 8px;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--figma-color-border);
   border-radius: 6px;
-  background: var(--figma-color-bg-secondary);
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
+  font: 11px/16px var(--font-family);
+  outline: 0;
+}
+
+.presetChip svg {
+  flex: 0 0 auto;
+  color: var(--figma-color-icon-secondary);
+}
+
+.presetChipName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presetChip:not([disabled]):hover {
+  border-color: var(--figma-color-border-strong);
+}
+
+.presetChipOn {
+  border-color: var(--figma-color-border-brand, var(--figma-color-text-brand, #007be5));
+  box-shadow: inset 0 0 0 1px
+    var(--figma-color-border-brand, var(--figma-color-text-brand, #007be5));
+  background: var(--figma-color-bg-brand-tertiary, #e5f4ff);
+}
+
+.presetChipOn svg,
+.presetChipOn .presetChipName {
+  color: var(--figma-color-text-brand, #007be5);
+}
+
+/* 상태를 알리는 칩이지 고르는 칩이 아니다 — 켜져 있지만 눌리지 않는다 */
+.presetChipState {
+  flex: 0 1 auto;
+  cursor: default;
 }
 
 .stateName {
   font-weight: 600;
 }
 
-/* 되돌리기를 오른쪽 끝으로 민다 */
-.statePush {
-  flex: 1 1 auto;
+/* 두 줄 넘게 접히는 설명문. 라벨·값처럼 한 줄로 끝나는 것에는 걸지 않는다 —
+   행간을 전부 늘리면 목록이 성기게 흩어진다 */
+.says,
+.scanHelp,
+.chartLegend p,
+.statusCardDetail,
+.outcomeNote,
+.styleLine {
+  line-height: 1.72;
+  /* 한국어는 기본이 글자 단위로 끊긴다 — "그림 내용에 따 / 라 달라집니다" 가 그것이다 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
-/* 어느 프리셋인지 — 시작 탭 타일과 같은 그림이라 글자보다 먼저 읽힌다 */
-.stateGlyph {
-  display: flex;
-  flex: 0 0 auto;
-  color: var(--figma-color-icon-secondary);
+.says {
+  margin-top: 18px;
+}
+
+.says + .says {
+  margin-top: 24px;
 }
 
 /* 상한이 배율을 이겼다 — 고른 값이 그대로 안 나간다는 사실은 조용히 두면 안 된다 */
 .saysWarn {
-  margin-top: 8px;
+  margin-top: 24px;
   color: var(--figma-color-text-warning, #b86200);
 }
 
@@ -1728,46 +1803,325 @@ button.statusCard:hover {
   color: inherit;
 }
 
+/* 이름 · 원본 · 결과 · 표시. 설정이 무엇을 하는지 그림보다 이 줄들이 정확하게 말한다.
+   flex 로 두면 이름 길이와 자릿수에 따라 화살표가 줄마다 다른 x 에 서서 열이 흐트러진다 —
+   그리드로 못 박아 숫자와 화살표가 세로로 맞게 한다. 이름만 남는 폭을 먹는다. */
 .imageList {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  /* baseline 이면 빈 칸(배지 없는 줄의 경고 자리)에 기준선이 없어 그 칸만 낮게 그려진다 —
+     호버 배경이 줄 끝에서 한 단 꺼진다. 늘려서 네 칸 높이를 맞춘다 */
+  align-items: stretch;
+  /* 칸 사이를 gap 으로 벌리면 호버 배경이 그 틈에서 끊겨 한 줄이 네 조각으로 보인다 —
+     간격은 칸 제 패딩으로 내고 gap 은 0 으로 둔다 */
+  column-gap: 0;
+  row-gap: 0;
   margin-top: 6px;
 }
 
-/* 이름 · 원본 · 결과. 설정이 무엇을 하는지 그림보다 이 줄들이 정확하게 말한다 */
+/* 줄 전체가 버튼이지만 칸은 그리드가 잡는다 — display: contents 로 버튼 상자를 지운다.
+   대신 hover 를 줄 데가 없어져서, 배경은 각 칸이 나눠 그린다 */
 .imageRow {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 4px 0;
+  display: contents;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.imageRow > * {
+  padding: 5px;
+}
+
+.imageRow:hover > * {
+  background: var(--figma-color-bg-hover);
+}
+
+/* 양 끝만 둥글게 — 네 칸이 이어져 하나의 줄로 보인다 */
+.imageRow:hover > *:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.imageRow:hover > *:last-child {
+  border-radius: 0 4px 4px 0;
 }
 
 .imageName {
-  flex: 1 1 auto;
   min-width: 0;
+  padding-left: 6px;
 }
 
-.imageFrom {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-/* 잘리는 그림의 표시 — 줄 오른쪽 끝, 앰버. 목록에서 눈에 걸려야 의미가 있다 */
 .imageClipped {
-  flex: 0 0 auto;
-  margin-left: 8px;
-  white-space: nowrap;
-  color: var(--figma-color-text-warning, #b86200);
+  padding-right: 6px;
 }
 
+.imageFrom,
+.imageTo,
+.imageClipped {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.imageFrom,
 .imageTo {
-  flex: 0 0 auto;
+  text-align: right;
+}
+
+/* 잘리는 그림의 표시 — 줄 오른쪽 끝, 앰버. 목록에서 눈에 걸려야 의미가 있다.
+   자리는 늘 비워 둔다(빈 칸도 열을 차지한다) — 있는 줄만 밀려나면 그게 더 어수선하다 */
+.imageClipped {
   min-width: 62px;
   text-align: right;
-  white-space: nowrap;
+  color: var(--figma-color-text-warning, #b86200);
 }
 
 /* 손대지 않는 것은 강조하지 않는다 — 볼 이유가 있는 줄이 눈에 남아야 한다 */
 .imageKept * {
   color: var(--figma-color-text-secondary);
+}
+
+/* ── 해상도: 바 둘과 그림 ────────────────────── */
+
+/* 라벨 · 바 · 값. 그리드라 두 줄의 바가 같은 x 에서 시작하고 끝난다 */
+.boundRow {
+  display: grid;
+  /* 라벨은 짧다(최대·최소·배율 / Largest·Smallest·Scale) — 110px 은 트랙만 잡아먹었다 */
+  grid-template-columns: 64px minmax(0, 1fr) 58px;
+  align-items: center;
+  column-gap: 10px;
+  margin-top: 8px;
+  /* 눈금(.boundScale)은 흐름 밖이라 제 자리를 못 만든다 — 여기서 잡아 주지 않으면
+     마지막 줄의 눈금이 아래 문단 위로 올라탄다 */
+  padding-bottom: 14px;
+}
+
+.repsBox + .boundRow {
+  margin-top: 16px;
+}
+
+.boundTrack {
+  position: relative;
+  min-width: 0;
+}
+
+/* 사다리의 처음과 끝 — 지금 값이 구간의 어디쯤인지 알려면 양끝이 있어야 한다 */
+.boundScale {
+  /* 흐름에서 뺀다 — 이 두 숫자가 칸 높이를 늘리면 라벨과 값이 바에서 어긋난다 */
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--figma-color-text-secondary);
+}
+
+/* 라이브러리 RangeSlider 는 16px 트랙에 16px 손잡이라 알약처럼 두껍다. 피그마 제 슬라이더는
+   얇은 선에 작은 손잡이다 — 4px 선, 12px 손잡이로 맞춘다.
+   루트가 div 가 아니라 label 이다(range-slider.js). 처음에 `> div` 로 잡아 아무것도 안 걸렸다.
+   채움은 JS 가 input 에 인라인 그라디언트로 칠하므로 클래스로 못 덮는다 — 대신 위아래
+   패딩을 주고 content-box 로 잘라 가운데 4px 띠에만 칠하게 한다. 이때 offsetHeight 는
+   12 로 남아, 채움 끝을 셈하는 JS 의 손잡이 폭(= offsetHeight)과도 어긋나지 않는다.
+   background-clip 에 !important 가 필요하다: JS 가 쓰는 것은 `background` 단축 속성이라
+   background-clip 을 border-box 로 되돌린다. 인라인이라 보통 규칙으로는 못 이기고,
+   그대로 두면 회색 트랙만 얇아지고 파란 채움은 12px 알약으로 남는다. */
+.boundTrack > label,
+.sliderTrack > label {
+  height: 12px;
+}
+
+.boundTrack input[type='range'],
+.sliderTrack input[type='range'] {
+  height: 4px;
+  padding: 4px 0;
+  border-radius: 2px;
+  background-clip: content-box !important;
+  box-sizing: content-box;
+}
+
+.boundTrack > label > div,
+.sliderTrack > label > div {
+  top: 4px;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.boundTrack input[type='range']::-webkit-slider-thumb,
+.sliderTrack input[type='range']::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  /* 테두리를 안쪽으로 — content-box 면 12+3+3 = 18px 이 되어 12px 줄을 넘는다 */
+  box-sizing: border-box;
+  border-width: 3px;
+  border-radius: 6px;
+}
+
+/* 잠긴 바. 라이브러리 기본은 테두리를 지우고 --figma-color-bg(다크에서 #2c2c2c)로 칠해서
+   어두운 판 위에 까만 점이 남는다 — 고장 난 것처럼 보인다. 채움도 bg-disabled(#3a3a3a)라
+   트랙(#383838)과 구분이 안 가 값이 어디인지도 안 보인다. 둘 다 회색으로 올려
+   "손잡이는 여기 있고, 지금은 못 만진다" 로 읽히게 한다 */
+.boundTrack input[type='range']:disabled,
+.sliderTrack input[type='range']:disabled {
+  --create-figma-plugin-range-slider-progress-track-color: var(--figma-color-text-disabled);
+}
+
+.boundTrack input[type='range']:disabled::-webkit-slider-thumb,
+.sliderTrack input[type='range']:disabled::-webkit-slider-thumb {
+  border: 3px solid var(--figma-color-bg-secondary);
+  background-color: var(--figma-color-text-disabled);
+}
+
+.boundValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 대표 셋을 실제 가로세로 비로. 점선이 지금, 칠한 것이 내보낼 크기 */
+/* 그림 묶음에 상자를 둘러 손잡이와 구분한다 */
+.repsBox {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 8px;
+  /* 모눈 — 크기를 견주는 판이라는 신호다. 꾸미기용이라 아주 옅게 두고,
+     상자·글자보다 뒤에 있어야 하므로 배경으로만 넣는다. 앱이 다크 고정이라 흰색 저알파로 쓴다 */
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 12px 12px;
+  background-position: center;
+}
+
+/* 크기를 읽는 동안의 자리. 높이는 SizeDiagram 이 인라인으로 준다 — CSS 에 숫자를 또
+   적으면 STAGE 를 고칠 때 조용히 갈라진다 */
+.repsWait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--figma-color-text-secondary);
+}
+
+/* 그림이 먼저, 바가 아래 — 바는 이 그림을 움직이는 손잡이다 */
+.reps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  /* end 로 두면 이름이 두 줄인 칸의 상자가 위로 밀려 네 상자가 어긋난다 —
+     견주라고 그린 것이 상자이므로 상자를 한 줄에 세우고 글자를 아래로 흘린다 */
+  align-items: start;
+}
+
+.repStage + * {
+  margin-top: 8px;
+}
+
+/* 줄 전체가 캔버스로 가는 문이다 */
+.rep {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 사각형은 아래에서 자란다 — 바를 끌면 위로 커지고 아래로 줄어든다 */
+.repStage {
+  display: block;
+  position: relative;
+}
+
+.repBox {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  border-radius: 2px;
+  /* 바를 끌면 사각형이 자랐다 줄었다 한다 — 정지 화면에서는 안 보이는 부분이다 */
+  transition:
+    width 0.16s ease,
+    height 0.16s ease;
+}
+
+/* 지금 크기. 채워 둬야 버려지는 만큼이 눈에 보인다 — 점선만 두면 빈 공간으로 읽힌다 */
+.repNow {
+  border: 1px dashed var(--figma-color-border-strong);
+  background: var(--figma-color-bg-secondary);
+}
+
+.repNext {
+  background: var(--figma-color-bg-brand);
+}
+
+/* 손대지 않는 그림. 회색으로 꽉 채워 두면 "이만큼 나간다" 는 결과처럼 읽혀서, 바를 만질 때
+   파랑이 회색으로 바뀌는 것이 파일이 달라진 것처럼 보였다. 사선은 결과가 아니라 "여기는
+   손대지 않는다" 는 표시다 — 채워진 면이 아니므로 다른 상자와 무게를 겨루지도 않는다.
+   background 는 단축 속성으로 준다: .repNext 의 색을 지워야 사선만 남는다 */
+.repKept {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--figma-color-icon-secondary) 0 1px,
+    transparent 1px 5px
+  );
+}
+
+/* 여기 글자는 상자를 거드는 주석이다 — 본문 크기로 두면 그림보다 글이 먼저 읽힌다.
+   Text 를 안 쓰므로(SizeDiagram 참고) 줄 상자가 정직하다 — line-height 가 곧 줄 간격이다 */
+.repName,
+.repNum {
+  display: block;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.repName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--figma-color-text-secondary);
+}
+
+.repNum {
+  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+  color: var(--figma-color-text-brand);
+}
+
+.repNumKept {
+  color: var(--figma-color-text-secondary);
+}
+
+.rep:hover .repName {
+  color: var(--figma-color-text-brand);
+}
+
+.chartLegend {
+  margin-top: 12px;
+}
+
+.chartLegend p {
+  margin: 0;
+}
+
+/* 한 문단 안의 줄 간격(19px)보다 넓어야 두 문단으로 읽힌다.
+   Text 는 제 상자를 9px 줄이므로(text.module.css) 마진에서 그만큼이 먹힌다 — 얹어서 준다.
+   `.chartLegend p`(0,1,1) 가 `.chartWhy`(0,1,0) 를 이겨서 이 간격이 통째로 죽어 있었다 —
+   같은 자리에서 겨루도록 앞에 부모를 붙인다 */
+.chartLegend .chartWhy {
+  margin-top: 24px;
 }
 
 /* ── 옵션 탭 ───────────────────────────────── */

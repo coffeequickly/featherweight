@@ -16,6 +16,14 @@ import { Settings } from './types'
 export type CompressionProfile = {
   multiplier: number
   maxEdge: number
+  /**
+   * 이 프로필의 하한. 예전에는 사용자의 `settings.minEdge` 를 그대로 빌려 썼는데,
+   * 그때는 `targetFor` 가 그 값을 무시하고 640 을 하드코딩해서 아무 일도 없었다.
+   * 하한이 실제로 동작하게 되자 사다리의 맨 아래칸이 조용히 약해졌다 — 사용자가 최소를
+   * 올려 두면 목표 용량이 예전만큼 못 줄인다. 프로필이 압축을 온전히 설명하게 두면
+   * 남의 설정을 빌릴 일이 없다.
+   */
+  minEdge: number
   quality: number
   reencodeOpaquePng: boolean
 }
@@ -26,22 +34,25 @@ export const MIN_QUALITY = 0.6
 export const MAX_QUALITY = 0.98
 export const MIN_MULTIPLIER = 1
 export const MIN_MAX_EDGE = 1024
+/** 사다리 맨 아래칸의 하한. 여기까지 내려가야 예전만큼 작아진다 */
+export const MIN_MIN_EDGE = 640
 
 /**
  * 좋음 → 작음 순서의 사다리. 앞쪽일수록 화질이 좋고 파일이 크다.
  * 마지막 항목이 최소 품질 가드에 닿는 지점이다.
  */
 export const PROFILE_LADDER: CompressionProfile[] = [
-  { multiplier: 2, maxEdge: 4096, quality: 0.92, reencodeOpaquePng: false },
-  { multiplier: 2, maxEdge: 3072, quality: 0.88, reencodeOpaquePng: true },
-  { multiplier: 1.75, maxEdge: 2560, quality: 0.84, reencodeOpaquePng: true },
-  { multiplier: 1.5, maxEdge: 2048, quality: 0.8, reencodeOpaquePng: true },
-  { multiplier: 1.35, maxEdge: 1800, quality: 0.76, reencodeOpaquePng: true },
-  { multiplier: 1.2, maxEdge: 1600, quality: 0.72, reencodeOpaquePng: true },
-  { multiplier: 1.1, maxEdge: 1280, quality: 0.66, reencodeOpaquePng: true },
+  { multiplier: 2, maxEdge: 4096, minEdge: 1024, quality: 0.92, reencodeOpaquePng: false },
+  { multiplier: 2, maxEdge: 3072, minEdge: 1024, quality: 0.88, reencodeOpaquePng: true },
+  { multiplier: 1.75, maxEdge: 2560, minEdge: 1024, quality: 0.84, reencodeOpaquePng: true },
+  { multiplier: 1.5, maxEdge: 2048, minEdge: 1024, quality: 0.8, reencodeOpaquePng: true },
+  { multiplier: 1.35, maxEdge: 1800, minEdge: 1024, quality: 0.76, reencodeOpaquePng: true },
+  { multiplier: 1.2, maxEdge: 1600, minEdge: 800, quality: 0.72, reencodeOpaquePng: true },
+  { multiplier: 1.1, maxEdge: 1280, minEdge: 640, quality: 0.66, reencodeOpaquePng: true },
   {
     multiplier: MIN_MULTIPLIER,
     maxEdge: MIN_MAX_EDGE,
+    minEdge: MIN_MIN_EDGE,
     quality: MIN_QUALITY,
     reencodeOpaquePng: true
   }
@@ -59,6 +70,7 @@ export function applyProfile(settings: Settings, profile: CompressionProfile): S
     ...settings,
     multiplier: profile.multiplier as Settings['multiplier'],
     maxEdge: profile.maxEdge as Settings['maxEdge'],
+    minEdge: profile.minEdge as Settings['minEdge'],
     quality: profile.quality,
     reencodeOpaquePng: profile.reencodeOpaquePng
   }

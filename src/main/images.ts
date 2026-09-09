@@ -116,14 +116,15 @@ function knownSizes(usages: readonly ImageUsage[]): Record<string, PixelSize> {
  */
 export function planFor(
   root: SceneNode,
-  profile: { multiplier: number; maxEdge: number }
+  profile: { multiplier: number; maxEdge: number; minEdge: number }
 ): ImagePlan[] {
   const usages = collectImageUsages(root)
   return planImageTargets(
     usages,
     {
       multiplier: profile.multiplier as Settings['multiplier'],
-      maxEdge: profile.maxEdge as Settings['maxEdge']
+      maxEdge: profile.maxEdge as Settings['maxEdge'],
+      minEdge: profile.minEdge as Settings['minEdge']
     },
     knownSizes(usages)
   )
@@ -283,7 +284,7 @@ async function shrinkOne(
     rememberSize(plan.imageHash, read)
     longEdge = Math.max(read.width, read.height)
   }
-  const belowFloor = !shouldShrink(longEdge, plan.targetLongEdge, settings.minEdge)
+  const belowFloor = !shouldShrink(longEdge, plan.targetLongEdge)
   if (belowFloor && keepOriginal === undefined) return null
 
   // 앞 프레임에서 같은 목표·설정으로 만든 결과가 있으면 그대로 — 바이트도 안 읽고 UI 도 안 부른다

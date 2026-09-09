@@ -95,3 +95,39 @@ describe('imageRoster', () => {
     expect(roster.map((row) => row.name)).toEqual(['큰 사진', '작은 사진', '로고'])
   })
 })
+
+describe('설정을 바꿔도 흔들리지 않는 것', () => {
+  /** 같은 그림이 두 프레임에 다른 이름·다른 크기로 놓인 문서 */
+  function twoFrames(): Preflight {
+    return {
+      frames: [
+        { id: 'f1', longEdge: 1920, images: [usage('h', '20191111_222551_IMG_3026', 900)] },
+        { id: 'f2', longEdge: 1920, images: [usage('h', 'Background', 1600)] }
+      ],
+      imageEdges: { h: 4096 },
+      textRejects: []
+    }
+  }
+
+  it('이름은 가장 크게 놓인 자리를 따른다 — 상한을 올려도 안 바뀐다', () => {
+    // 실기 제보: 최대를 3840 → 5120 으로 올리자 대표 그림 이름이 갈아치워졌다.
+    // 예전에는 "목표가 가장 큰 자리" 를 골랐는데 목표는 설정을 타서 승자가 바뀌었다.
+    const low = imageRoster(twoFrames(), { ...SETTINGS, multiplier: 2, maxEdge: 3840 })
+    const high = imageRoster(twoFrames(), { ...SETTINGS, multiplier: 2, maxEdge: 5120 })
+
+    expect(low[0].name).toBe('Background')
+    expect(high[0].name).toBe('Background')
+    expect(low[0].name).toBe(high[0].name)
+  })
+
+  it('목표는 여전히 가장 큰 자리를 따른다', () => {
+    const roster = imageRoster(twoFrames(), { ...SETTINGS, multiplier: 2, maxEdge: 5120 })
+    // 1600pt 자리 × 2배 = 3200px (900pt 자리의 1800px 이 아니라)
+    expect(roster[0].target).toBe(3200)
+  })
+
+  it('레이어는 두 프레임 것을 모두 모은다', () => {
+    const roster = imageRoster(twoFrames(), SETTINGS)
+    expect(roster[0].nodeIds).toEqual(['node-h'])
+  })
+})

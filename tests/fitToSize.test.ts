@@ -8,6 +8,7 @@ import {
   clampTargetMb,
   fixedBytes,
   MAX_QUALITY,
+  MIN_MIN_EDGE,
   MAX_TARGET_MB,
   mbToBytes,
   MIN_MAX_EDGE,
@@ -259,5 +260,28 @@ describe('보정 — Figma 가 다시 넣는 몫만', () => {
     expect(predictSize(1 * MB, heavyJpeg.bytes, 0.2)).toBeCloseTo(14.2 * MB)
     // 기준 60MB × 0.2 = 13MB 라 목표를 넘고, 유일한 후보도 14.2MB 라 못 맞춘다
     expect(chooseProfile([heavyJpeg], 1 * MB, 10 * MB, 60 * MB, 0.2).kind).toBe('unreachable')
+  })
+})
+
+describe('PROFILE_LADDER 의 하한', () => {
+  it('맨 아래칸은 640 까지 내려간다', () => {
+    // 사용자의 minEdge 를 빌려 쓰던 시절, targetFor 가 그 값을 무시하고 640 을 하드코딩해서
+    // 아무 일도 없었다. 하한이 실제로 동작하게 된 뒤로는 사다리가 제 하한을 들어야
+    // 최소를 올려 둔 사용자에게도 목표 용량이 예전만큼 줄어든다.
+    const last = PROFILE_LADDER[PROFILE_LADDER.length - 1]
+    expect(last.minEdge).toBe(MIN_MIN_EDGE)
+    expect(last.minEdge).toBe(640)
+  })
+
+  it('아래로 갈수록 하한이 낮아지기만 한다', () => {
+    for (let i = 1; i < PROFILE_LADDER.length; i += 1) {
+      expect(PROFILE_LADDER[i].minEdge).toBeLessThanOrEqual(PROFILE_LADDER[i - 1].minEdge)
+    }
+  })
+
+  it('어느 칸도 하한이 상한을 넘지 않는다', () => {
+    for (const profile of PROFILE_LADDER) {
+      expect(profile.minEdge).toBeLessThanOrEqual(profile.maxEdge)
+    }
   })
 })

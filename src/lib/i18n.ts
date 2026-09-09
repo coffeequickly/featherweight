@@ -297,7 +297,7 @@ const MESSAGES = {
   // 배율은 Figma 내보내기의 @1x @2x 와 같은 어휘다. 뜻은 설명 줄이 준다 —
   // "1.5배" 만으로는 아무것도 안 읽히지만 "150%까지 확대해도 선명하다" 는 읽힌다.
   // PDF 는 1pt = 1/72인치라 배율 × 72 가 곧 DPI 다. 인쇄 요구는 그 숫자가 받는다.
-  'images.sectionResolution': { en: 'Resolution', ko: '해상도' },
+  'images.sectionResolution': { en: 'Image size', ko: '이미지 크기' },
   // 셋(배율·확대율·DPI)은 한 값에서 나온다 — 따로 넘기면 서로 어긋날 수 있다
   'images.zoomSays': {
     en: (p) =>
@@ -309,11 +309,50 @@ const MESSAGES = {
     en: 'The largest placed image becomes {target}px. Smaller ones keep only what they show.',
     ko: '가장 크게 놓인 이미지가 {target}px이 됩니다. 작게 놓인 것은 보이는 만큼만 남깁니다.'
   },
-  /** 상한이 배율을 이길 때만 — 고른 배율이 그대로 적용되지 않는다는 사실 */
+  /**
+   * 최대가 배율을 이길 때만. 화면의 바 이름 그대로 "최대" 라고 불러야 한다 —
+   * "한 장 상한" 이라고 쓰면 바로 위 바가 그것인 줄 모르고 어디를 만져야 할지 알 수 없다.
+   */
   'images.cappedSays': {
     en: (p) =>
-      `${n(Number(p.count), 'image hits', 'images hit')} the ${p.maxEdge}px per-image limit and are exported smaller than the chosen scale.`,
-    ko: '이미지 {count}장은 한 장 상한 {maxEdge}px에 걸려, 고른 배율보다 작게 내보냅니다.'
+      `${n(Number(p.count), 'image hits', 'images hit')} the ${p.maxEdge}px maximum and are exported smaller than the chosen scale. Raise Largest to give them room.`,
+    ko: '이미지 {count}장은 최대 {maxEdge}px에 걸려, 고른 배율보다 작게 나갑니다. 더 키우려면 최대를 올리세요.'
+  },
+  'images.boundLargest': { en: 'Largest', ko: '최대' },
+  'images.boundSmallest': { en: 'Smallest', ko: '최소' },
+  'images.boundScale': { en: 'Scale', ko: '배율' },
+  'images.advanced': { en: 'Advanced', ko: '고급 옵션' },
+  /** 접혀 있을 때도 세 값은 읽힌다 — 펼치지 않고 지나갈 수 있어야 한다 */
+  'images.boundSummary': {
+    en: '{max}px max · {min}px min · {scale}×',
+    ko: '최대 {max}px · 최소 {min}px · {scale}×'
+  },
+  'presets.customTip': {
+    en: 'Values differ from every preset. Pick one to go back.',
+    ko: '어느 프리셋과도 값이 다릅니다. 하나를 고르면 그 값으로 돌아갑니다.'
+  },
+  /** 막대의 두 쪽 — 남는 픽셀과 버리는 픽셀 */
+  /** 대표 셋 — 버려지는 픽셀이 많은 순으로 뽑는다 */
+  'images.repCut': { en: '{original} → {target}px', ko: '{original} → {target}px' },
+  'images.repKept': { en: '{original}px, unchanged', ko: '{original}px 그대로' },
+  'images.mixedFrames': {
+    en: 'Frames vary in size; the largest is {size}pt.',
+    ko: '프레임 크기는 여러 가지이고 가장 큰 것이 {size}pt입니다.'
+  },
+  /** 바이트가 아니라 픽셀이다 — 바이트는 그림 내용에 따라 갈려서 내보내기 전에 못 말한다 */
+  'images.cutSays': {
+    en: (p) =>
+      `${p.shrink} of ${n(Number(p.total), 'image', 'images')} will be downscaled, cutting ${p.percent}% of the pixels. Bytes depend on what the pictures contain.`,
+    ko: '이미지 {total}장 중 {shrink}장이 줄어듭니다. 픽셀로는 {percent}% 줄어듭니다. 실제 용량은 그림 내용에 따라 달라집니다.'
+  },
+  'images.cutNone': {
+    en: (p) => `${n(Number(p.total), 'image is', 'images are')} already within this range.`,
+    ko: '이미지 {total}장이 이미 이 범위 안에 있습니다.'
+  },
+  /** 원본 크기는 비동기로 들어온다 — 그동안 "0장" 이라고 말하면 안 된다 */
+  'images.cutMeasuring': {
+    en: (p) => `Reading the size of ${n(Number(p.total), 'image', 'images')}.`,
+    ko: '이미지 {total}장의 크기를 읽는 중입니다.'
   },
   'images.sectionList': { en: 'Images in this document', ko: '이 문서의 이미지' },
   'images.listCount': {
@@ -321,6 +360,10 @@ const MESSAGES = {
     ko: '{total}장 중 {shrink}장이 줄어듭니다'
   },
   'images.listKept': { en: 'unchanged', ko: '그대로' },
+  'images.listFind': {
+    en: 'Show this layer on the canvas',
+    ko: '이 레이어를 캔버스에서 보여 줍니다'
+  },
   /** 프레임 밖으로 넘쳐 잘리는 그림 — 목록 행에 붙는 짧은 표시 */
   'images.listClipped': { en: '{percent}% shown', ko: '{percent}%만 보임' },
   /**
@@ -346,8 +389,8 @@ const MESSAGES = {
   },
   'images.listNone': { en: 'No images in this document', ko: '이 문서에 이미지가 없습니다' },
   'images.fitLocked': {
-    en: 'Target size mode chooses the resolution and quality. Pick a preset on the Start tab to set them yourself.',
-    ko: '목표 용량 모드에서는 해상도와 화질을 자동으로 정합니다. 직접 정하려면 시작 탭에서 프리셋을 고르세요.'
+    en: 'Target size mode chooses the resolution and quality. Pick another preset above to set them yourself.',
+    ko: '목표 용량 모드에서는 해상도와 화질을 자동으로 정합니다. 직접 정하려면 위에서 다른 프리셋을 고르세요.'
   },
 
   'settings.sectionCareful': { en: 'Use with care', ko: '주의해서 쓸 것' },

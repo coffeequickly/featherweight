@@ -5,7 +5,7 @@
 // 규칙이 갈라지면 예고와 결과가 어긋나고, 그 순간 예고는 믿을 수 없는 것이 된다.
 
 import { missingFonts } from './fontStatus'
-import { MIN_TARGET_LONG_EDGE, planImageTargets, shouldShrink } from './imageTarget'
+import { planImageTargets, shouldShrink } from './imageTarget'
 import { FontUsage, FrameItem, Preflight, Reason, Settings, StoredFont, TextReject } from './types'
 
 export type ImageForecast = {
@@ -36,7 +36,7 @@ export function forecastImages(preflight: Preflight, settings: Settings): ImageF
     for (const plan of planImageTargets(frame.images, settings, preflight.imageSizes)) {
       const edge = preflight.imageEdges[plan.imageHash]
       if (edge === undefined) continue
-      if (shouldShrink(edge, plan.targetLongEdge, settings.minEdge)) shrink.add(plan.imageHash)
+      if (shouldShrink(edge, plan.targetLongEdge)) shrink.add(plan.imageHash)
     }
   }
 
@@ -71,6 +71,12 @@ export type ImageRow = {
    * 이보다 작으면 그만큼의 픽셀이 화면에 나오지 않고도 파일에 실린다.
    */
   visible: number
+  /** 이 그림을 쓰는 레이어들 — 목록에서 누르면 캔버스에서 그것들을 보여 준다 */
+  nodeIds: string[]
+  /** 짧은 변 ÷ 긴 변(0~1). 그림을 진짜 비로 그리는 데 쓴다. 모르면 1 */
+  aspect: number
+  /** 이 그림이 캔버스에 놓인 긴 변(pt). 최대 바가 도달 px 를 셈하는 기준이다 */
+  shown: number
 }
 
 /**
@@ -87,7 +93,10 @@ export type ImageRow = {
  */
 export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[] {
   /** 해시별로 가장 큰 목표와, 그 목표를 만든 자리의 이름·표시 크기·기준선 */
-  const best = new Map<string, { name: string; shown: number; target: number; visible: number }>()
+  const best = new Map<
+    string,
+    { name: string; shown: number; target: number; visible: number; nodeIds: string[] }
+  >()
 
   for (const frame of preflight.frames) {
     const nameOf = new Map<string, { name: string; edge: number; visible: number }>()
@@ -101,25 +110,46 @@ export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[
     }
 
     for (const plan of planImageTargets(frame.images, settings, preflight.imageSizes)) {
-      const found = best.get(plan.imageHash)
-      if (found !== undefined && found.target >= plan.targetLongEdge) continue
       const at = nameOf.get(plan.imageHash)
-      best.set(plan.imageHash, {
-        name: at?.name ?? '',
-        shown: at?.edge ?? 0,
-        target: plan.targetLongEdge,
-        visible: at?.visible ?? 1
-      })
+      const found = best.get(plan.imageHash)
+      // 자리는 여러 프레임에 흩어져 있다 — 목표는 가장 큰 것을 따르되 레이어는 다 모은다
+      const nodeIds = [...new Set([...(found?.nodeIds ?? []), ...plan.nodeIds])]
+      if (found === undefined) {
+        best.set(plan.imageHash, {
+          name: at?.name ?? '',
+          shown: at?.edge ?? 0,
+          target: plan.targetLongEdge,
+          visible: at?.visible ?? 1,
+          nodeIds
+        })
+        continue
+      }
+      found.nodeIds = nodeIds
+      found.target = Math.max(found.target, plan.targetLongEdge)
+      // 이름·표시 크기·잘린 비는 **가장 크게 놓인 자리**의 것이다. 예전에는 목표가 가장 큰
+      // 자리를 골랐는데, 목표는 설정을 타므로 상한을 올리면 승자가 바뀌어 같은 그림의
+      // 이름이 갈아치워졌다(실기: 최대를 3840→5120 으로 올리자 대표 그림 이름이 바뀜).
+      // 놓인 크기는 설정과 무관하니 여기서만은 그걸 기준으로 삼는다.
+      if ((at?.edge ?? 0) > found.shown) {
+        found.name = at?.name ?? found.name
+        found.shown = at?.edge ?? found.shown
+        found.visible = at?.visible ?? found.visible
+      }
     }
   }
 
   const rows: ImageRow[] = []
-  for (const [imageHash, { name, shown, target, visible }] of best) {
+  for (const [imageHash, { name, shown, target, visible, nodeIds }] of best) {
     const edge = preflight.imageEdges[imageHash]
     const original = edge === undefined ? null : edge
+    const size = preflight.imageSizes?.[imageHash]
+    const aspect =
+      size === undefined || size.width <= 0 || size.height <= 0
+        ? 1
+        : Math.min(size.width, size.height) / Math.max(size.width, size.height)
     // 제 목표보다 크고 절대 하한도 넘을 때만 손댄다 — 로고·아이콘은 어떤 문서에서도 그대로
-    const kept = original === null ? false : !shouldShrink(original, target, settings.minEdge)
-    const wanted = Math.max(Math.ceil(shown * settings.multiplier), MIN_TARGET_LONG_EDGE)
+    const kept = original === null ? false : !shouldShrink(original, target)
+    const wanted = Math.max(Math.ceil(shown * settings.multiplier), settings.minEdge)
     rows.push({
       imageHash,
       name,
@@ -127,7 +157,10 @@ export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[
       target,
       kept,
       capped: settings.maxEdge < wanted,
-      visible
+      visible,
+      nodeIds,
+      aspect,
+      shown
     })
   }
 

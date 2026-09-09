@@ -1,5 +1,11 @@
 // main <-> ui 공유 타입. Figma·DOM 의존 금지. (PRD §7.3)
 
+/**
+ * `sheaf.*` 와 `__sheaf_tmp__` 는 옛 이름이지만 **바꾸면 안 된다.**
+ * clientStorage 키라서 이름을 고치는 순간 기존 사용자의 저장된 설정과 폰트가 통째로
+ * 사라진다(플러그인 입장에서는 처음 실행하는 것과 같다). 임시 노드 이름도 마찬가지다 —
+ * 옛 버전이 남긴 잔여물을 이 이름으로 찾아 지운다.
+ */
 export const TMP_NODE_NAME = '__sheaf_tmp__'
 /** 임시 클론의 소유권 표식(pluginData 키). 이름은 사용자도 쓸 수 있지만 이 키는 우리만 쓴다 */
 export const TMP_MARK_KEY = 'sheaf.tmp'
@@ -29,11 +35,11 @@ export type Settings = {
    * PDF 는 1pt = 1/72인치라 배율이 곧 DPI다 — 1× = 72, 2× = 144, 4× = 288.
    * 3·4 는 인쇄용으로 뒤에 넣었다. 옛 저장값(1·1.5·2)은 그대로 유효하다.
    */
-  multiplier: 1 | 1.5 | 2 | 3 | 4
+  multiplier: 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5 | 3 | 3.5 | 4
   /** 긴 변 상한 — HD · FHD · QHD · 4K. 옛 값(1024·1600·2048·4096)은 settingsOptions.snapSettings 가 옮긴다 */
-  maxEdge: 1280 | 1920 | 2560 | 3840
+  maxEdge: 1280 | 1920 | 2560 | 3840 | 5120 | 7680
   /** 원본이 이 픽셀 이하면 아예 손대지 않는다 — 로고·아이콘을 지키는 절대 하한 */
-  minEdge: 640 | 1024 | 1600
+  minEdge: 480 | 640 | 800 | 1024 | 1280 | 1600 | 2048
   reencodeOpaquePng: boolean
   embedText: boolean // Phase 2
   /** 텍스트에 건 URL 하이퍼링크를 PDF 링크 주석으로 넣는다 — 텍스트를 다시 그리며 잃는 것을 되살린다 */
@@ -52,6 +58,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 0.8,
   multiplier: 1.5,
   maxEdge: 1920,
+  // 균형 프리셋과 같아야 한다 — 어긋나면 새 사용자가 "균형" 이라고 보면서 다른 값을 받는다
   minEdge: 640,
   reencodeOpaquePng: true,
   embedText: true,
@@ -312,7 +319,7 @@ export type ImageUsage = {
 
 export type PreflightFrame = {
   id: string
-  /** 렌더 기준 긴 변(px) — 건너뛸 기준선(skipFloor)을 셈하는 데 쓴다 */
+  /** 렌더 기준 긴 변(px) — 이미지 목표와 그림의 기준이다 */
   longEdge: number
   images: ImageUsage[]
 }
@@ -593,12 +600,6 @@ export interface NodesFocusHandler extends EventHandler {
 export interface ToastHandler extends EventHandler {
   name: 'toast'
   handler: (message: string) => void
-}
-
-/** UI 에서 창 크기를 조절하면 메인이 figma.ui.resize 를 부른다. */
-export interface ResizeWindowHandler extends EventHandler {
-  name: 'resize:window'
-  handler: (size: { width: number; height: number }) => void
 }
 
 export interface ErrorHandler extends EventHandler {

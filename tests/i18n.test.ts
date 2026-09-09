@@ -87,6 +87,9 @@ describe('formatNumber', () => {
 
 describe('사전 무결성', () => {
   const PARAMS = {
+    max: 1920,
+    min: 640,
+    scale: 1.5,
     count: 2,
     missing: 1,
     total: 3,
@@ -115,6 +118,7 @@ describe('사전 무결성', () => {
     texts: 2,
     multiplier: 1.5,
     maxEdge: 2048,
+    original: 3000,
     quality: '0.80',
     file: 'a.ttf',
     chars: '10',

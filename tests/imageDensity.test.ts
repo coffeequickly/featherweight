@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { cropFractions, neededLongEdge, Placement } from '../src/lib/imageDensity'
-import { MIN_TARGET_LONG_EDGE, targetFor } from '../src/lib/imageTarget'
+import { targetFor } from '../src/lib/imageTarget'
 import { ImageUsage } from '../src/lib/types'
 
 const square = { width: 800, height: 800 }
@@ -175,7 +175,7 @@ describe('neededLongEdge — CROP 실측 사례', () => {
 // 계산이 맞아도 배관이 끊겨 있으면 아무 일도 안 일어난다. 실측 자리로 끝까지 확인한다.
 
 describe('targetFor — 밀도 보정', () => {
-  const settings = { multiplier: 1 as const, maxEdge: 3840 as const }
+  const settings = { multiplier: 1 as const, maxEdge: 3840 as const, minEdge: 1024 as const }
 
   function usage(over: Partial<ImageUsage>): ImageUsage {
     return {
@@ -203,7 +203,7 @@ describe('targetFor — 밀도 보정', () => {
 
   it('작게 놓인 것은 하한이 먼저다 — 밀도 보정이 그 아래를 만들지 않는다', () => {
     const u = usage({ width: 100, height: 100, scaleMode: 'CROP', crop: { x: 0.5, y: 0.5 } })
-    expect(targetFor(u, settings, { width: 400, height: 400 })).toBe(MIN_TARGET_LONG_EDGE)
+    expect(targetFor(u, settings, { width: 400, height: 400 })).toBe(1024)
   })
 
   it('여유분 안이면 올리지 않는다 — image 7 은 ×1.04 라 그대로다', () => {
@@ -226,12 +226,16 @@ describe('targetFor — 밀도 보정', () => {
 
   it('한 장 상한을 넘지 않는다', () => {
     const u = usage({ width: 2000, height: 2000, scaleMode: 'CROP', crop: { x: 0.2, y: 0.2 } })
-    expect(targetFor(u, { multiplier: 1, maxEdge: 1920 }, { width: 4000, height: 4000 })).toBe(1920)
+    expect(
+      targetFor(u, { multiplier: 1, maxEdge: 1920, minEdge: 1024 }, { width: 4000, height: 4000 })
+    ).toBe(1920)
   })
 
   it('배율이 곱해진다', () => {
     const u = usage({ width: 434, height: 434 })
-    expect(targetFor(u, { multiplier: 2, maxEdge: 3840 }, { width: 1200, height: 900 })).toBe(1158)
+    expect(
+      targetFor(u, { multiplier: 2, maxEdge: 3840, minEdge: 1024 }, { width: 1200, height: 900 })
+    ).toBe(1158)
   })
 
   it('TILE 은 손대지 않는다', () => {
