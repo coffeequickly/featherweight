@@ -178,8 +178,8 @@ export default async function main(): Promise<void> {
     fontOps = fontOps.then(() => recordFontFacts(payload.ref, payload.facts))
   })
 
-  on<FrameThumbsRequestHandler>('frames:thumbs:request', () => {
-    void sendThumbs()
+  on<FrameThumbsRequestHandler>('frames:thumbs:request', (limit) => {
+    void sendThumbs(limit)
   })
 
   on<FrameFocusHandler>('frame:focus', (id) => {
@@ -214,7 +214,7 @@ export default async function main(): Promise<void> {
   // 같은 프레임의 글자·폰트·이미지를 고치면 체크리스트가 따라 바뀐다 (선택 목록은 그대로)
   watchContentChanges()
 
-  showUI({ width: 400, height: WINDOW_HEIGHT })
+  showUI({ width: WINDOW_WIDTH, height: WINDOW_HEIGHT })
 }
 
 let cancelled = false
@@ -222,7 +222,12 @@ let exporting = false
 /** 이전 실행이 정리되는 동안 들어온 내보내기 요청 — 하나만 기억한다 */
 let pendingExport: ExportRequest | null = null
 
-/** 메인 한 화면이 스크롤 없이 들어가는 높이. 하위 화면은 안에서 스크롤한다. */
+/**
+ * 폭을 정하는 것은 탭 바가 아니라 프리셋 타일의 영어 부제다 — 넷을 한 줄로 담으려면
+ * 최소 410px 이 필요하다(실측). 440 은 거기에 여유를 둔 값이다.
+ */
+const WINDOW_WIDTH = 440
+/** 시작 탭이 스크롤 없이 들어가는 높이. 목록이 긴 탭은 안에서 스크롤한다. */
 const WINDOW_HEIGHT = 560
 
 /**
@@ -757,11 +762,15 @@ function touchesSelection(change: NodeChange, selected: ReadonlySet<string>): bo
   return false
 }
 
-/** 정렬 화면이 열릴 때만 — 그때의 집합으로 그린다 */
-async function sendThumbs(): Promise<void> {
+/**
+ * 썸네일이 필요한 화면이 열릴 때만 — 그때의 집합으로 그린다.
+ * limit 이 있으면 앞에서부터 그만큼만. exportAsync 는 장당 비싸다.
+ */
+async function sendThumbs(limit?: number): Promise<void> {
   const generation = selectionGeneration
   const isStale = (): boolean => generation !== selectionGeneration
-  const thumbs = await renderThumbs(selectionNodes, isStale)
+  const nodes = limit === undefined ? selectionNodes : selectionNodes.slice(0, limit)
+  const thumbs = await renderThumbs(nodes, isStale)
   if (isStale() || thumbs.length === 0) return
   emit<FrameThumbsHandler>('frames:thumbs', thumbs)
 }

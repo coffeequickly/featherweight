@@ -11,14 +11,64 @@
   --line-height-16: 18px;
 }
 
+/* ── 다크 고정 ──────────────────────────────────────────────
+   Figma 는 themeColors 로 사용자 테마의 --figma-color-* 를 iframe 에 주입한다
+   (create-figma-plugin 의 showUI 가 기본으로 켠다). 우리는 그걸 덮어써서 항상 다크로 낸다.
+   라이트 Figma 를 쓰는 사용자도 이 패널은 어둡게 본다.
+
+   Figma 가 주입하는 선언과 같은 :root 라 !important 로만 이긴다. 되돌리려면 이 블록만
+   지우면 사용자 테마를 다시 따라간다.
+
+   값은 tools/ui-preview.mjs 의 FIGMA_VARS_DARK 와 같아야 한다 — 미리보기와 실제가
+   갈라지면 캡처로 판단할 수 없다. */
+:root {
+  color-scheme: dark !important;
+  --figma-color-bg: #2c2c2c !important;
+  --figma-color-bg-secondary: #383838 !important;
+  --figma-color-bg-hover: #3f3f3f !important;
+  --figma-color-bg-brand: #0d99ff !important;
+  --figma-color-bg-disabled: #3a3a3a !important;
+  --figma-color-border: #444444 !important;
+  --figma-color-border-strong: #5c5c5c !important;
+  --figma-color-text: #ffffff !important;
+  --figma-color-text-secondary: #a8a8a8 !important;
+  --figma-color-text-disabled: #6a6a6a !important;
+  --figma-color-text-onbrand: #ffffff !important;
+  --figma-color-icon: #cccccc !important;
+  --figma-color-icon-secondary: #8c8c8c !important;
+  --figma-color-bg-warning-tertiary: #4a3a12 !important;
+  --figma-color-text-warning: #f3c11b !important;
+  --figma-color-text-brand: #7cc4f8 !important;
+  --figma-color-icon-brand: #7cc4f8 !important;
+  --figma-color-border-brand: #7cc4f8 !important;
+  --figma-color-bg-brand-tertiary: #1e3a55 !important;
+  --figma-color-icon-success: #79d297 !important;
+  --figma-color-icon-warning: #ffcd29 !important;
+  --figma-color-text-success: #79d297 !important;
+}
+
+/* 말줄임은 글자가 든 요소 자신에게 걸어야 한다. 바깥 상자에만 걸면 안쪽 Text 가
+   블록이라 넘친 자리에 "…" 가 안 나오고 그냥 잘린다.
+   그런데 Text 는 baseline 을 맞추려고 :before 의 margin-top: -9px 로 제 상자를 9px 줄이고
+   글자는 그 밖에 둔다(text.module.css) — 그 상태로 클립하면 위아래가 잘린다.
+   트릭을 걷어내고 같은 9px 를 제 마진으로 옮긴다: 차지하는 자리도 글자 위치도 그대로,
+   글자만 상자 안으로 들어온다. */
 .ellipsis {
+  /* 자식의 음수 마진이 밖으로 새지 않게 BFC 를 만들고, flex 안에서 줄어들게 min-width 를 푼다 */
+  display: flow-root;
+  min-width: 0;
+}
+
+.ellipsis > * {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* overflow: hidden 은 세로도 자른다 — g·j·y 꼬리가 잘리지 않게
-     클립 박스만 2px 내리고 레이아웃은 그대로 둔다 */
-  padding-bottom: 2px;
-  margin-bottom: -2px;
+  margin-top: -9px;
+}
+
+.ellipsis > *::before {
+  display: none;
 }
 
 .rowBetween {
@@ -97,6 +147,65 @@
 .headerActionDisabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ── 탭 바 ─────────────────────────────────── */
+
+/* 여섯을 균등하게 나눈다 — 자리가 언어와 무관하게 고정이라 위치로 기억된다 */
+.tabBar {
+  flex: 0 0 auto;
+  display: flex;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--figma-color-border);
+}
+
+.tabItem {
+  flex: 1 1 0;
+  min-width: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--figma-color-text-secondary);
+  border-bottom: 2px solid transparent;
+  /* 바 아래 경계선과 겹쳐 선택 밑줄이 끊기지 않게 */
+  margin-bottom: -1px;
+}
+
+.tabItem:hover:not(:disabled) {
+  color: var(--figma-color-text);
+}
+
+.tabItem:disabled {
+  color: var(--figma-color-text-disabled, #b3b3b3);
+  cursor: default;
+}
+
+.tabItemOn {
+  color: var(--figma-color-text);
+  font-weight: 600;
+  border-bottom-color: var(--figma-color-text);
+}
+
+.tabItemWarn:not(:disabled),
+.tabItemWarn:hover:not(:disabled) {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.tabLabel {
+  position: relative;
+}
+
+/* 폭을 먹지 않는다 — 켜고 꺼도 탭 자리가 움직이지 않는다 */
+.tabDot {
+  position: absolute;
+  top: -3px;
+  right: -8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--figma-color-text-warning, #b86200);
 }
 
 .appFooter {
@@ -439,11 +548,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 호버·드래그 배경이 내용에 딱 붙지 않게 숨통을 준다.
-     가로 패딩만큼 음수 마진 — 텍스트는 16px 그리드에 남는다 */
-  padding: 8px;
-  margin: 0 -8px;
-  border-radius: 6px;
+  /* 한 장이 한 덩어리로 읽히게 상자를 두른다 — 끌어 옮기는 대상이라 경계가 있어야 한다 */
+  padding: 9px 10px;
+  margin-top: 6px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 8px;
   position: relative;
   transition: transform 0.12s ease;
 }
@@ -464,10 +573,31 @@
   text-align: right;
 }
 
+/* 끌 수 있다는 표시. 행 맨 앞이 손잡이 자리다 — 잡는 곳이 줄마다 같은 자리에 선다 */
+.frameGrip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 24px;
+  margin: 0 0 0 -4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--figma-color-icon-secondary);
+  cursor: grab;
+}
+
+.frameGrip:disabled {
+  color: var(--figma-color-text-disabled, #b3b3b3);
+  cursor: default;
+}
+
 .frameThumb,
 .frameThumbEmpty {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   object-fit: contain;
   background: var(--figma-color-bg-secondary);
@@ -478,6 +608,11 @@
 .frameMeta {
   flex: 1 1 auto;
   min-width: 0;
+  line-height: 1.5;
+}
+
+.frameMetaLine {
+  margin-top: 4px;
 }
 
 .frameActions {
@@ -531,8 +666,8 @@
 }
 
 .fontRowActions {
-  /* 파일이 있는 행에는 휴지통이 더 붙는다. 폭을 고정해야 버튼이 세로로 정렬된다 */
-  flex: 0 0 78px;
+  /* 동작이 전부 24px 아이콘이라 최대 둘(교체+삭제) 기준으로 칸을 고정한다 */
+  flex: 0 0 52px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -668,6 +803,912 @@
   margin-top: 8px;
 }
 
+/* ── 정렬 탭 ───────────────────────────────── */
+
+/* 기준 하나와 방향 하나. 손으로 옮기면 기준이 "직접" 이 되고 되돌리기가 나타난다 */
+.sortBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sortLabel {
+  flex: 0 0 auto;
+}
+
+.sortSelect {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 5px;
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sortSelect:disabled {
+  color: var(--figma-color-text-disabled, #b3b3b3);
+  cursor: default;
+}
+
+/* "직접" 은 고를 수 있는 값이 아니라 상태다 — 드롭다운 옆에 이름으로 선다 */
+.sortManual {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--figma-color-bg-secondary);
+  font-weight: 600;
+}
+
+.sortFlip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 5px;
+  background: var(--figma-color-bg);
+  color: var(--figma-color-icon);
+  cursor: pointer;
+  /* 화살표를 세워 "뒤집기" 로 읽히게 한다 */
+  transform: rotate(90deg);
+}
+
+.sortFlipOn {
+  border-color: var(--figma-color-border-brand, var(--figma-color-text-brand));
+  color: var(--figma-color-text-brand, #007be5);
+  transform: rotate(270deg);
+}
+
+.sortFlip:disabled {
+  color: var(--figma-color-text-disabled, #b3b3b3);
+  cursor: default;
+}
+
+.sortPush {
+  flex: 1 1 auto;
+}
+
+.excludedHead {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--figma-color-border);
+}
+
+/* ── 결과 탭 ───────────────────────────────── */
+
+/* 내보낸 결과물은 상자를 갖는다 — 이 화면에서 유일하게 "만들어진 것" 이다 */
+.fileCard {
+  margin-top: 10px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.fileCardTop {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.fileCardIcon {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--figma-color-icon-success, #14ae5c);
+}
+
+.fileCardIconWarn {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.fileCardBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fileCardName * {
+  font-weight: 600;
+}
+
+.fileCardMeta {
+  margin-top: 4px;
+}
+
+/* 목표 용량 판정 — 파일 카드 안에서 한 겹 아래 */
+.fileCardFit {
+  padding: 9px 12px 10px;
+  border-top: 1px solid var(--figma-color-border);
+  background: var(--figma-color-bg-secondary);
+  color: var(--figma-color-text-success, #009951);
+}
+
+.fileCardFitWarn {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.fileCardFit * {
+  color: inherit;
+}
+
+/* 접었다 펴는 섹션 — 머리글은 요약만, 궁금하면 펼친다.
+   상자를 두르면 접힌 것과 펼친 것이 한 덩어리로 읽힌다 */
+.fold {
+  margin-top: 6px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.foldHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  border: 0;
+  background: var(--figma-color-bg-secondary);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.foldHead:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.foldCaret {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--figma-color-icon-secondary);
+  margin-left: -4px;
+}
+
+.foldTitle {
+  flex: 0 0 auto;
+}
+
+.foldTitle * {
+  font-weight: 600;
+}
+
+.foldSummary {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 요약 안쪽이 블록이면 제 너비를 다 차지해 오른쪽 정렬이 풀린다 */
+.foldSummary * {
+  text-align: inherit;
+}
+
+.foldWarn {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.foldWarn * {
+  color: inherit;
+}
+
+.foldBody {
+  padding: 8px 12px 10px 30px;
+  border-top: 1px solid var(--figma-color-border);
+}
+
+/* 완성된 PDF 첫 장. 파일이 있다는 것 자체가 결과라 테두리로 판정하지 않는다 —
+   판정은 아래 목표 용량 줄이 맡는다.
+   상자는 1:1 이고 그림은 가운데 맞춘다 — 세로 문서면 상자가 길어져 카드가 아래로 쏠린다 */
+.fileThumb {
+  flex: 0 0 auto;
+  width: 48px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+  background: var(--figma-color-bg);
+}
+
+.fileThumbImg {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* 한 갈래(포함 / 아웃라인)와 그 아래 사정. 사유는 아웃라인의 자식이지 형제가 아니다 */
+.outcome + .outcome {
+  margin-top: 10px;
+}
+
+.outcomeHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.outcomeIcon {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.outcomeOk {
+  color: var(--figma-color-icon-success, #14ae5c);
+}
+
+.outcomeWarn {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.outcomeCost {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* 아이콘 폭(16) + 간격(8) 만큼 들여쓴다 — 부모 글자와 왼쪽 기준선이 맞는다 */
+.outcomeChildren {
+  margin-top: 4px;
+  padding-left: 24px;
+}
+
+.foldBody .outcome:first-child {
+  margin-top: 2px;
+}
+
+.outcomeNote {
+  padding: 3px 0;
+  line-height: 1.55;
+}
+
+.reasonRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 6px 6px 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reasonRow + .reasonRow {
+  border-top: 1px solid var(--figma-color-border);
+  border-radius: 0;
+}
+
+.reasonRow:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.reasonWhy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.reasonCount {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.reasonGo {
+  flex: 0 0 auto;
+  display: flex;
+  color: var(--figma-color-icon-secondary);
+}
+
+/* 부가 정보 — 알아 두면 좋지만 손댈 일은 없는 것 */
+.resultLine {
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+.resultWarn {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.resultWarn * {
+  color: inherit;
+}
+
+/* 임베딩한 텍스트 몇 줄 — 이 제품을 쓰는 이유가 여기서 눈으로 확인된다 */
+.resultPreview {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 8px;
+  background: var(--figma-color-bg-secondary);
+  line-height: 1.75;
+}
+
+.resultPreviewMore {
+  margin-top: 2px;
+  opacity: 0.6;
+}
+
+/* 전체 보기 — 쭉 읽고 복사하는 화면 */
+.previewHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.previewHead .previewCount {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.55;
+}
+
+/* 버튼은 줄바꿈되면 안 된다 — 두 줄이 되면 머리글 높이가 흔들린다 */
+.previewHead button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 여기서는 글자를 고를 수 있어야 한다 — base.css 가 전역으로 막아 둔다 */
+.previewBody {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 8px;
+  background: var(--figma-color-bg-secondary);
+  line-height: 1.8;
+  user-select: text;
+}
+
+.previewBody * {
+  user-select: text;
+}
+
+.previewLine + .previewLine {
+  margin-top: 2px;
+}
+
+/* ── 폰트 패밀리 상세 ─────────────────────── */
+
+/* 스타일 하나에 카드 하나. 좁은 행에는 못 넣던 셋(중요도·원인·결과)을 여기서 다 말한다 */
+.styleCard {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+}
+
+.styleCardWarn {
+  border-color: var(--figma-color-icon-warning, #ffcd29);
+  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
+}
+
+.styleCardWarn .styleLine * {
+  color: var(--figma-color-text-warning, #b86200);
+  opacity: 0.9;
+}
+
+.styleHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.styleName {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.styleName * {
+  font-weight: 600;
+}
+
+.styleStatus {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--figma-color-text-secondary);
+}
+
+.styleStatus * {
+  color: inherit;
+}
+
+.styleStatusWarn {
+  color: var(--figma-color-text-warning, #b86200);
+  font-weight: 600;
+}
+
+.styleLine {
+  margin-top: 3px;
+}
+
+.styleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+/* 진짜 input 은 감춰 두고 버튼이 대신 연다 */
+.hiddenFile {
+  display: none;
+}
+
+/* 폰트 목록 맨 위 — 무엇이 문제인지와 다음에 뭘 하는지를 한 자리에서 */
+.fontBanner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.fontBanner * {
+  color: inherit;
+}
+
+.fontBannerIcon {
+  display: flex;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.fontBannerBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fontBannerHead * {
+  font-weight: 600;
+}
+
+.fontBannerDetail {
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+/* 폴더 버튼 줄. 배너 바로 아래라 숨통을 준다 — 붙어 있으면 배너의 일부로 읽힌다 */
+.scanRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── 저장 공간 관리 ────────────────────────── */
+
+/* 저장소 섹션 아래 한 줄 — 얼마나 남았는지와 관리로 가는 문 */
+.storageSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.storageSummary .linkButton {
+  margin-left: auto;
+}
+
+/* 서체 이름을 다 적는다 — 접지 않으므로 줄을 넘어가면 넘어간 대로 둔다 */
+.storageNames {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.storageUnused {
+  margin-top: 3px;
+}
+
+.storageList {
+  margin-top: 14px;
+}
+
+.storageListTitle {
+  margin-bottom: 4px;
+}
+
+.storageRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+}
+
+.storageRow + .storageRow {
+  border-top: 1px solid var(--figma-color-border);
+}
+
+.storageRowBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.storageRowMeta {
+  margin-top: 2px;
+}
+
+/* ── 폰트 목록 ─────────────────────────────── */
+
+/* 줄 전체가 상세로 가는 문이다 — 아이콘을 줄마다 달지 않는다 */
+.famRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 9px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.famRow + .famRow {
+  border-top: 1px solid var(--figma-color-border);
+  border-radius: 0;
+}
+
+.famRow:hover {
+  background: var(--figma-color-bg-hover);
+}
+
+.famBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.famHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.famName {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.famName * {
+  font-weight: 600;
+}
+
+.famMeta {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--figma-color-text-secondary);
+}
+
+.famMetaWarn {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.famMeta * {
+  color: inherit;
+}
+
+.famBadges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+/* 스타일 하나. 뱃지지 버튼이 아니다 — 누르는 것은 줄 전체다 */
+.famBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  line-height: 15px;
+  white-space: nowrap;
+  background: var(--figma-color-bg-secondary);
+  color: var(--figma-color-text-secondary);
+}
+
+.famBadgeWarn {
+  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.famBadgeWarn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.famBadgeRest {
+  padding: 2px 2px;
+  white-space: nowrap;
+}
+
+.famChevron {
+  flex: 0 0 auto;
+  display: flex;
+  color: var(--figma-color-icon-secondary);
+}
+
+/* ── 시작 탭 ───────────────────────────────── */
+
+/* 프리셋 아래 한 줄. 값·상태·갈 곳이 한 덩어리로 앉는다.
+   목표 용량의 입력칸(28px)이 있는 상태와 값만 있는 상태의 높이가 같아야 아래가 안 움직인다 */
+.valueRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 28px;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--figma-color-bg-secondary);
+}
+
+.valueItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.valueItem svg {
+  color: var(--figma-color-icon-secondary);
+}
+
+.valueKey {
+  color: var(--figma-color-text-secondary);
+}
+
+.valuePush {
+  flex: 1 1 auto;
+}
+
+/* 문제만 카드가 된다. 정상인 것은 아래 회색 한 줄로 눌린다 */
+.statusCard {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 6px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
+  color: var(--figma-color-text-warning, #b86200);
+  cursor: pointer;
+}
+
+.statusCard * {
+  color: inherit;
+}
+
+.statusCardIcon {
+  display: flex;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.statusCardBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.statusCardHead * {
+  font-weight: 600;
+}
+
+.statusCardDetail {
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+.statusCardGo {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-weight: 600;
+  align-self: center;
+}
+
+.statusFine {
+  display: flex;
+  gap: 6px;
+  /* 한 줄이든 두 줄이든 체크가 글자 덩어리 가운데에 온다 */
+  align-items: center;
+  margin-top: 8px;
+  color: var(--figma-color-text-secondary);
+}
+
+.statusFineIcon {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--figma-color-icon-success, #14ae5c);
+}
+
+/* 무엇을 뽑는지 눈으로 확인하는 자리 — 앞 몇 장만 */
+.pageStrip {
+  margin-top: 16px;
+}
+
+.pageStripHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageStripHead .linkButton {
+  margin-left: auto;
+}
+
+.pageStripRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pageCell {
+  flex: 0 0 auto;
+}
+
+.pageThumb {
+  width: 56px;
+  max-height: 74px;
+  border: 1px solid var(--figma-color-border);
+  border-radius: 3px;
+  background: var(--figma-color-bg-secondary);
+  overflow: hidden;
+}
+
+.pageThumbImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pageNo {
+  margin-top: 3px;
+  text-align: center;
+}
+
+.pageMore {
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* ── 이미지 탭 ─────────────────────────────── */
+
+/* 맨 위 한 줄 — 지금 값이 프리셋 그대로인지, 직접 만진 것인지 */
+.panelState {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--figma-color-bg-secondary);
+}
+
+.stateName {
+  font-weight: 600;
+}
+
+/* 되돌리기를 오른쪽 끝으로 민다 */
+.statePush {
+  flex: 1 1 auto;
+}
+
+/* 어느 프리셋인지 — 시작 탭 타일과 같은 그림이라 글자보다 먼저 읽힌다 */
+.stateGlyph {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--figma-color-icon-secondary);
+}
+
+/* 상한이 배율을 이겼다 — 고른 값이 그대로 안 나간다는 사실은 조용히 두면 안 된다 */
+.saysWarn {
+  margin-top: 8px;
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.saysWarn * {
+  color: inherit;
+}
+
+.imageList {
+  margin-top: 6px;
+}
+
+/* 이름 · 원본 · 결과. 설정이 무엇을 하는지 그림보다 이 줄들이 정확하게 말한다 */
+.imageRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.imageName {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.imageFrom {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.imageTo {
+  flex: 0 0 auto;
+  min-width: 62px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 손대지 않는 것은 강조하지 않는다 — 볼 이유가 있는 줄이 눈에 남아야 한다 */
+.imageKept * {
+  color: var(--figma-color-text-secondary);
+}
+
+/* ── 옵션 탭 ───────────────────────────────── */
+
+/* 결과를 통째로 뒤집는 옵션. 상자가 나머지와 무게가 다르다고 말한다 */
+.dangerBox {
+  border: 1px solid var(--figma-color-border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.dangerBoxOn {
+  border-color: var(--figma-color-icon-warning, #ffcd29);
+  background: var(--figma-color-bg-warning-tertiary, #fff1c2);
+}
+
+/* 켜져 있을 때만 — 다른 탭이 무의미해진다는 사실 */
+.dangerEffect {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--figma-color-icon-warning, #ffcd29);
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+.dangerEffect * {
+  color: inherit;
+}
+
+.optionsTail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--figma-color-border);
+}
+
+.optionsVersion {
+  margin-left: auto;
+}
+
 /* ── 결과 ─────────────────────────────────── */
 
 .reportLine {
@@ -726,20 +1767,6 @@
   transition: width 0.2s ease;
 }
 
-/* ── 텍스트 확인 ──────────────────────────── */
-
-.previewBody {
-  max-height: 340px;
-  overflow-y: auto;
-  background: var(--figma-color-bg-secondary);
-  border-radius: 4px;
-  padding: 8px;
-}
-
-.previewLine + .previewLine {
-  margin-top: 4px;
-}
-
 /* 체크리스트 설명 줄 — 영문은 한 줄에 안 들어온다. 두 줄까지 허용하고 그 뒤를 자른다.
    Text 컴포넌트를 안 쓴다: 그 안쪽 상자에 클램프를 걸면 첫 줄 위가 잘리고,
    바깥에 걸면 줄 사이가 벌어졌다. 글꼴·색만 Muted 와 같게 맞춘다. */
@@ -751,6 +1778,45 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 상태 줄 + "자세히" — 증거는 접어 두고 상태만 상시로 */
+.rowStatus {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.rowStatus > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 펼친 증거 — 긴 파일명·오류도 화면 안에서 줄바꿈한다 */
+.rowDetails {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--figma-color-text-secondary, #666);
+  overflow-wrap: anywhere;
+}
+
+/* 글자 링크 버튼 — 자세히·도움말 */
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--figma-color-text-brand, #0d99ff);
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.linkButton:disabled {
+  color: var(--figma-color-text-disabled, #b3b3b3);
+  cursor: default;
 }
 
 /* 넣어 둔 파일이 자리에 맞지 않을 때 — 행 안의 세 번째 줄 */
@@ -772,7 +1838,8 @@
 /* 마지막 폴더 스캔의 결과 — 토스트는 사라지고 잘린다. 닫거나 다음 스캔까지 남는다 */
 .scanBox {
   margin-top: 8px;
-  padding: 8px 4px 8px 10px;
+  /* 좌우 여백이 달라 카드 안 글자만 다른 줄에 서 있었다 (실측 L26 R380) — 대칭으로 */
+  padding: 10px 12px;
   border: 1px solid var(--figma-color-border);
   border-radius: 4px;
   background: var(--figma-color-bg-secondary, #f5f5f5);
@@ -780,20 +1847,28 @@
 .scanBox.warn {
   border-color: var(--figma-color-icon-warning, #ffcd29);
 }
+/* 닫기 아이콘 버튼이 24px 이라 제목 줄만 오른쪽으로 더 튀어나온다 — 여백만큼 당긴다 */
+.scanBoxHead {
+  margin-right: -6px;
+}
+
 .scanBoxLine {
   margin-top: 4px;
-  padding-right: 6px;
   font-size: 11px;
   line-height: 16px;
 }
 .scanBoxActions {
+  /* 행의 행동 버튼이 전부 오른쪽 끝이라 카드만 왼쪽이면 눈이 두 줄을 따라간다 */
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 8px;
 }
 
 /* 저장 공간 게이지 — 5MB 중 얼마나 찼는지. 90% 넘으면 주황 */
+/* 섹션 제목 줄 바로 아래에 오므로 스스로 숨통을 갖는다 — 안 그러면 글자를 덮는다 */
 .storageBar {
+  margin-top: 8px;
   height: 4px;
   border-radius: 2px;
   background: var(--figma-color-bg-secondary, #f0f0f0);

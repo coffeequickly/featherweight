@@ -117,7 +117,7 @@ describe('saveFoundFonts', () => {
     const outcome = await saveFoundFonts(scan([[a, found('a.ttf')]]), [a], [], d)
     expect(outcome.saved).toBe(0)
     expect(outcome.failed).toBe(1)
-    expect(outcome.lastError).toBe('no reply from the plugin')
+    expect(outcome.lastError).toBe('No response was received for the save request.')
     expect(outcome.failures.get(fontKey(a))?.request).toBeDefined()
   })
 
@@ -184,10 +184,12 @@ describe('scanDetailLines', () => {
       failures: new Map()
     })
     expect(lines).toHaveLength(4)
-    expect(lines[0]).toMatch(/^1 had several matching files/)
-    expect(lines[1]).toBe('1 found, but not in the needed weight or style')
+    expect(lines[0]).toMatch(/^1 font had multiple matching files/)
+    expect(lines[1]).toBe('The required style was not found for 1 font.')
     expect(lines[2]).toBe('1 not in this folder')
-    expect(lines[3]).toBe('scan incomplete: 3 file(s) not checked (limit)')
+    expect(lines[3]).toBe(
+      'Scan incomplete: 3 files were not checked because the scan limit was reached.'
+    )
     for (const line of lines) expect(line.startsWith(' · ')).toBe(false)
   })
 })
@@ -211,10 +213,10 @@ describe('scanSummary', () => {
       failures: new Map()
     })
     expect(text).toContain('Added 2 fonts')
-    expect(text).toContain('1 had several matching files')
-    expect(text).toContain('1 could not be saved (quota exceeded)')
-    expect(text).toContain('1 found, but not in the needed weight')
-    expect(text).toContain('1 only as variable files')
+    expect(text).toContain('1 font had multiple matching files')
+    expect(text).toContain('Could not save 1 font. Details: quota exceeded')
+    expect(text).toContain('The required style was not found for 1 font')
+    expect(text).toContain('Only variable files were found for 1 font')
     expect(text).toContain('1 not in this folder')
     expect(text).not.toContain('incomplete')
   })
@@ -235,9 +237,9 @@ describe('scanSummary', () => {
       savedKeys: [],
       failures: new Map()
     })
-    expect(text).toContain('1 not found (scan incomplete)')
+    expect(text).toContain('The scan is incomplete for 1 font.')
     expect(text).toContain(
-      'scan incomplete: 2 file(s) could not be read, 1 face(s) inside collections could not be read, 30 file(s) not checked (limit)'
+      'Scan incomplete: Could not read 2 files. Could not read 1 font style in collections. 30 files were not checked because the scan limit was reached.'
     )
     expect(text).not.toContain('not in this folder')
   })

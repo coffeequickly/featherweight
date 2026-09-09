@@ -1,16 +1,10 @@
-// 하단 고정 영역 — 톱니(고급 설정)·내보내기 버튼·진행·오류·알림. 어느 화면에서든 보인다.
-// 결과 카드는 여기 없다 — 메인 화면의 체크리스트 아래(ReportCard)에 온다.
+// 하단 고정 영역 — 내보내기 버튼·진행·오류·알림. 어느 탭에서든 보인다.
+//
+// 톱니는 없앴다. 고급 설정이 이미지·옵션 탭으로 갈라져 탭 바에 자리를 얻었으므로,
+// 같은 곳으로 가는 문이 둘일 이유가 없다.
+// 결과는 여기 없다 — 결과 탭이 받는다.
 
-import {
-  Banner,
-  Button,
-  IconButton,
-  IconSettings24,
-  IconWarning16,
-  Muted,
-  Text,
-  VerticalSpace
-} from '@create-figma-plugin/ui'
+import { Banner, Button, IconWarning16, Muted, Text, VerticalSpace } from '@create-figma-plugin/ui'
 import { Fragment, JSX } from 'preact'
 
 import { t } from '../lib/i18n'
@@ -23,17 +17,9 @@ type Props = {
   /** 내보낼 페이지 수 — 버튼 라벨과 활성화 여부에 쓴다 */
   pageCount: number
   onExport: () => void
-  /** 버튼 옆 톱니 — 압축 플러그인들이 설정을 두는 자리다 */
-  onOpenSettings: () => void
 }
 
-export function ExportFooter({
-  exporter,
-  notice,
-  pageCount,
-  onExport,
-  onOpenSettings
-}: Props): JSX.Element {
+export function ExportFooter({ exporter, notice, pageCount, onExport }: Props): JSX.Element {
   return (
     <Fragment>
       {notice === null ? null : (
@@ -46,14 +32,6 @@ export function ExportFooter({
       )}
 
       <div class="footerRow">
-        {/* 내보내는 동안은 설정을 바꿀 수 없다 — 비활성 톱니를 눌러 보게 두지 않는다 */}
-        {exporter.busy ? null : (
-          <div class="footerGear">
-            <IconButton onClick={onOpenSettings} title={t('screen.settings')}>
-              <IconSettings24 />
-            </IconButton>
-          </div>
-        )}
         <div class="footerMain">
           {exporter.busy ? (
             <Fragment>
