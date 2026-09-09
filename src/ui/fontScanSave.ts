@@ -152,14 +152,14 @@ export function scanIncompleteLine(result: ScanResult): string | null {
   }
   if (result.unread > 0) detail.push(t('fonts.scanCapFiles', { count: result.unread }))
   if (result.memoryCapped) detail.push(t('fonts.scanCapMemory'))
-  return t('fonts.scanIncomplete', { detail: detail.join(', ') })
+  return t('fonts.scanIncomplete', { detail: detail.join(' ') })
 }
 
-/** 스캔 결과 한 줄 — 넣은 수를 먼저, 못 넣은 것은 이유별로 */
+/** 스캔 결과 — 저장 결과를 먼저, 상세 사유는 문장별 줄로 구분한다. */
 export function scanSummary(result: ScanResult, outcome: SaveOutcome): string {
   const parts = [t('fonts.scanResult', { found: outcome.saved })]
   if (outcome.failed > 0) {
     parts.push(t('fonts.scanSaveFailed', { count: outcome.failed, error: outcome.lastError }))
   }
-  return [...parts, ...scanDetailLines(result, outcome)].join(' · ')
+  return [...parts, ...scanDetailLines(result, outcome)].join('\n')
 }

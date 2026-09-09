@@ -23,7 +23,12 @@ export const CLIENT_STORAGE_LIMIT = 5 * 1024 * 1024
 export type Settings = {
   version: 2
   quality: number // 0.5–1.0
-  multiplier: 1 | 1.5 | 2
+  /**
+   * 이 이미지가 캔버스에서 차지하는 크기의 몇 배까지 픽셀을 남길지.
+   * PDF 는 1pt = 1/72인치라 배율이 곧 DPI다 — 1× = 72, 2× = 144, 4× = 288.
+   * 3·4 는 인쇄용으로 뒤에 넣었다. 옛 저장값(1·1.5·2)은 그대로 유효하다.
+   */
+  multiplier: 1 | 1.5 | 2 | 3 | 4
   /** 긴 변 상한 — HD · FHD · QHD · 4K. 옛 값(1024·1600·2048·4096)은 settingsOptions.snapSettings 가 옮긴다 */
   maxEdge: 1280 | 1920 | 2560 | 3840
   /** 원본이 이 픽셀 이하면 아예 손대지 않는다 — 로고·아이콘을 지키는 절대 하한 */
@@ -55,7 +60,14 @@ export const DEFAULT_SETTINGS: Settings = {
   fitTargetMb: 5
 }
 
-export type SortMode = 'position' | 'name'
+/**
+ * 정렬 기준. 방향(뒤집기)은 따로 둔다 — 셋 × 둘을 여섯 칸으로 늘어놓으면 고를 수 없다.
+ *
+ * "고른 순서" 는 없다. figma.currentPage.selection 은 클릭한 차례를 보존하지 않아서
+ * (실기 확인: 1·2·3·4·5 를 차례로 골랐는데 1·4·5·2·3 이 왔다) 지킬 수 없는 약속이었다.
+ * 순서를 직접 정하는 길은 정렬 탭에서 행을 끌어 옮기는 쪽이고, 그 상태는 "직접" 칩이 말한다.
+ */
+export type SortMode = 'position' | 'name' | 'layer'
 
 export type FrameItem = {
   id: string
@@ -66,6 +78,11 @@ export type FrameItem = {
   y: number
   imageCount: number
   textCount: number
+  /**
+   * 레이어 패널에서 위에서 몇 번째인가. Figma 의 children 은 아래에서 위 순서라
+   * 뒤집어 담는다 — 화면에서 보는 순서와 같아야 "레이어 순서" 라는 말이 맞는다.
+   */
+  layerIndex: number
   thumb?: Uint8Array
 }
 
@@ -244,7 +261,12 @@ export interface FrameThumbsHandler extends EventHandler {
 /** 썸네일은 정렬 화면을 열 때만 만든다 — 31장 렌더가 캔버스를 버벅이게 했다 */
 export interface FrameThumbsRequestHandler extends EventHandler {
   name: 'frames:thumbs:request'
-  handler: () => void
+  /**
+   * 그릴 프레임의 id. 개수가 아니라 id 여야 한다 — 메인의 선택 배열은 Figma 가 준 순서고
+   * UI 는 그것을 정렬해 보여 주므로, "앞에서 넷" 이 서로 다른 넷을 가리킨다.
+   * 실기에서 시작 탭의 세 번째 칸이 계속 비어 있었던 이유다.
+   */
+  handler: (ids: string[]) => void
 }
 
 /**
@@ -260,6 +282,8 @@ export interface FrameMetaHandler extends EventHandler {
 export type ImageUsage = {
   nodeId: string
   imageHash: string
+  /** 레이어 이름 — 이미지 목록에서 어느 그림인지 가리키는 유일한 단서다 */
+  name: string
   /** 노드의 표시 크기 (px) */
   width: number
   height: number
@@ -400,6 +424,12 @@ export interface FontSaveResultHandler extends EventHandler {
 export interface FontDeleteHandler extends EventHandler {
   name: 'font:delete'
   handler: (ref: FontRef) => void
+}
+
+/** 저장소 전체 비우기. 한도(5MB)가 빡빡해 한 종씩 지우는 것만으로는 답이 안 될 때가 있다 */
+export interface FontClearHandler extends EventHandler {
+  name: 'fonts:clear'
+  handler: () => void
 }
 
 export interface NoticeHandler extends EventHandler {

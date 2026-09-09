@@ -64,14 +64,18 @@ const FIGMA_VARS_DARK = `
   --figma-color-icon: #cccccc;
   --figma-color-icon-secondary: #8c8c8c;
   --figma-color-bg-warning-tertiary: #4a3a12;
+  --figma-color-bg-warning-secondary: #5c4917;
   --figma-color-text-warning: #f3c11b;
+  --figma-color-text-danger: #ff8a80;
   /* 아래는 문서에 다크 값이 없어 근사값이다 — 실제 색은 Figma 안에서 본다 */
   --figma-color-text-brand: #7cc4f8;
   --figma-color-icon-brand: #7cc4f8;
   --figma-color-border-brand: #7cc4f8;
+  --figma-color-border-brand-strong: #4aa8f0;
   --figma-color-bg-brand-tertiary: #1e3a55;
   --figma-color-icon-success: #79d297;
   --figma-color-icon-warning: #ffcd29;
+  --figma-color-text-success: #79d297;
 }
 body { margin: 0; background: var(--figma-color-bg); }
 `
@@ -248,6 +252,10 @@ function page(uiScript, query) {
   // ?bare=1&screen=settings&w=400&h=560 — 스크린샷 자동화용: 컨트롤 바 없이 UI 만 꽉 채운다
   const bare = query.get('bare') === '1'
   const screen = query.get('screen') ?? ''
+  // ?family=Nexa — 폰트 패밀리 상세를 바로 연다 (캡처 자동화용)
+  const family = query.get('family') ?? ''
+  // ?sub=storage — 하위 페이지를 바로 연다 (캡처 자동화용)
+  const sub = query.get('sub') ?? ''
   const lang = query.get('lang') ?? ''
   const dark = query.get('theme') === 'dark'
   const platform = query.get('platform') ?? ''
@@ -288,6 +296,7 @@ function page(uiScript, query) {
 const FIXTURE = ${JSON.stringify(FIXTURE)}
 const UI_SCRIPT = ${JSON.stringify(uiScript)}
 const VARS = ${JSON.stringify(dark ? FIGMA_VARS_DARK : FIGMA_VARS)}\nconst FRAME_COUNT = ${frames === null ? 'null' : Number(frames)}
+const LANG = ${JSON.stringify(lang)}
 const ALL_FONTS_READY = ${allFontsReady}
 const BAD_FILE = ${badFile}
 const FIT_TO_SIZE = ${fitToSize}
@@ -301,6 +310,8 @@ iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VAR
   '</style></head><body class="figma-light"><div id="create-figma-plugin"></div>' +
   '<script>const __FIGMA_COMMAND__="";const __SHOW_UI_DATA__={};' +
   'window.__PREVIEW_SCREEN__="${screen}";' +
+  'window.__PREVIEW_FAMILY__="${family}";' +
+  'window.__PREVIEW_SUB__="${sub}";' +
   ('${withReport}' === 'true'
     ? 'window.__PREVIEW_REPORT__=' + JSON.stringify(FIXTURE.report) + ';'
     : '') +
@@ -335,6 +346,11 @@ window.addEventListener('message', (event) => {
       : baseSelection
     send('editor', EDITOR)
     send('selection', selection)
+    // 썸네일 — 캔버스로 종이 같은 그림을 그려 실제 바이트로 보낸다.
+    // 회색 상자만 나오면 페이지 띠나 결과 카드의 배치를 판단할 수 없다.
+    void Promise.all(selection.map((frame, i) => fakeThumb(frame, i))).then((thumbs) => {
+      send('frames:thumbs', thumbs.filter((row) => row !== null))
+    })
     send(
       'frames:meta',
       selection.map((f) => ({ id: f.id, imageCount: f.imageCount, textCount: f.textCount }))
@@ -383,17 +399,53 @@ window.addEventListener('message', (event) => {
   }
 })
 
+/** 프레임 하나의 가짜 썸네일 PNG 바이트 */
+async function fakeThumb(frame, index) {
+  const long = 160
+  const ratio = frame.width / frame.height
+  const w = ratio >= 1 ? long : Math.round(long * ratio)
+  const h = ratio >= 1 ? Math.round(long / ratio) : long
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = '#dfe3ea'
+  ctx.fillRect(w * 0.1, h * 0.1, w * 0.55, h * 0.05)
+  ctx.fillRect(w * 0.1, h * 0.2, w * 0.8, h * 0.28)
+  ctx.fillStyle = '#eceff3'
+  for (let row = 0; row < 5; row += 1) {
+    ctx.fillRect(w * 0.1, h * (0.56 + row * 0.07), w * (row === 4 ? 0.45 : 0.8), h * 0.035)
+  }
+  ctx.fillStyle = '#c8ced8'
+  ctx.font = String(Math.round(h * 0.12)) + 'px sans-serif'
+  ctx.fillText(String(index + 1), w * 0.1, h * 0.95)
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+  if (blob === null) return null
+  return { id: frame.id, thumb: new Uint8Array(await blob.arrayBuffer()) }
+}
+
 function send(name, ...args) {
   iframe.contentWindow.postMessage({ pluginMessage: [name, ...args] }, '*')
 }
 
-/** 픽스처 프레임 i 가 쓰는 이미지들 — 표지는 큰 사진+로고, 프로젝트 장은 스크린샷 넷+아이콘 넷 */
+/** 픽스처 프레임 i 가 쓰는 이미지들 — 표지는 큰 사진+로고, 프로젝트 장은 스크린샷 넷+아이콘 넷.
+    레이어 이름은 화면 언어를 따른다 — 영문 캡처(마케팅 보드)에 한글 이름이 섞이면 안 된다 */
 function imagesFor(i) {
-  const use = (hash, width, height) => ({ nodeId: 'n-' + hash, imageHash: hash, width, height, scaleMode: 'FILL' })
+  const use = (hash, name, width, height) => ({ nodeId: 'n-' + hash, imageHash: hash, name, width, height, scaleMode: 'FILL' })
+  const ko = LANG.toLowerCase().startsWith('ko')
+  const cover = ko ? '\ud45c\uc9c0 \ubc30\uacbd' : 'Cover photo'
+  const logo = ko ? '\ub85c\uace0' : 'Logo'
+  const shot = ko ? '\ud654\uba74 \ucea1\ucc98 0' : 'Screenshot 0'
+  const icon = ko ? '\uc544\uc774\ucf58 0' : 'Icon 0'
   switch (i % 3) {
-    case 0: return [use('cover', 595, 397), use('logo', 120, 40)]
-    case 1: return [use('logo', 120, 40)]
-    default: return [0, 1, 2, 3].flatMap((k) => [use('shot' + k, 260, 170), use('icon' + k, 48, 48)])
+    case 0: return [use('cover', cover, 595, 397), use('logo', logo, 120, 40)]
+    case 1: return [use('logo', logo, 120, 40)]
+    default: return [0, 1, 2, 3].flatMap((k) => [
+      use('shot' + k, shot + (k + 1), 260, 170),
+      use('icon' + k, icon + (k + 1), 48, 48)
+    ])
   }
 }
 

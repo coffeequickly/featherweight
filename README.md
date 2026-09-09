@@ -1,6 +1,6 @@
 # Featherweight – Compressed PDF Export with Real Fonts
 
-![Featherweight — compressed PDF export with real fonts](docs/brand/cover-1920x960.png?v=5)
+![Featherweight — compressed PDF export with real fonts](docs/brand/cover-1920x960.png?v=6)
 
 A Figma plugin that exports frames as **light PDFs with real embedded fonts**.
 
@@ -36,6 +36,15 @@ Korean line-break joiners no longer force outlines either.
 Keep hyperlinks). **OTF fonts** can be added now, not just TTF. The font
 folder picker explains itself.
 
+**New in 3.0** — six tabs that follow the work: **Start · Order · Fonts ·
+Images · Options · Result**. Start shows only what needs you and the tab holding
+it turns amber. Fonts groups by family with a detail page per style and a
+storage screen you can empty. Images gains **3× and 4×** for print (216 and
+288 DPI) and lists every image with the size it starts at and the size it ends
+up. **Result** opens on the finished PDF — its first page, what went in with
+fonts, what stayed outlined and why, and the text a parser will actually read.
+Dark interface.
+
 **New in 2.2** — **Target** now spends the whole budget. If Balanced already
 fits, it climbs toward Sharp; between ladder steps it fine-tunes JPEG quality;
 and predictions are calibrated against what Figma actually puts in the PDF, so
@@ -47,12 +56,10 @@ PDF export outlines the text and keeps every image at full size). Selecting a
 section exports the frames inside it. Selecting thirty frames no longer
 freezes the canvas, and image-heavy exports are faster.
 
-**New in 2.0** — one screen instead of tabs. Presets are tiles that show the
-numbers they set; a *Before you export* checklist says how many images will
-shrink, which fonts are ready and exactly which text layers would stay as
-outlines (and why), with a link to the layer. Missing fonts can be picked out
-of your font folder in one go. Advanced settings open with an HD-to-4K chart of
-what your images become.
+**New in 2.0** — one screen instead of tabs (3.0 brought tabs back, arranged by
+the order of the work rather than by feature). Presets became tiles that show
+the numbers they set, a *Before you export* checklist said what would change,
+and missing fonts could be picked out of a font folder in one go.
 
 ## How it works
 
@@ -60,12 +67,13 @@ what your images become.
    with nothing selected to export the whole deck
 2. Pick a preset at the top — Sharp / Balanced / Smallest, or **Target** to name
    a file size. The chips underneath show exactly what changes
-3. Read the **Before you export** checklist: frames, images, fonts, text. A
-   warning row tells you what will be outlined and takes you straight to the fix
-   (**Order & exclude**, **Add fonts**, **Show layers**) — your layers are never
-   modified
+3. Check the **Start** tab. It lists only what needs you — a missing font, text
+   that would stay outlined and why — and the tab that fixes it turns amber.
+   Follow it, or export anyway; your layers are never modified
 4. **Export PDF** — the save dialog is pre-filled with a timestamped file name.
-   In the report, click a reason to select the affected layers on canvas
+   **Result** then shows the first page, what was embedded, what stayed as
+   outlines and why (click a reason to select those layers on canvas), and the
+   text a parser will read
 
 ## Fonts
 
@@ -177,16 +185,22 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
   등 60종은 자동으로 받아 넣습니다. 글 위주 이력서가 10MB에서 1MB 아래로 내려갑니다.
 - **보이는 크기에 맞춘 이미지 압축** — 이미지는 실제로 표시되는 크기에 맞춰 줄이고
   다시 인코딩합니다. 선명하게 / 균형 / 최소 용량 중 하나를 고르면 어떤 숫자가
-  적용되는지 바로 보이고, 고급 설정에서 배율·상한(HD~4K)·품질을 직접 정할 수도
-  있습니다. 로고와 작은 이미지는 손대지 않으니 선명하던 것이 뭉개지지 않습니다.
+  적용되는지 바로 보이고, 이미지 탭에서 해상도(1×~4×, 인쇄 기준 최대 288 DPI)와
+  품질을 직접 정할 수도 있습니다. 이 문서의 이미지가 몇 px에서 몇 px이 되는지
+  한 줄씩 보여 주므로, 설정이 어디에 닿는지 내보내기 전에 확인됩니다. 로고와 작은
+  이미지는 손대지 않으니 선명하던 것이 뭉개지지 않습니다.
 - **목표 용량 맞추기** — 업로드 한도가 5MB라면 숫자만 적으세요. 한 번 내보내 크기를
   재고, 그 안에 드는 가장 좋은 화질을 찾아 다시 내보냅니다. 화질에는 하한이 있어서
   목표가 무리면 가능한 가장 작은 파일과 함께 그 하한을 알려 드립니다.
-- **내보내기 전에 미리 확인** — 메인 화면의 체크리스트 한 장이 말해 줍니다. 이미지
-  몇 장이 줄어드는지, 폰트는 준비됐는지, 어떤 텍스트가 왜 아웃라인으로 남는지 — 그
-  레이어로 바로 가는 링크와 함께. 내보낸 뒤에 놀랄 일이 없습니다.
+- **내보내기 전에 미리 확인** — 시작·정렬·폰트·이미지·옵션·결과 여섯 탭이 작업
+  순서대로 놓여 있습니다. 시작 탭은 손볼 것만 보여 주고, 그것이 든 탭은 색으로
+  알려 줍니다 — 없는 폰트, 왜 아웃라인으로 남는 텍스트인지, 그 레이어로 가는 링크까지.
+- **내보낸 뒤에 무엇이 들어갔는지** — 결과 탭이 완성된 PDF의 첫 장, 파일 크기,
+  폰트와 함께 들어간 텍스트와 아웃라인으로 남은 텍스트를 사유별로 보여 줍니다.
+  사유를 누르면 그 레이어가 캔버스에서 선택됩니다. 파서가 실제로 읽을 텍스트도
+  그 자리에서 확인할 수 있어, 제출 전에 이름과 연락처가 빠지지 않았는지 봅니다.
 
-이 넷이 합쳐지면 차이가 큽니다. 12쪽 포트폴리오가 같은 페이지, 같은 모습으로
+이 다섯이 합쳐지면 차이가 큽니다. 12쪽 포트폴리오가 같은 페이지, 같은 모습으로
 22.7MB에서 4.0MB가 됐습니다.
 
 ### 사용법
@@ -194,7 +208,7 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
 1. 프레임을 선택하고 Featherweight를 실행합니다. Figma Slides에서는 아무것도
    고르지 않으면 덱 전체가 대상입니다
 2. 프리셋을 고릅니다. 목표 용량이면 원하는 크기를 적습니다
-3. 체크리스트를 읽습니다. 경고가 있으면 따라가서 페이지를 정렬하거나, 폰트를
+3. 시작 탭을 봅니다. 경고가 있으면 따라가서 페이지를 정렬하거나, 폰트를
    넣거나, 레이어를 찾습니다
 4. 내보내기 — 저장 창에 날짜가 붙은 파일명이 미리 채워져 있습니다
 
@@ -219,7 +233,7 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
   폰트 불가). 그 폰트의 라이선스가 문서 임베딩을 허용하는지는 직접 확인하셔야
   합니다. 자동으로 받는 폰트는 전부 SIL OFL이라 임베딩이 허용됩니다.
 - 회전된 텍스트, 그라데이션·선·효과가 있는 텍스트, 밑줄 텍스트는 원래 아웃라인을
-  유지합니다(의도한 동작이고, 조용히 바꾸지 않습니다). 체크리스트가 내보내기 전에
+  유지합니다(의도한 동작이고, 조용히 바꾸지 않습니다). 시작 탭이 내보내기 전에
   어느 것인지 알려 줍니다.
 - 텍스트는 추출 가능한 형태로 들어가지만 특정 ATS의 파싱 결과를 보장하지는
   않습니다. Figma, Inc.와 무관합니다.
@@ -247,9 +261,11 @@ pick `~/figma-plugins/sheaf/manifest.json`. After that, re-running
 `install:local` is enough — no re-import needed.
 
 `ui:preview` accepts query flags for reviewing states without Figma:
-`?screen=fonts&theme=dark&lang=en-US&platform=win&frames=12&fit=1&text=clean&bare=1`.
-`screen` is one of `settings` / `frames` / `fonts` / `text` / `preview`; omit it
-for the main screen. `report=1` shows the result card as it looks after an export.
+`?screen=fonts&lang=en-US&platform=win&frames=12&fit=1&text=clean&bare=1`.
+`screen` is a tab id — `start` / `order` / `fonts` / `images` / `options` /
+`result` — and `sub` opens a subpage (`outline` / `extracted` / `storage`), with
+`family=` for a font's detail page. `report=1` fills the Result tab as it looks
+after an export. The interface is dark-only since 3.0, so `theme=` does nothing.
 
 ### Repo layout
 

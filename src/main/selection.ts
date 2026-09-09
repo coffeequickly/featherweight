@@ -94,8 +94,21 @@ export function listItems(nodes: readonly ExportableNode[]): FrameItem[] {
     x: node.x,
     y: node.y,
     imageCount: 0,
-    textCount: 0
+    textCount: 0,
+    layerIndex: layerIndexOf(node)
   }))
+}
+
+/**
+ * 레이어 패널에서 위에서 몇 번째인가. children 은 아래에서 위 순서라 뒤집는다 —
+ * 사용자가 보는 순서와 다르면 "레이어 순서" 라는 이름이 거짓말이 된다.
+ * 부모를 못 찾으면(페이지 직속이 아닌 경우) 0 — 그때는 다른 기준이 순서를 정한다.
+ */
+function layerIndexOf(node: SceneNode): number {
+  const siblings = node.parent?.children
+  if (siblings === undefined) return 0
+  const index = siblings.indexOf(node)
+  return index < 0 ? 0 : siblings.length - 1 - index
 }
 
 /**
@@ -142,6 +155,7 @@ export async function scanSelection(
       height: Math.round(node.height),
       x: node.x,
       y: node.y,
+      layerIndex: layerIndexOf(node),
       imageCount: new Set(scan.images.map((usage) => usage.imageHash)).size,
       textCount: scan.textCount
     })
@@ -286,10 +300,14 @@ export async function imageEdges(
 /**
  * 썸네일을 묶음으로 병렬 렌더. 30장을 하나씩 기다리면 몇 초가 걸리던 일이다.
  * 도중에 선택이 바뀌었으면(isStale) 남은 것은 그리지 않는다 — 어차피 버려진다.
+ *
+ * 묶음이 끝날 때마다 onBatch 로 넘긴다. 레이어가 수천 개인 문서에서는 exportAsync 한 장이
+ * 그 자체로 느려서, 전부 끝나고 한 번에 보내면 목록이 오래 비어 있다. 그린 것부터 보낸다.
  */
 export async function renderThumbs(
   nodes: readonly ExportableNode[],
-  isStale: () => boolean
+  isStale: () => boolean,
+  onBatch?: (batch: Array<{ id: string; thumb: Uint8Array }>) => void
 ): Promise<Array<{ id: string; thumb: Uint8Array }>> {
   const out: Array<{ id: string; thumb: Uint8Array }> = []
 
@@ -297,26 +315,42 @@ export async function renderThumbs(
     if (isStale()) break
     const chunk = nodes.slice(start, start + THUMB_CONCURRENCY)
     const thumbs = await Promise.all(chunk.map(renderThumb))
+    if (isStale()) break
+    const batch: Array<{ id: string; thumb: Uint8Array }> = []
     chunk.forEach((node, index) => {
       const thumb = thumbs[index]
-      if (thumb !== null) out.push({ id: node.id, thumb })
+      if (thumb !== null) batch.push({ id: node.id, thumb })
     })
+    out.push(...batch)
+    if (batch.length > 0 && onBatch !== undefined) onBatch(batch)
   }
 
   return out
 }
 
-/** 썸네일 실패가 목록 표시를 막지 않는다. */
+/**
+ * 썸네일 실패가 목록 표시를 막지 않는다.
+ *
+ * 다만 조용히 삼키지도 않는다 — 실기에서 다섯 장 중 한 장만 빈 칸이 되는 것을 봤는데,
+ * 사유가 남지 않아 무엇이 걸렸는지 알 수 없었다. exportAsync 는 무거운 프레임에서
+ * 간헐적으로 실패하므로 한 번 더 해 보고, 그래도 안 되면 어느 레이어가 왜 실패했는지 남긴다.
+ */
 async function renderThumb(node: ExportableNode): Promise<Uint8Array | null> {
-  try {
-    const longEdge = Math.max(node.width, node.height)
-    if (longEdge <= 0) return null
-    const scale = Math.min(1, THUMB_LONG_EDGE / longEdge)
-    return await node.exportAsync({
-      format: 'PNG',
-      constraint: { type: 'SCALE', value: scale }
-    })
-  } catch {
-    return null
+  const longEdge = Math.max(node.width, node.height)
+  if (longEdge <= 0) return null
+  const scale = Math.min(1, THUMB_LONG_EDGE / longEdge)
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: scale } })
+    } catch (error) {
+      if (attempt === 1) {
+        console.warn(
+          `[Featherweight] 썸네일 실패: ${node.name} (${node.type}, ${Math.round(node.width)}×${Math.round(node.height)})`,
+          error
+        )
+      }
+    }
   }
+  return null
 }

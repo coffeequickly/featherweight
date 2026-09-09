@@ -9,7 +9,7 @@ function usage(
   height: number,
   scaleMode: ImageUsage['scaleMode'] = 'FILL'
 ): ImageUsage {
-  return { nodeId: `node-${hash}`, imageHash: hash, width, height, scaleMode }
+  return { nodeId: `node-${hash}`, imageHash: hash, name: hash, width, height, scaleMode }
 }
 
 function frame(id: string, longEdge: number, images: ImageUsage[]): Preflight['frames'][number] {
@@ -104,6 +104,7 @@ describe('uniformSize', () => {
   const item = (id: string, width: number, height: number): FrameItem => ({
     id,
     name: id,
+    layerIndex: 0,
     width,
     height,
     x: 0,

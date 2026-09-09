@@ -32,26 +32,26 @@ describe('t', () => {
 
   it('{name} 자리를 채운다', () => {
     setLocale('ko')
-    expect(t('app.excluded', { count: 3 })).toBe('제외됨 3개')
-    expect(t('report.skipped', { name: 'Cover', reason: 'x' })).toBe('건너뜀 — Cover: x')
+    expect(t('app.pageCount', { count: 3 })).toBe('3장')
+    expect(t('report.skipped', { name: 'Cover', reason: 'x' })).toBe('Cover 건너뜀: x')
   })
 
   it('영어 단복수를 처리한다', () => {
-    expect(t('report.textDrawn', { count: 1 })).toBe('1 text node in real fonts')
-    expect(t('report.textDrawn', { count: 4 })).toBe('4 text nodes in real fonts')
+    expect(t('app.pageCount', { count: 1 })).toBe('1 page')
+    expect(t('app.pageCount', { count: 4 })).toBe('4 pages')
   })
 
   it('없는 파라미터는 자리 표시를 그대로 둔다 — 조용히 빈칸이 되지 않는다', () => {
     setLocale('ko')
-    expect(t('app.excluded')).toBe('제외됨 {count}개')
+    expect(t('app.pageCount')).toBe('{count}장')
   })
 
   it('font.loadFailed 의 사유 접미사 — 있으면 괄호, 없으면 생략', () => {
     expect(t('font.loadFailed', { family: 'A', style: 'Bold', why: '' })).toBe(
-      'could not load A Bold'
+      'Could not load the font file for A Bold.'
     )
     expect(t('font.loadFailed', { family: 'A', style: 'Bold', why: 'HTTP 404' })).toBe(
-      'could not load A Bold (HTTP 404)'
+      'Could not load the font file for A Bold. (HTTP 404)'
     )
   })
 })
@@ -101,6 +101,7 @@ describe('사전 무결성', () => {
     need: '2MB',
     free: '1MB',
     status: 'no file',
+    font: 'Helvetica Neue Bold',
     before: '2MB',
     after: '1MB',
     actual: '6MB',

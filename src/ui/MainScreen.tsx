@@ -1,16 +1,21 @@
-// 메인 한 화면 — 프리셋 · 체크리스트 · (내보낸 뒤) 결과 카드. 고급 설정은 푸터의 톱니로 간다.
+// 시작 탭 — 어떻게 뽑을지(프리셋), 지금 무엇이 문제인지, 그리고 무엇을 뽑는지.
+//
+// 결과는 여기 없다. 결과 탭이 받는다 — 체크리스트 아래에 붙여 두면 고치고 다시
+// 내보내는 왕복마다 스크롤을 오르내려야 했다.
 
 import { Muted, Text, VerticalSpace } from '@create-figma-plugin/ui'
 import { Fragment, JSX } from 'preact'
 
 import { t } from '../lib/i18n'
 import { EditorKind, FontUsage, FrameItem, Preflight, Settings, StoredFont } from '../lib/types'
-import { unitWords } from './units'
-import { PreFlight, SubScreen } from './PreFlight'
+import { PageStrip } from './PageStrip'
 import { PresetBar } from './PresetBar'
-import { ReportCard } from './ReportCard'
-import { ExportReport } from './useExport'
+import { StatusList } from './StatusList'
+import { unitWords } from './units'
 import { FrameOrder } from './useFrameOrder'
+
+/** 시작 탭에서 갈 수 있는 곳 — 탭 셋과 하위 페이지 하나 */
+export type StartTarget = 'frames' | 'fonts' | 'options' | 'outline' | 'images'
 
 type Props = {
   items: FrameItem[]
@@ -21,10 +26,8 @@ type Props = {
   settings: Settings
   editor: EditorKind
   disabled: boolean
-  report: ExportReport | null
   onChangeSettings: (next: Settings) => void
-  onOpen: (screen: SubScreen | 'preview') => void
-  onDismissReport: () => void
+  onOpen: (target: StartTarget) => void
 }
 
 export function MainScreen({
@@ -36,21 +39,19 @@ export function MainScreen({
   settings,
   editor,
   disabled,
-  report,
   onChangeSettings,
-  onOpen,
-  onDismissReport
+  onOpen
 }: Props): JSX.Element {
   return (
     <Fragment>
       <VerticalSpace space="medium" />
-      <PresetBar settings={settings} disabled={disabled} onChange={onChangeSettings} />
+      <PresetBar
+        settings={settings}
+        disabled={disabled}
+        onChange={onChangeSettings}
+        onOpenImages={() => onOpen('images')}
+      />
       <VerticalSpace space="large" />
-
-      <Text>
-        <Muted>{t('preflight.title')}</Muted>
-      </Text>
-      <VerticalSpace space="extraSmall" />
 
       {items.length === 0 ? (
         <Fragment>
@@ -67,36 +68,24 @@ export function MainScreen({
               </Fragment>
             )}
           </div>
-          {/* 아무것도 선택하지 않았을 때만 — 프레임을 고르면 체크리스트가 대신 말한다 */}
+          {/* 아무것도 선택하지 않았을 때만 — 프레임을 고르면 상태가 대신 말한다 */}
           <VerticalSpace space="small" />
           <Text>
             <Muted>{t('app.promise', unitWords(editor))}</Muted>
           </Text>
         </Fragment>
       ) : (
-        <PreFlight
-          items={items}
-          visibleCount={order.visible.length}
-          excludedCount={order.excluded.length}
-          reordered={order.reordered}
-          preflight={preflight}
-          fonts={fonts}
-          storedFonts={storedFonts}
-          settings={settings}
-          editor={editor}
-          onOpen={onOpen}
-          onEnableText={() => onChangeSettings({ ...settings, embedText: true })}
-        />
-      )}
-
-      {report === null ? null : (
         <Fragment>
-          <VerticalSpace space="medium" />
-          <ReportCard
-            report={report}
-            onClose={onDismissReport}
-            onOpenPreview={() => onOpen('preview')}
+          <StatusList
+            items={order.visible}
+            preflight={preflight}
+            fonts={fonts}
+            storedFonts={storedFonts}
+            settings={settings}
+            editor={editor}
+            onGo={onOpen}
           />
+          <PageStrip items={order.visible} onGo={() => onOpen('frames')} />
         </Fragment>
       )}
     </Fragment>

@@ -7,6 +7,8 @@ import { FrameItem, SortMode } from '../lib/types'
 
 export type FrameOrder = {
   sortMode: SortMode
+  /** 기준을 뒤집었는가 — 기준과 방향은 따로 고른다 */
+  reversed: boolean
   /** 정렬·수동 순서를 적용한 전체 (제외된 것 포함) */
   ordered: FrameItem[]
   /** 실제로 내보낼 것들, 순서대로 */
@@ -15,6 +17,9 @@ export type FrameOrder = {
   /** 손으로 순서를 바꿨는가 — 체크리스트가 "순서 직접 정함" 이라고 말할 근거 */
   reordered: boolean
   sort: (mode: SortMode) => void
+  flip: () => void
+  /** 손으로 옮긴 순서를 버리고 기준으로 되돌린다 */
+  resetManual: () => void
   move: (id: string, direction: -1 | 1) => void
   reorder: (id: string, toIndex: number) => void
   exclude: (id: string) => void
@@ -24,6 +29,7 @@ export type FrameOrder = {
 
 export function useFrameOrder(items: FrameItem[], selectionSerial: number): FrameOrder {
   const [sortMode, setSortMode] = useState<SortMode>('position')
+  const [reversed, setReversed] = useState(false)
   const [excludedIds, setExcludedIds] = useState<string[]>([])
   const [manualOrder, setManualOrder] = useState<string[]>([])
 
@@ -35,7 +41,7 @@ export function useFrameOrder(items: FrameItem[], selectionSerial: number): Fram
 
   // 기본은 정렬 결과, 손으로 옮긴 뒤에는 그 순서를 따른다
   const ordered = useMemo(() => {
-    const sorted = sortItems(items, sortMode)
+    const sorted = sortItems(items, sortMode, reversed)
     if (manualOrder.length === 0) return sorted
 
     const byId = new Map(sorted.map((item) => [item.id, item]))
@@ -44,7 +50,7 @@ export function useFrameOrder(items: FrameItem[], selectionSerial: number): Fram
       .filter((item): item is FrameItem => item !== undefined)
     const rest = sorted.filter((item) => !manualOrder.includes(item.id))
     return [...picked, ...rest]
-  }, [items, sortMode, manualOrder])
+  }, [items, sortMode, reversed, manualOrder])
 
   const visible = useMemo(
     () => ordered.filter((item) => !excludedIds.includes(item.id)),
@@ -96,13 +102,24 @@ export function useFrameOrder(items: FrameItem[], selectionSerial: number): Fram
     setExcludedIds([])
   }, [])
 
+  const flip = useCallback((): void => {
+    setReversed((previous) => !previous)
+  }, [])
+
+  const resetManual = useCallback((): void => {
+    setManualOrder([])
+  }, [])
+
   return {
     sortMode,
+    reversed,
     ordered,
     visible,
     excluded,
     reordered: manualOrder.length > 0,
     sort,
+    flip,
+    resetManual,
     move,
     reorder,
     exclude,

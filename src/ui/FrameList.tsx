@@ -1,8 +1,7 @@
 import {
   IconButton,
-  IconChevronDown24,
-  IconChevronUp24,
   IconClose24,
+  IconDragHandle16,
   Muted,
   Text,
   VerticalSpace
@@ -163,6 +162,27 @@ function FrameRow({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >
+        {/* 끌 수 있다는 표시. 키보드로도 옮길 수 있어야 하므로 진짜 버튼이다 —
+            위아래 화살표 키가 ↑↓ 버튼 둘을 대신한다 */}
+        <button
+          type="button"
+          class="frameGrip"
+          aria-label={t('frames.moveFor', { name: item.name })}
+          title={t('frames.move')}
+          disabled={disabled}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowUp' && !first) {
+              event.preventDefault()
+              onMove(item.id, -1)
+            }
+            if (event.key === 'ArrowDown' && !last) {
+              event.preventDefault()
+              onMove(item.id, 1)
+            }
+          }}
+        >
+          <IconDragHandle16 />
+        </button>
         <div class="frameIndex">
           <Text>
             <Muted>{index + 1}</Muted>
@@ -177,8 +197,7 @@ function FrameRow({
           <div class="ellipsis">
             <Text>{item.name}</Text>
           </div>
-          <VerticalSpace space="extraSmall" />
-          <div class="ellipsis">
+          <div class="frameMetaLine ellipsis">
             <Text>
               <Muted>
                 {t('frames.meta', {
@@ -193,13 +212,12 @@ function FrameRow({
         </div>
       </div>
       <div class="frameActions">
-        <IconButton disabled={disabled || first} onClick={() => onMove(item.id, -1)}>
-          <IconChevronUp24 />
-        </IconButton>
-        <IconButton disabled={disabled || last} onClick={() => onMove(item.id, 1)}>
-          <IconChevronDown24 />
-        </IconButton>
-        <IconButton disabled={disabled} onClick={() => onExclude(item.id)}>
+        <IconButton
+          aria-label={t('frames.excludeFor', { name: item.name })}
+          disabled={disabled}
+          onClick={() => onExclude(item.id)}
+          title={t('frames.exclude')}
+        >
           <IconClose24 />
         </IconButton>
       </div>
@@ -207,7 +225,8 @@ function FrameRow({
   )
 }
 
-function useThumbUrl(thumb: Uint8Array | undefined): string | null {
+/** 시작 탭의 페이지 띠도 같은 것을 쓴다 — 두 곳이 다르게 그리면 같은 프레임 같지 않다 */
+export function useThumbUrl(thumb: Uint8Array | undefined): string | null {
   const blob = useMemo(
     () => (thumb === undefined ? null : new Blob([thumb as BlobPart], { type: 'image/png' })),
     [thumb]

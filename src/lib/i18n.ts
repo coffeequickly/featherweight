@@ -18,12 +18,24 @@ const n = (count: number, one: string, other: string): string =>
 
 const MESSAGES = {
   // ── UI 골격 ─────────────────────────────────────────────
-  'app.sortPosition': { en: 'Position', ko: '위치순' },
-  'app.sortName': { en: 'Name', ko: '이름순' },
-  'app.excluded': { en: '{count} excluded', ko: '제외됨 {count}개' },
+  // 정렬 기준 셋. 방향은 따로 — 여섯 조합을 칸으로 늘어놓으면 고를 수 없다
+  'app.sortPosition': { en: 'Canvas position', ko: '캔버스 위치' },
+  'app.sortName': { en: 'Name', ko: '이름' },
+  'app.sortLayer': { en: 'Layer order', ko: '레이어 순서' },
+  'app.sortManual': { en: 'Custom', ko: '직접' },
+  'app.sortLabel': { en: 'Sort by', ko: '기준' },
+  'app.sortFlip': { en: 'Reverse the order', ko: '순서 뒤집기' },
+  'app.sortReset': { en: 'Undo custom order', ko: '되돌리기' },
+  'app.pageCount': {
+    en: (p) => n(Number(p.count), 'page', 'pages'),
+    ko: '{count}장'
+  },
+  'app.excludedTitle': {
+    en: (p) => `${n(Number(p.count), 'page', 'pages')} left out`,
+    ko: '뺀 페이지 {count}장'
+  },
   'app.restore': { en: 'Restore', ko: '복원' },
   'app.preparing': { en: 'Preparing…', ko: '준비 중…' },
-  'app.closeReport': { en: 'Close', ko: '닫기' },
   'app.cancel': { en: 'Cancel', ko: '취소' },
   'app.export': {
     en: (p) =>
@@ -32,15 +44,34 @@ const MESSAGES = {
   },
   'app.retry': { en: 'Try again', ko: '다시 시도' },
   // ── 화면 이동 ─────────────────────────────────────────
-  // 메인 한 화면 + 하위 화면. 하위 화면 헤더에 "‹ 제목" 으로 뜬다.
+  // 탭 여섯이 작업 순서다. 하위 페이지는 탭 아래 "‹ 제목" 헤더로 드나든다.
+  //
+  // 탭 라벨은 아이콘 없이 글자만 쓴다 — 문제가 있는 탭은 글자색과 점으로 알린다.
+  // 라벨이 길어지면 고정폭 탭바가 영어에서 넘치므로 한 단어를 유지한다.
+  'tab.start': { en: 'Start', ko: '시작' },
+  'tab.order': { en: 'Order', ko: '정렬' },
+  'tab.fonts': { en: 'Fonts', ko: '폰트' },
+  'tab.images': { en: 'Images', ko: '이미지' },
+  'tab.options': { en: 'Options', ko: '옵션' },
+  'tab.result': { en: 'Result', ko: '결과' },
+  /** 문제 있는 탭의 스크린리더 이름 — 색과 점만으로는 전달되지 않는다 */
+  'tab.needsAttention': { en: '{label}, needs attention', ko: '{label}, 확인이 필요합니다' },
+
+  // 결과 탭은 내보내기 전에도 열린다 — 빈 채로 두지 않고 무엇이 올지 말한다
+  'result.notYet': { en: 'Nothing exported yet', ko: '아직 내보내지 않았습니다' },
+  'result.notYetHint': {
+    en: 'After exporting, this tab shows the file size, which fonts were embedded, and the text embedded in the PDF.',
+    ko: '내보내고 나면 파일 크기, PDF에 포함한 폰트, 그리고 임베딩한 텍스트를 여기서 확인합니다.'
+  },
+
   'screen.back': { en: 'Back', ko: '뒤로' },
-  'screen.settings': { en: 'Advanced settings', ko: '고급 설정' },
-  'screen.frames': { en: 'Arrange', ko: '정렬하기' },
-  'screen.fonts': { en: 'Fonts', ko: '폰트' },
-  'screen.text': { en: 'Outlined text', ko: '아웃라인 처리될 텍스트' },
-  'screen.preview': { en: 'Text check', ko: '텍스트 확인' },
-  'settings.reset': { en: 'Reset', ko: '기본값으로' },
-  'fonts.none': { en: 'No text in this document', ko: '문서에 쓰인 폰트가 없습니다' },
+  'screen.text': { en: 'Outlined text', ko: '아웃라인으로 내보낼 텍스트' },
+  'screen.preview': {
+    en: 'Embedded text',
+    ko: '임베딩한 텍스트'
+  },
+  'settings.reset': { en: 'Reset all settings', ko: '설정 기본값으로 되돌리기' },
+  'fonts.none': { en: 'No fonts used in this document', ko: '이 문서가 쓰는 폰트가 없습니다' },
   // 아무것도 선택하지 않았을 때만 보이는 약속 — 프레임을 고르면 체크리스트가 대신 말한다
   // 디자인 파일에서는 프레임, Slides 에서는 슬라이드 — 문장에 {unit}/{units} 로 끼운다
   'unit.frame': { en: 'frame', ko: '프레임' },
@@ -48,138 +79,82 @@ const MESSAGES = {
   'unit.slide': { en: 'slide', ko: '슬라이드' },
   'unit.slides': { en: 'slides', ko: '슬라이드' },
   'app.promise': {
-    en: 'Images in the selected {units} are downscaled to the size they are shown at, and text is embedded with real fonts.',
-    ko: '선택한 {unit}의 이미지는 보이는 크기에 맞춰 줄이고, 텍스트는 진짜 폰트로 넣습니다.'
+    en: 'Optimizes images in the selected {units} and embeds fonts for supported text.',
+    ko: '선택한 {unit}의 이미지를 최적화하고, 지원하는 텍스트의 폰트를 PDF에 포함합니다.'
   },
 
-  // ── 내보내기 전 체크리스트 ───────────────────────────────
-  // 네 줄: 프레임 · 이미지 · 폰트 · 텍스트. 문제가 있으면 그 줄이 경고가 되고 갈 곳을 단다.
-  'preflight.title': { en: 'Before you export', ko: '내보내기 전에' },
-  'preflight.checking': { en: 'Checking…', ko: '확인 중…' },
-  'preflight.scanning': { en: 'Reading the selection', ko: '선택한 프레임을 읽는 중' },
+  // ── 시작 탭의 상태 ────────────────────────────────────
+  // 문제만 카드로 세우고 나머지는 회색 한 줄로 누른다. 정상인 줄에 갈 곳을 달지 않는다 —
+  // 각 항목으로 가는 문은 탭이 이미 맡고 있어 두 번 두면 체크리스트로 되돌아간다.
+  /** 문제가 있을 때만 붙는다 — 아무 문제 없는 줄 위에 달면 거짓말이 된다 */
+  'start.sectionStatus': { en: 'Needs attention', ko: '확인이 필요합니다' },
+  'start.fontsIncluded': {
+    en: (p) => `${n(Number(p.count), 'font', 'fonts')} embedded`,
+    ko: '폰트 {count}종 포함'
+  },
+
+  'start.textOffHead': {
+    en: 'All text is exported as outlines',
+    ko: '모든 텍스트를 아웃라인으로 내보냅니다'
+  },
+  'start.textOffDetail': {
+    en: 'The Fonts tab has no effect. Turn this off on the Options tab.',
+    ko: '폰트 탭의 설정은 적용되지 않습니다. 옵션 탭에서 끌 수 있습니다.'
+  },
+  'start.fontsHead': {
+    en: (p) =>
+      `${n(Number(p.missing), 'font is', 'fonts are')} missing, so ${n(Number(p.texts), 'text layer', 'text layers')} will be outlined`,
+    ko: '폰트 {missing}종이 없어 텍스트 {texts}개를 아웃라인으로 내보냅니다'
+  },
+  'start.fontsDetail': {
+    en: (p) =>
+      `${p.first}${Number(p.rest) > 0 ? ` and ${p.rest} more` : ''}${
+        Number(p.auto) > 0 ? `. The other ${p.auto} are downloaded during export.` : ''
+      }`,
+    ko: (p) =>
+      `${p.first}${Number(p.rest) > 0 ? ` 외 ${p.rest}종` : ''}${
+        Number(p.auto) > 0 ? `. 나머지 ${p.auto}종은 내보낼 때 받아옵니다.` : ''
+      }`
+  },
+  'start.fontFilesHead': {
+    en: (p) =>
+      Number(p.count) === 1
+        ? 'A font file does not match its style'
+        : `${p.count} font files do not match their style`,
+    ko: '선택한 폰트 파일 {count}개의 스타일이 요청한 스타일과 다릅니다'
+  },
+  'start.fontFilesUnusableHead': {
+    en: (p) =>
+      Number(p.count) === 1 ? 'A font file cannot be used' : `${p.count} font files cannot be used`,
+    ko: '선택한 폰트 파일 {count}개를 사용할 수 없습니다'
+  },
+  'start.structuralHead': {
+    en: (p) =>
+      `${n(Number(p.count), 'text layer', 'text layers')} stay outlined even with the font embedded`,
+    ko: '텍스트 {count}개는 폰트 파일을 선택해도 아웃라인으로 내보냅니다'
+  },
+  // 갈 곳이 탭이면 탭 이름을 그대로 쓴다 — 탭 바에 같은 글자가 있어 대응이 바로 보인다.
+  // 탭이 없는 하위 페이지만 동작으로 부른다.
+  'start.goOutline': { en: 'See why', ko: '사유 보기' },
+
+  'start.pagesTitle': { en: 'Pages to export', ko: '내보낼 페이지' },
+  'start.pagesMore': {
+    en: (p) => `and ${n(Number(p.count), 'more page', 'more pages')}`,
+    ko: '외 {count}장'
+  },
   'preflight.frames': {
     en: (p) => `${n(Number(p.count), String(p.unit), String(p.units))} · ${p.size}`,
     ko: '{unit} {count}장 · {size}'
   },
   'preflight.framesMixed': { en: 'mixed sizes', ko: '크기 여러 가지' },
-  'preflight.framesAsIs': { en: 'As selected on the canvas', ko: '캔버스에서 선택한 그대로' },
-  'preflight.slidesAsIs': { en: 'In deck order', ko: '덱 순서 그대로' },
-  'preflight.framesReordered': { en: 'Custom order', ko: '순서 직접 정함' },
-  'preflight.framesExcluded': {
-    en: (p) => `${p.count} excluded`,
-    ko: '{count}장 제외'
-  },
-  // 줄마다 제목 + 한 줄 설명 — 설명이 없는 줄이 섞이면 줄 높이가 달라져 정렬이 깨진다
-  'preflight.imagesNone': { en: 'No images', ko: '이미지 없음' },
-  'preflight.imagesNoneDetail': { en: 'Nothing to downscale', ko: '줄일 것이 없습니다' },
-  'preflight.imagesRule': {
-    en: 'up to {multiplier}× shown size · max {maxEdge}px',
-    ko: '보이는 크기의 {multiplier}배까지 · 최대 {maxEdge}px'
-  },
-  'preflight.imagesFitDetail': {
-    en: 'quality chosen to fit {target}',
-    ko: '화질은 {target}에 맞춰 정합니다'
-  },
-  'preflight.noTextDetail': {
-    en: 'No text layers in the selected {units}',
-    ko: '선택한 {unit}에 텍스트가 없습니다'
-  },
-  'preflight.textOffDetail': {
-    en: 'No search, copy or ATS parsing',
-    ko: '검색·복사·ATS 파싱이 안 됩니다'
-  },
-  'preflight.images': {
-    en: (p) => n(Number(p.count), 'image', 'images'),
-    ko: '이미지 {count}장'
-  },
-  'preflight.imagesSizing': {
-    en: 'Reading sizes · {done}/{total}',
-    ko: '원본 크기 읽는 중 · {done}/{total}'
-  },
   'preflight.imagesShrink': {
-    en: (p) => `${p.shrink} of ${p.total} images will be downscaled`,
-    ko: '이미지 {total}장 중 {shrink}장 줄임 예정'
+    en: (p) => `${p.shrink} of ${p.total} images downscaled`,
+    ko: '이미지 {total}장 중 {shrink}장 축소'
   },
   'preflight.imagesAllKept': {
-    en: (p) => `${n(Number(p.total), 'image', 'images')} · nothing to downscale`,
-    ko: '이미지 {total}장 · 줄일 것 없음'
+    en: (p) => `${n(Number(p.total), 'image', 'images')} unchanged`,
+    ko: '이미지 {total}장 그대로'
   },
-  'preflight.imagesKeptTiny': {
-    en: (p) => `${p.count} at or under ${p.minEdge}px stay untouched`,
-    ko: '{minEdge}px 이하 {count}장은 그대로 둡니다'
-  },
-  'preflight.imagesWithinBudget': {
-    en: 'All within the frame budget — kept as they are',
-    ko: '전부 프레임 크기 안이라 그대로 둡니다'
-  },
-  'preflight.fontsNone': { en: 'No text', ko: '텍스트 없음' },
-  'preflight.fontsReady': {
-    en: (p) => `All ${n(Number(p.count), 'font', 'fonts')} ready`,
-    ko: '폰트 {count}종 전부 준비됨'
-  },
-  'preflight.fontsAuto': {
-    en: '{names} · downloaded automatically',
-    ko: '{names} · 자동으로 받아옵니다'
-  },
-  'preflight.fontsMixed': {
-    en: '{names} · some from your files',
-    ko: '{names} · 일부는 직접 넣은 파일'
-  },
-  // 폰트 줄은 원인만 말한다 — "아웃라인" 이라는 결말은 텍스트 줄 하나가 맡는다
-  'preflight.fontsFileMismatch': {
-    en: (p) =>
-      Number(p.count) === 1
-        ? 'An added font file has a different weight'
-        : `${p.count} added font files have a different weight`,
-    ko: '직접 넣은 폰트 파일 {count}개의 굵기가 다릅니다'
-  },
-  'preflight.fontsFileUnusable': {
-    en: (p) =>
-      Number(p.count) === 1
-        ? "An added font file can't be used"
-        : `${p.count} added font files can't be used`,
-    ko: '직접 넣은 폰트 파일 {count}개를 쓸 수 없습니다'
-  },
-  'preflight.fontsFileProblemMore': {
-    en: (p) => ` and ${p.count} more`,
-    ko: ' 외 {count}종'
-  },
-  'preflight.fontsMissing': {
-    en: (p) =>
-      `${n(Number(p.missing), 'font', 'fonts')} missing · used in ${n(Number(p.texts), 'text', 'texts')}`,
-    ko: '폰트 {missing}종 없음 · 텍스트 {texts}개에 쓰임'
-  },
-  // first = 없는 폰트 첫 이름, more = 없는 폰트 나머지 수, auto = 자동으로 받아올 수
-  'preflight.fontsMissingDetail': {
-    en: (p) =>
-      `${p.first}${Number(p.more) > 0 ? ` and ${p.more} more` : ''}${
-        Number(p.auto) > 0 ? ` · the other ${p.auto} download automatically` : ''
-      }`,
-    ko: (p) =>
-      `${p.first}${Number(p.more) > 0 ? ` 외 ${p.more}종` : ''}${
-        Number(p.auto) > 0 ? ` · 나머지 ${p.auto}종은 자동으로 받아옵니다` : ''
-      }`
-  },
-  'preflight.fontsAction': { en: 'Add fonts', ko: '폰트 지정' },
-  'preflight.textNone': { en: 'No text', ko: '텍스트 없음' },
-  'preflight.textAll': {
-    en: (p) => `All ${n(Number(p.count), 'text', 'texts')} in real fonts`,
-    ko: '텍스트 {count}개 전부 진짜 폰트로'
-  },
-  'preflight.textAllDetail': {
-    en: 'Nothing will be outlined',
-    ko: '아웃라인 처리될 것이 없습니다'
-  },
-  'preflight.textSome': {
-    en: (p) => `${n(Number(p.count), 'text', 'texts')} will be outlined`,
-    ko: '텍스트 {count}개가 아웃라인 처리됩니다'
-  },
-  'preflight.textAction': { en: 'Show layers', ko: '레이어 보기' },
-  'preflight.textOff': {
-    en: 'All text goes out as outlines — the option is on',
-    ko: '아웃라인 내보내기가 켜져 있어 텍스트 전부 아웃라인 처리됩니다'
-  },
-  'preflight.textOffAction': { en: 'Turn off', ko: '끄기' },
   'preflight.moreReasons': {
     en: (p) => ` · ${p.count} more`,
     ko: ' 외 {count}가지'
@@ -202,12 +177,19 @@ const MESSAGES = {
   // Slides 는 아무것도 안 고르면 덱 전체라, 빈 화면은 덱에 슬라이드가 없을 때뿐이다
   'frames.emptySlides': { en: 'This deck has no slides yet', ko: '이 덱에 슬라이드가 없습니다' },
   'frames.emptyHint': {
-    en: 'Frames, or a section holding them · multi-select supported',
-    ko: '프레임이나 프레임을 묶은 섹션 · 여러 개 선택 가능'
+    en: 'Select one or more frames, or a section holding them.',
+    ko: '프레임이나 프레임을 묶은 섹션을 여러 개 선택할 수 있습니다.'
   },
+  'frames.move': { en: 'Drag to reorder', ko: '끌어서 순서 바꾸기' },
+  'frames.moveFor': {
+    en: 'Reorder {name}. Use arrow keys to move it.',
+    ko: '{name} 순서 바꾸기. 위아래 화살표 키로 옮깁니다.'
+  },
+  'frames.exclude': { en: 'Leave out', ko: '빼기' },
+  'frames.excludeFor': { en: 'Leave {name} out', ko: '{name} 빼기' },
   'frames.focus': {
-    en: 'Click to show on canvas · drag to reorder',
-    ko: '클릭하면 캔버스에서 보여줍니다 · 끌면 순서가 바뀝니다'
+    en: 'Click to show it on the canvas. Drag to reorder.',
+    ko: '클릭하면 캔버스에서 보여 줍니다. 끌면 순서가 바뀝니다.'
   },
   'frames.meta': {
     en: (p) =>
@@ -228,58 +210,30 @@ const MESSAGES = {
   'presets.tagBalanced': { en: 'Default', ko: '기본값' },
   'presets.tagSmall': { en: 'Upload limits', ko: '업로드 한도' },
   'presets.tagFit': { en: 'Name a size', ko: 'MB 지정' },
-  'presets.reset': { en: 'Reset', ko: '되돌리기' },
+  'presets.reset': { en: 'Back to Balanced', ko: '균형 프리셋으로' },
+  /** 어느 타일도 안 켜진 이유 — 상태에 이름이 없으면 "왜 아무것도 안 켜졌지" 가 된다 */
+  'presets.custom': { en: 'Custom', ko: '직접 설정' },
+  'presets.fromPreset': {
+    en: '{label} preset settings',
+    ko: '{label} 프리셋 설정입니다'
+  },
   'presets.resetTip': {
-    en: 'Custom numbers — back to the Balanced preset',
-    ko: '숫자를 직접 정한 상태입니다 — 균형 프리셋으로 되돌립니다'
+    en: 'You set the numbers yourself. This returns to the Balanced preset.',
+    ko: '숫자를 직접 정한 상태입니다. 균형 프리셋으로 되돌립니다.'
   },
   'images.fitHelp': {
-    en: 'Picks the best image quality that still fits the target. Quality never drops below a floor — if the target is out of reach, you get the smallest possible file and a note saying so. Takes about twice as long.',
+    en: 'Picks the best image quality that still fits the target. Quality never drops below a floor. If the target is out of reach, you get the smallest possible file and a note saying so. Takes about twice as long.',
     ko: '목표를 지키는 가장 좋은 화질을 골라 줍니다. 화질에는 하한이 있어서, 목표가 무리면 가능한 가장 작은 파일과 함께 그 사실을 알려 드립니다. 보통보다 두 배쯤 걸립니다.'
   },
   'fit.label': { en: 'File size', ko: '파일 크기' },
   'fit.under': { en: 'MB or less', ko: 'MB 이하' },
-  // 프리셋 아래 칩 세 개 — 눌렀을 때 실제로 바뀌는 숫자. 뜻은 툴팁이 받는다.
-  'chip.scaleTip': {
-    en: (p) => `Keeps pixels up to ${p.multiplier}× the size the image is shown at`,
-    ko: '보이는 크기의 {multiplier}배까지 픽셀을 남깁니다'
-  },
-  'chip.edgeTip': {
-    en: (p) => `Long edge never above ${p.maxEdge}px · ${p.fhd}`,
-    ko: '긴 변이 {maxEdge}px 를 넘지 않게 줄입니다 · {fhd}'
-  },
   'chip.auto': { en: 'auto', ko: '자동' },
   'chip.autoTip': {
     en: 'Chosen automatically to fit the target size',
     ko: '목표 용량에 맞춰 자동으로 정합니다'
   },
   'images.multiplier': { en: 'Scale', ko: '배율' },
-  'images.maxEdge': { en: 'Max edge', ko: '상한' },
-  // ── 크기 그림 (SizeDiagram) ─────────────────────────────
-  'diagram.frame': { en: '{Unit} long edge {frame}pt', ko: '{unit} 긴 변 {frame}pt' },
-  'diagram.frameSample': { en: 'e.g. a {frame}pt {unit}', ko: '예: {frame}pt {unit}' },
-  'diagram.wanted': {
-    en: '× scale {multiplier} = {wanted}px',
-    ko: '× 배율 {multiplier} = {wanted}px'
-  },
-  'diagram.result': {
-    en: 'Full-bleed images keep up to {effective}px',
-    ko: '전면 이미지는 {effective}px까지 남깁니다'
-  },
-  'diagram.resultCapped': {
-    en: ' — the cap decides, not the scale',
-    ko: ' — 배율이 아니라 상한이 정합니다'
-  },
-  // ── 이미지 탭 섹션 ────────────────────────────────────
-  // 설명은 고정 문구가 아니라 지금 값을 되읽어 준다 — "내 설정이 뭘 하는지" 가
-  // "이 항목이 무엇인지" 보다 쓸모 있다.
-  'images.sectionSize': { en: 'Size', ko: '크기' },
-  'images.sectionKeep': { en: 'Leave alone', ko: '손대지 않을 것' },
-  'images.sectionQuality': { en: 'Compression', ko: '압축' },
-  'images.keepSays': {
-    en: (p) => `Images ${p.minEdge}px or smaller are never touched, in any document.`,
-    ko: '{minEdge}px 이하 이미지는 어떤 문서에서도 손대지 않습니다.'
-  },
+  'images.sectionQuality': { en: 'Quality', ko: '품질' },
   'images.qualitySays': {
     en: (p) =>
       Number(p.quality) >= 0.9
@@ -292,7 +246,7 @@ const MESSAGES = {
         ? 'JPEG 압축 강도. 0.90 위로는 눈으로 차이를 알기 어렵고 용량만 빠르게 늡니다.'
         : Number(p.quality) <= 0.7
           ? 'JPEG 압축 강도. 0.70 아래로는 넓은 색면에 띠가 보이기 시작합니다.'
-          : 'JPEG 압축 강도. 0.80 은 화면·인쇄 양쪽에 무난합니다.'
+          : 'JPEG 압축 강도. 0.80은 화면·인쇄 양쪽에 무난합니다.'
   },
   // 프리셋 칸의 툴팁
   'presets.detailSharp': {
@@ -301,104 +255,155 @@ const MESSAGES = {
   },
   'presets.detailBalanced': {
     en: 'enough for a PDF read on screen',
-    ko: '화면으로 볼 PDF 에 충분합니다'
+    ko: '화면으로 볼 PDF에 충분합니다'
   },
   'presets.detailSmall': { en: 'for tight upload limits', ko: '업로드 한도가 빡빡할 때' },
   'presets.detailFit': {
     en: 'you name the size, it finds the quality',
     ko: '크기를 정하면 화질을 찾아 줍니다'
   },
-  // "건너뛰기" 는 뭘 건너뛰는지 안 읽혔다 — 작은 그림은 손대지 않고 통과한다는 뜻이다
-  'images.minEdge': { en: 'Keep under', ko: '그대로 두기' },
   'images.quality': { en: 'Quality', ko: '품질' },
   'images.reencode': { en: 'Re-encode opaque PNGs as JPEG', ko: '투명 없는 PNG는 JPEG로' },
-  'settings.sectionText': { en: 'Text', ko: '텍스트' },
-  'settings.sectionFonts': { en: 'Fonts', ko: '폰트' },
-  'settings.manageFonts': { en: 'Manage stored fonts…', ko: '저장된 폰트 관리…' },
-  'settings.manageFontsSays': {
-    en: 'Fonts you added, from every file — {used} of {limit} used.',
-    ko: '모든 파일에서 직접 넣은 폰트 — {used} / {limit} 사용 중.'
+  /** 왜 켜 두는 게 좋은지 — 사진을 PNG 로 둔 문서에서 차이가 가장 크다 */
+  'images.reencodeSays': {
+    en: 'PNG keeps every pixel, so a photo saved as PNG can be several times larger than the same image as JPEG. Images with transparency are left as PNG.',
+    ko: 'PNG는 픽셀을 그대로 담아, 사진을 PNG로 두면 같은 그림의 JPEG보다 몇 배 커집니다. 투명한 부분이 있는 이미지는 PNG로 둡니다.'
   },
-  // 진짜 폰트로 넣는 건 기본 기능이다 — 옵션은 그 반대(전부 아웃라인)를 켜는 쪽이다
+  'settings.sectionText': { en: 'Text', ko: '텍스트' },
+  // 폰트를 PDF 에 포함하는 것이 기본 동작이다 — 옵션은 그 반대(전부 아웃라인)를 켜는 쪽이다
   'settings.outlineAll': {
     en: 'Export all text as outlines',
     ko: '모든 텍스트를 아웃라인으로 내보내기'
   },
   'settings.keepLinks': { en: 'Keep hyperlinks', ko: '하이퍼링크 유지' },
   'settings.keepLinksSays': {
-    en: 'URL links on text stay clickable in the PDF.',
-    ko: '텍스트에 건 URL 링크가 PDF 에서도 눌립니다.'
+    en: 'Hyperlinks in text remain clickable in the PDF.',
+    ko: '텍스트의 하이퍼링크를 PDF에서도 사용할 수 있습니다.'
   },
   'settings.glyphFallback': {
     en: 'Draw missing characters with a fallback font',
     ko: '폰트에 없는 글자는 대체 폰트로 그리기'
   },
   'settings.glyphFallbackSays': {
-    en: 'Only those characters — from Inter first, then Pretendard. Off: the whole layer is outlined instead.',
-    ko: '그 글자만 Inter, 그다음 Pretendard 순으로 대체합니다. 끄면 그 텍스트는 통째로 아웃라인이 됩니다.'
+    en: 'Only those characters are replaced, from Inter first, then Pretendard. When off, the whole layer is outlined instead.',
+    ko: '그 글자만 Inter, 그다음 Pretendard 순으로 대체합니다. 끄면 그 텍스트 전체를 아웃라인으로 내보냅니다.'
   },
   'settings.outlineAllSays': {
-    en: 'Only when the fonts cannot be had. Outlined text cannot be searched, copied or read by an ATS.',
-    ko: '폰트를 구할 수 없을 때만 쓰세요. 아웃라인 텍스트는 검색·복사·ATS 파싱이 안 됩니다.'
+    en: 'Converts all text to outlines. Search and copy may be limited, and text may not be recognized by an ATS.',
+    ko: '모든 텍스트를 아웃라인으로 변환합니다. 검색·복사가 제한되거나 채용 시스템(ATS)에서 텍스트를 인식하지 못할 수 있습니다.'
   },
-  'settings.fitNote': {
-    en: 'Target size mode picks size and compression automatically. Only the settings below still apply.',
-    ko: '목표 용량 모드에서는 크기·압축을 자동으로 정합니다. 아래 항목만 적용됩니다.'
+  // 결과를 통째로 뒤집는 옵션은 나머지와 무게가 다르다 — 상자에 따로 두고 그렇게 부른다
+  // ── 이미지 탭 ─────────────────────────────────────────
+  // 배율은 Figma 내보내기의 @1x @2x 와 같은 어휘다. 뜻은 설명 줄이 준다 —
+  // "1.5배" 만으로는 아무것도 안 읽히지만 "150%까지 확대해도 선명하다" 는 읽힌다.
+  // PDF 는 1pt = 1/72인치라 배율 × 72 가 곧 DPI 다. 인쇄 요구는 그 숫자가 받는다.
+  'images.sectionResolution': { en: 'Resolution', ko: '해상도' },
+  // 셋(배율·확대율·DPI)은 한 값에서 나온다 — 따로 넘기면 서로 어긋날 수 있다
+  'images.zoomSays': {
+    en: (p) =>
+      `Stays sharp when zoomed to ${Number(p.multiplier) * 100}%. That is ${Math.round(Number(p.multiplier) * 72)} DPI in print.`,
+    ko: (p) =>
+      `${Number(p.multiplier) * 100}%까지 확대해도 선명합니다. 인쇄 기준으로 ${Math.round(Number(p.multiplier) * 72)} DPI입니다.`
+  },
+  'images.largestSays': {
+    en: 'The largest placed image becomes {target}px. Smaller ones keep only what they show.',
+    ko: '가장 크게 놓인 이미지가 {target}px이 됩니다. 작게 놓인 것은 보이는 만큼만 남깁니다.'
+  },
+  /** 상한이 배율을 이길 때만 — 고른 배율이 그대로 적용되지 않는다는 사실 */
+  'images.cappedSays': {
+    en: (p) =>
+      `${n(Number(p.count), 'image hits', 'images hit')} the ${p.maxEdge}px per-image limit and are exported smaller than the chosen scale.`,
+    ko: '이미지 {count}장은 한 장 상한 {maxEdge}px에 걸려, 고른 배율보다 작게 내보냅니다.'
+  },
+  'images.sectionList': { en: 'Images in this document', ko: '이 문서의 이미지' },
+  'images.listCount': {
+    en: (p) => `${p.shrink} of ${n(Number(p.total), 'image', 'images')} will be downscaled`,
+    ko: '{total}장 중 {shrink}장이 줄어듭니다'
+  },
+  'images.listKept': { en: 'unchanged', ko: '그대로' },
+  'images.listUnsized': { en: 'reading size', ko: '크기 읽는 중' },
+  'images.listMore': {
+    en: (p) => `and ${n(Number(p.count), 'more image', 'more images')}`,
+    ko: '외 {count}장'
+  },
+  'images.listNone': { en: 'No images in this document', ko: '이 문서에 이미지가 없습니다' },
+  'images.fitLocked': {
+    en: 'Target size mode chooses the resolution and quality. Pick a preset on the Start tab to set them yourself.',
+    ko: '목표 용량 모드에서는 해상도와 화질을 자동으로 정합니다. 직접 정하려면 시작 탭에서 프리셋을 고르세요.'
+  },
+
+  'settings.sectionCareful': { en: 'Use with care', ko: '주의해서 쓸 것' },
+  /** 켜져 있을 때만 — 다른 탭의 설정이 무의미해진다는 사실을 그 자리에서 말한다 */
+  'settings.outlineAllEffect': {
+    en: 'The Fonts tab has no effect while this is on. All text is exported as outlines.',
+    ko: '이 옵션이 켜져 있는 동안 폰트 탭의 설정은 적용되지 않습니다. 모든 텍스트를 아웃라인으로 내보냅니다.'
   },
 
   // ── 폰트 화면 ───────────────────────────────────────────
   'fonts.help': {
-    en: 'Open-license fonts are downloaded at export. Any other font needs its file once — without it the text is outlined.',
-    ko: '공개 폰트는 내보낼 때 자동으로 받습니다. 그 밖의 폰트는 파일을 한 번 넣으면 됩니다 — 없으면 아웃라인으로 나갑니다.'
+    en: 'Figma does not provide installed font files to plugins. If automatic download is unavailable, select the font file here. Without a usable file, the text is exported as outlines. Selected files stay on this computer.',
+    ko: 'Figma는 컴퓨터에 설치된 폰트 파일을 플러그인에 제공하지 않습니다. 자동 다운로드를 지원하지 않는 폰트는 여기에서 파일을 선택하세요. 사용할 파일이 없으면 텍스트를 아웃라인으로 내보냅니다. 선택한 파일은 외부로 전송되지 않습니다.'
   },
-  'fonts.detailCatalog': { en: 'auto-downloaded', ko: '자동으로 받아옴' },
-  'fonts.detailUploaded': { en: '{file} · {size}', ko: '{file} · {size}' },
+  'fonts.detailCatalog': {
+    en: 'Downloaded at export',
+    ko: '내보낼 때 받아옴'
+  },
+  'fonts.detailUploaded': {
+    en: 'Saved · {size}',
+    ko: '저장됨 · {size}'
+  },
+  'fonts.whyFile': {
+    en: 'Why is a font file required?',
+    ko: '폰트 파일이 필요한 이유'
+  },
   // ── 행에 남는 폴더 스캔 결과 — "파일 없음" 대신 스캔이 알아낸 것 ────
-  'fonts.rowNoFile': { en: 'no file', ko: '파일 없음' },
-  'fonts.rowUnsaved': { en: 'found, not saved', ko: '찾았지만 저장 못 함' },
-  'fonts.rowNotInFolder': { en: 'not in that folder', ko: '폴더에 없음' },
-  'fonts.rowStyleMissing': {
-    en: 'family in the folder, not this weight',
-    ko: '폴더에 이 굵기 없음'
+  'fonts.rowNoFile': {
+    en: 'Font file required',
+    ko: '폰트 파일 필요'
   },
-  'fonts.rowVariableOnly': {
-    en: 'only a variable file in the folder — use its "static" folder',
-    ko: '폴더에 가변 파일뿐 — "static" 폴더를 고르세요'
+  'fonts.rowNoRoom': {
+    en: 'Insufficient storage',
+    ko: '저장 공간 부족'
   },
-  'fonts.rowRestricted': {
-    en: "the folder's file forbids embedding (license flag)",
-    ko: '폴더의 파일이 임베드를 금지함 (라이선스)'
+  'fonts.delete': { en: 'Delete', ko: '삭제' },
+  'fonts.deleteFor': {
+    en: 'Delete the saved copy of {font}',
+    ko: '{font} 저장 사본 삭제'
   },
-  'fonts.rowUnusable': { en: "the folder's file can't be used", ko: '폴더의 파일을 쓸 수 없음' },
-  'fonts.rowUnchecked': { en: 'not found — scan incomplete', ko: '못 찾음 — 검사 미완료' },
-  'fonts.rowNoRoom': { en: 'no room', ko: '공간 부족' },
-  'fonts.rowSaveFailed': { en: 'could not save: {error}', ko: '저장 실패: {error}' },
-  'fonts.rowTooBig': { en: 'larger than the 5 MB limit', ko: '5MB 한도보다 큼' },
-  'fonts.rowRescan': { en: 'scan the folder again', ko: '폴더를 다시 스캔하세요' },
-  'fonts.retry': { en: 'Retry', ko: '다시 넣기' },
+  'fonts.scanBoxClose': { en: 'Close the scan result', ko: '검사 결과 닫기' },
   // ── 결과 상자 — 닫거나 다음 스캔까지 남는다 ────────────────
-  'fonts.scanBoxTitle': { en: 'Folder scan:', ko: '폴더 스캔:' },
-  'fonts.scanBoxSaved': { en: (p) => `${p.count} added`, ko: '{count}종 넣음' },
-  'fonts.scanBoxNoRoom': { en: (p) => `${p.count} out of room`, ko: '{count}종 공간 부족' },
-  'fonts.scanBoxUnsaved': { en: (p) => `${p.count} not saved`, ko: '{count}종 저장 못 함' },
-  'fonts.scanBoxNotFound': { en: (p) => `${p.count} not found`, ko: '{count}종 없음' },
+  'fonts.scanBoxTitle': { en: 'Folder scan:', ko: '폴더 검사:' },
+  'fonts.scanBoxSaved': {
+    en: '{count} saved',
+    ko: '{count}종 저장됨'
+  },
+  'fonts.scanBoxNoRoom': {
+    en: (p) => `${n(Number(p.count), 'font needs', 'fonts need')} more storage`,
+    ko: '{count}종 공간 부족'
+  },
+  'fonts.scanBoxUnsaved': {
+    en: '{count} failed to save',
+    ko: '{count}종 저장 실패'
+  },
+  'fonts.scanBoxNotFound': {
+    en: (p) => `${n(Number(p.count), 'font needs', 'fonts need')} a file`,
+    ko: '{count}종 파일 필요'
+  },
   'fonts.scanBoxStorage': {
-    en: '{need} needed, {free} free — delete stored fonts below, then',
-    ko: '필요 {need}, 남은 {free} — 아래 저장된 폰트를 지우고'
+    en: 'Storage needed: {need}. Available: {free}. Delete saved font files to free up space, then retry saving.',
+    ko: '필요한 공간: {need}. 남은 공간: {free}. 저장된 폰트 파일을 삭제해 공간을 확보한 뒤 다시 저장하세요.'
   },
-  'fonts.scanBoxRetryAll': { en: (p) => `Retry ${p.count}`, ko: '{count}종 다시 넣기' },
+  'fonts.scanBoxRetryAll': {
+    en: 'Retry saving ({count})',
+    ko: '{count}종 다시 저장'
+  },
   'fonts.detailBuild': { en: ' · v{build}', ko: ' · v{build}' },
-  'fonts.detailFigmaBuild': {
-    en: ' · v{build}, the build Figma bundles',
-    ko: ' · v{build} · Figma 내장과 동일'
-  },
   'fonts.detailVersion': { en: ' · file v{version}', ko: ' · 파일 v{version}' },
-  'fonts.replace': { en: 'Replace', ko: '교체' },
   // ── 폰트 폴더에서 자동으로 찾기 ────────────────────────
   'fonts.scanFolder': { en: 'Choose font folder…', ko: '폰트 폴더 선택…' },
   'fonts.scanHint': {
-    en: "Files look greyed out in the dialog — that's normal; select the folder itself. Nothing leaves this computer.",
-    ko: '개별 파일이 회색이어도 정상입니다 — 폴더 자체를 선택하세요. 파일은 이 컴퓨터 밖으로 나가지 않습니다.'
+    en: 'Select the folder, not the files inside it. Greyed-out files are normal.',
+    ko: '개별 파일 대신 폴더를 선택하세요. 폴더 안의 파일이 회색으로 표시되는 것은 정상입니다.'
   },
   'fonts.scanning': {
     en: 'Reading fonts… {current}/{total}',
@@ -414,71 +419,164 @@ const MESSAGES = {
   },
   'fonts.scanAlternatives': {
     en: (p) =>
-      `${p.count} had several matching files — the one that covers the document's glyphs, newest version first, was used`,
-    ko: '{count}종은 맞는 파일이 여럿이라 문서의 글자를 덮는 가장 새 판을 골랐습니다'
+      `${n(Number(p.count), 'font had', 'fonts had')} multiple matching files. Styles, supported characters and versions were compared to select a file.`,
+    ko: '{count}종에서 여러 후보 파일을 찾았습니다. 스타일, 지원하는 글자, 버전을 비교해 파일을 선택했습니다.'
   },
   'fonts.scanSaveFailed': {
-    en: (p) => `${p.count} could not be saved (${p.error})`,
-    ko: '{count}종은 저장하지 못함 ({error})'
+    en: (p) => `Could not save ${n(Number(p.count), 'font', 'fonts')}. Details: ${p.error}`,
+    ko: '폰트 {count}종을 저장하지 못했습니다. 상세 오류: {error}'
   },
   'fonts.scanStyleMissing': {
-    en: (p) => `${p.count} found, but not in the needed weight or style`,
-    ko: '{count}종은 서체는 있지만 필요한 굵기·기울기가 폴더에 없음'
+    en: (p) => `The required style was not found for ${n(Number(p.count), 'font', 'fonts')}.`,
+    ko: '폰트 {count}종의 필요한 스타일을 찾지 못했습니다.'
   },
   'fonts.scanVariableOnly': {
     en: (p) =>
-      `${p.count} only as variable files — use the files in the download's "static" folder`,
-    ko: '{count}종은 가변 파일뿐 — 내려받은 폴더 안 "static" 파일을 쓰세요'
+      `Only variable files were found for ${n(Number(p.count), 'font', 'fonts')}. Select static font files.`,
+    ko: '폰트 {count}종은 가변 파일만 찾았습니다. 정적(static) 폰트 파일을 선택하세요.'
   },
   'fonts.scanRestricted': {
-    en: (p) => `${p.count} only in files whose license forbids embedding`,
-    ko: '{count}종은 임베드를 금지한 파일뿐'
+    en: (p) => `The files found for ${n(Number(p.count), 'font', 'fonts')} restrict embedding.`,
+    ko: '폰트 {count}종에서 찾은 파일은 임베딩이 제한되어 있습니다.'
   },
   'fonts.scanUnusable': {
-    en: (p) => `${p.count} only in files the plugin cannot use`,
-    ko: '{count}종은 쓸 수 없는 파일뿐'
+    en: (p) => `No usable files were found for ${n(Number(p.count), 'font', 'fonts')}.`,
+    ko: '폰트 {count}종의 사용 가능한 파일을 찾지 못했습니다.'
   },
   'fonts.scanUnchecked': {
-    en: (p) => `${p.count} not found (scan incomplete)`,
-    ko: '{count}종 못 찾음 (검사 미완료)'
+    en: (p) => `The scan is incomplete for ${n(Number(p.count), 'font', 'fonts')}.`,
+    ko: '폰트 {count}종의 검사를 완료하지 못했습니다.'
   },
-  'fonts.scanIncomplete': { en: 'scan incomplete: {detail}', ko: '검사 미완료: {detail}' },
+  'fonts.scanIncomplete': {
+    en: 'Scan incomplete: {detail}',
+    ko: '검사 미완료: {detail}'
+  },
   'fonts.scanUnreadable': {
-    en: (p) => `${p.count} file(s) could not be read`,
-    ko: '{count}개 파일을 읽지 못함'
+    en: (p) => `Could not read ${n(Number(p.count), 'file', 'files')}.`,
+    ko: '파일 {count}개를 읽지 못했습니다.'
   },
   'fonts.scanBrokenFaces': {
-    en: (p) => `${p.count} face(s) inside collections could not be read`,
-    ko: '컬렉션 안의 face {count}개를 읽지 못함'
+    en: (p) => `Could not read ${n(Number(p.count), 'font style', 'font styles')} in collections.`,
+    ko: '폰트 컬렉션에 포함된 스타일 {count}개를 읽지 못했습니다.'
   },
   'fonts.scanCapFiles': {
-    en: (p) => `${p.count} file(s) not checked (limit)`,
-    ko: '{count}개 파일은 상한으로 검사하지 않음'
+    en: (p) =>
+      `${n(Number(p.count), 'file was', 'files were')} not checked because the scan limit was reached.`,
+    ko: '검사 한도에 도달해 파일 {count}개를 확인하지 못했습니다.'
   },
   'fonts.scanCapMemory': {
-    en: 'stopped early — too much font data to hold at once; add the rest one by one',
-    ko: '중간에 멈춤 — 한 번에 들고 있을 폰트가 너무 많아 나머지는 하나씩 넣어 주세요'
+    en: 'The scan stopped at the memory limit. Select a smaller folder or add the remaining font files individually.',
+    ko: '메모리 사용 한도에 도달해 검사를 중단했습니다. 더 작은 폴더를 선택하거나 나머지 폰트 파일을 개별적으로 추가하세요.'
   },
-  'fonts.saveNoReply': { en: 'no reply from the plugin', ko: '플러그인이 응답하지 않음' },
+  'fonts.saveNoReply': {
+    en: 'No response was received for the save request.',
+    ko: '저장 요청에 대한 응답을 받지 못했습니다.'
+  },
   'fonts.scanFailed': {
-    en: 'The folder scan stopped: {error}. Fonts added before it stopped are kept.',
-    ko: '폴더 스캔이 멈췄습니다: {error}. 멈추기 전에 넣은 폰트는 그대로 있습니다.'
+    en: 'The font scan stopped. Files already saved have been kept. Details: {error}',
+    ko: '폰트 검사를 중단했습니다. 이미 저장된 파일은 유지됩니다. 상세 오류: {error}'
   },
-  'fonts.add': { en: 'Add', ko: '넣기' },
   'fonts.parseError': {
-    en: 'Could not read {file} as a font. It must be a static TTF/OTF.',
-    ko: '{file} 파일을 폰트로 읽지 못했습니다. static TTF/OTF 파일이어야 합니다.'
+    en: 'Could not read {file} as a font. Check the file or select another TTF, OTF, TTC or OTC font file.',
+    ko: '{file} 파일을 폰트로 읽지 못했습니다. 파일을 확인하거나 다른 TTF, OTF, TTC, OTC 폰트 파일을 선택하세요.'
   },
   'fonts.storageFull': {
-    en: 'Not enough storage for this file ({size}). Delete fonts you no longer use under "Stored fonts" below.',
-    ko: '이 파일을 넣을 공간이 없습니다 ({size}). 아래 "저장된 폰트" 에서 안 쓰는 것을 지워 주세요.'
+    en: 'There is not enough storage for this file ({size}). Review your saved fonts and delete files you no longer need.',
+    ko: '이 파일({size})을 저장할 공간이 부족합니다. 저장된 폰트 목록을 확인하고 더 이상 필요하지 않은 파일을 삭제하세요.'
   },
-  'fonts.sectionThisFile': { en: 'Fonts in this file', ko: '이 파일의 폰트' },
-  'fonts.storedTitle': { en: 'Stored fonts', ko: '저장된 폰트' },
-  'fonts.storageUsage': { en: 'storage {used} of {limit}', ko: '저장 공간 {used} / {limit}' },
-  'fonts.storedAside': { en: 'delete to free space', ko: '지우면 공간이 빕니다' },
-  'fonts.storedInUse': { en: ' · used in this file', ko: ' · 이 파일에서 사용 중' },
-  'fonts.storedNone': { en: 'Nothing stored yet', ko: '넣어 둔 폰트가 없습니다' },
+  'fonts.sectionThisFile': { en: 'Fonts in this document', ko: '이 문서가 쓰는 폰트' },
+  // ── 패밀리 목록 ────────────────────────────────────────
+  // 자리마다 한 줄이면 Pretendard 한 서체가 여섯 줄을 차지하고 여섯 줄이 같은 말을 반복한다.
+  // 서체 이름 한 줄에 스타일을 뱃지로 늘어놓고, 오른쪽에 그 서체의 상태를 한 마디로 적는다.
+  'fonts.familyCount': {
+    en: (p) => `${n(Number(p.count), 'style', 'styles')}`,
+    ko: '{count}종'
+  },
+  'fonts.familyMissing': {
+    en: (p) => `${p.count} missing`,
+    ko: '{count}종 없음'
+  },
+  'fonts.familyStored': { en: 'Saved · {size}', ko: '저장됨 · {size}' },
+  'fonts.familyCatalog': { en: 'Downloaded at export', ko: '내보낼 때 받아옴' },
+  'fonts.familyMixed': { en: 'Mixed sources', ko: '출처 섞임' },
+  'fonts.stylesMore': {
+    en: (p) => `and ${n(Number(p.count), 'more style', 'more styles')}`,
+    ko: '외 {count}개 스타일'
+  },
+  /** 목록 맨 위 — 스캔 전에는 무엇이 없는지, 스캔 뒤에는 무엇이 남았는지 */
+  'fonts.bannerMissing': {
+    en: (p) => `${n(Number(p.count), 'font', 'fonts')} could not be found`,
+    ko: '폰트 {count}종을 찾지 못했습니다'
+  },
+  'fonts.bannerMissingDetail': {
+    en: 'Text using these fonts is exported as outlines.',
+    ko: '이 폰트를 쓰는 텍스트는 아웃라인으로 내보냅니다.'
+  },
+  'fonts.bannerFiles': {
+    en: (p) => `${n(Number(p.count), 'font file does', 'font files do')} not match their style`,
+    ko: '선택한 폰트 파일 {count}개의 스타일이 요청한 스타일과 다릅니다'
+  },
+  // ── 패밀리 상세 ────────────────────────────────────────
+  // 좁은 행에는 못 넣던 것을 여기서 다 말한다: 얼마나 쓰는지, 왜 안 되는지,
+  // 안 고치면 어떻게 되는지. 셋이 모여야 사용자가 판단할 수 있다.
+  'family.usedBy': {
+    en: (p) => `Used by ${n(Number(p.count), 'text layer', 'text layers')} in this document`,
+    ko: '이 문서의 텍스트 {count}개가 씁니다'
+  },
+  'family.willOutline': {
+    en: 'Without a font file this text is exported as outlines.',
+    ko: '폰트 파일을 선택하지 않으면 이 텍스트를 아웃라인으로 내보냅니다.'
+  },
+  'family.catalogSource': {
+    en: 'Downloaded from jsDelivr during export. An internet connection is required.',
+    ko: 'jsDelivr에서 내보낼 때 받아옵니다. 인터넷 연결이 필요합니다.'
+  },
+  'family.pickFile': { en: 'Select font file…', ko: '폰트 파일 선택…' },
+  'family.replaceFile': { en: 'Select a different file…', ko: '다른 파일 선택…' },
+  'family.ownFile': { en: 'Use my own file…', ko: '내 폰트 파일 선택…' },
+  'family.deleteStored': { en: 'Delete saved copy', ko: '저장 사본 삭제' },
+  'family.header': {
+    en: (p) => `${n(Number(p.count), 'style', 'styles')} in this document`,
+    ko: '이 문서에서 {count}종'
+  },
+
+  // ── 저장 공간 관리 ─────────────────────────────────────
+  // 저장소는 문서가 아니라 플러그인 단위 자산이다 — 다른 파일에서 넣은 것도 여기 다 있다.
+  // 한도(5MB)가 빡빡해서, 무엇이 자리를 차지하는지 보고 지울 수 있어야 한다.
+  'screen.storage': { en: 'Manage font storage', ko: '저장 공간 관리' },
+  'fonts.storageManage': { en: 'Manage storage', ko: '저장 공간 관리' },
+  'fonts.storageUnused': {
+    en: (p) => `${n(Number(p.count), 'font', 'fonts')} not used here · ${p.size}`,
+    ko: '이 문서에서 쓰지 않는 폰트 {count}종 · {size}'
+  },
+
+  'storage.inUse': { en: 'Used in this document', ko: '이 문서에서 사용 중' },
+  'storage.unused': { en: 'Not used in this document', ko: '이 문서에서 쓰지 않음' },
+  'storage.empty': {
+    en: 'No font files are saved in the plugin yet.',
+    ko: '플러그인에 저장한 폰트 파일이 아직 없습니다.'
+  },
+  /** 목록 제목. 설명을 붙이려다 번역투가 됐다 — 줄마다 "이 문서에서 사용 중" 이 이미 말한다 */
+  'storage.listTitle': { en: 'Saved fonts', ko: '저장 중인 폰트' },
+  'storage.clear': { en: 'Delete all', ko: '전부 비우기' },
+  /** 되돌릴 수 없다 — 무엇이 사라지는지 세어서 말하고, 이 문서가 받을 영향까지 말한다 */
+  'storage.clearAsk': {
+    en: (p) =>
+      `This deletes all ${p.count} saved font files, including the ones this document uses.`,
+    ko: '저장한 폰트 파일 {count}개를 모두 지웁니다. 이 문서에서 쓰는 파일도 함께 지워집니다.'
+  },
+  'storage.clearGo': { en: 'Delete all', ko: '비우기' },
+
+  'fonts.storageSection': { en: 'Font storage', ko: '폰트 저장소' },
+  'fonts.storageUsage': { en: 'Storage {used} of {limit}', ko: '저장 공간 {used} / {limit}' },
+  'fonts.storedAllInUse': {
+    en: 'Every saved font is used by this document.',
+    ko: '저장한 폰트를 모두 이 문서에서 쓰고 있습니다.'
+  },
+  'fonts.storedNone': {
+    en: 'No saved fonts',
+    ko: '저장된 폰트 없음'
+  },
   // 한 장뿐이면 "1/1" 은 아무것도 알려주지 않는다 — 여럿일 때만 숫자를 붙인다
   'progress.prepare': { en: 'Preparing…', ko: '준비 중…' },
   'progress.page': {
@@ -510,92 +608,116 @@ const MESSAGES = {
   },
   'export.cancelled': { en: 'Cancelled.', ko: '취소했습니다.' },
   'export.textLost': {
-    en: '{count} text layers passed the check but could not be drawn ({reason}). The PDF was not saved — please try again.',
-    ko: '검사를 통과한 텍스트 {count}개를 그리지 못했습니다({reason}). PDF를 저장하지 않았습니다 — 다시 시도해 주세요.'
+    en: '{count} text layers passed the check but could not be drawn ({reason}). The PDF was not saved. Please try again.',
+    ko: '검사를 통과한 텍스트 {count}개를 그리지 못했습니다({reason}). PDF를 저장하지 않았습니다. 다시 시도해 주세요.'
   },
   'export.nothing': {
     en: 'No pages could be exported. See the reasons below.',
     ko: '내보낼 수 있는 페이지가 없습니다. 아래 사유를 확인해 주세요.'
   },
-  'report.summary': {
-    en: (p) => `${p.file} · ${n(Number(p.pages), 'page', 'pages')} · ${p.size} · ${p.seconds}s`,
-    ko: '{file} · {pages}쪽 · {size} · {seconds}초'
+  // ── 결과 탭 ───────────────────────────────────────────
+  // 맨 위가 판정이다: 파일 이름과 크기, 그리고 목표 용량을 맞췄는지. 그 아래 세 그룹이
+  // 같은 문법으로 선다 — 왼쪽에 이름, 오른쪽에 한 줄 요약, 아래에 상세.
+  'result.meta': {
+    en: (p) => `${p.size} · ${n(Number(p.pages), 'page', 'pages')} · ${p.seconds}s`,
+    ko: '{size} · {pages}쪽 · {seconds}초'
   },
+  'result.sectionText': { en: 'Text', ko: '텍스트' },
+  'result.sectionImages': { en: 'Images', ko: '이미지' },
+  'result.sectionExtracted': { en: 'Embedded text', ko: '임베딩한 텍스트' },
+  'result.seeAll': { en: 'See all', ko: '전체 보기' },
+  'result.textFoldOk': {
+    en: (p) => `${n(Number(p.count), 'layer', 'layers')}, all embedded`,
+    ko: '{count}개 모두 포함'
+  },
+  'result.textFoldWarn': {
+    en: (p) => `${p.total} · ${p.count} outlined`,
+    ko: '{total}개 중 {count}개 아웃라인'
+  },
+  /** 완성된 PDF 첫 장 — 초록 테두리가 "정상적으로 나갔다" 를 말한다 */
+  'result.firstPage': { en: 'First page of the exported PDF', ko: '내보낸 PDF 첫 장' },
+  'result.embedded': {
+    en: (p) => `${p.count} embedded with fonts`,
+    ko: '{count}개는 폰트와 함께 포함'
+  },
+  /**
+   * 아웃라인은 "내보냈다" 가 아니다 — 파일을 내보낸 것과 헷갈린다.
+   * 실제로 한 일은 글자를 글리프 모양대로 그린 것이다.
+   */
+  'result.outlined': {
+    en: (p) => `${p.count} drawn as outlines`,
+    ko: '{count}개는 아웃라인으로 그림'
+  },
+  'result.imagesAside': {
+    en: (p) => `${p.count} of ${p.total} downscaled`,
+    ko: '{total}장 중 {count}장 줄임'
+  },
+  'result.imagesNone': { en: 'No images', ko: '이미지 없음' },
+  'result.imagesShrunk': {
+    en: (p) => `${n(Number(p.count), 'image', 'images')} downscaled`,
+    ko: '{count}장을 줄였습니다'
+  },
+  'result.imagesKept': {
+    en: (p) => `${n(Number(p.count), 'image', 'images')} exported unchanged`,
+    ko: '{count}장은 그대로 내보냈습니다'
+  },
+  /** 파일 안에서 이미지가 차지하는 몫 — 더 줄일 값어치가 있는지 판단할 근거다 */
+  'result.imageShare': {
+    en: 'Images in the PDF: {size}, {percent}% of the file',
+    ko: 'PDF에 담긴 이미지 {size} · 파일의 {percent}%'
+  },
+  'result.imagesWarned': {
+    en: (p) => `${n(Number(p.count), 'image', 'images')} had trouble`,
+    ko: '{count}장에서 문제가 있었습니다'
+  },
+  /** 내보내기가 실패했을 때 — 토스트는 사라지므로 원문은 여기 남는다 */
+  'result.failed': { en: 'The last export failed', ko: '마지막 내보내기가 실패했습니다' },
+  'result.countUnit': { en: (p) => `${p.count}`, ko: '{count}개' },
+  'result.copy': { en: 'Copy all', ko: '전체 복사' },
+  'result.copied': { en: 'Copied', ko: '복사했습니다' },
   'report.saved': { en: '{file} · {size} saved', ko: '{file} · {size} 저장 완료' },
   'report.clickHint': {
     en: 'Click a reason to select those layers on the canvas',
     ko: '사유를 클릭하면 해당 레이어를 캔버스에서 선택합니다'
   },
-  'report.textDrawn': {
-    en: (p) => `${n(Number(p.count), 'text node', 'text nodes')} in real fonts`,
-    ko: '텍스트 {count}개 진짜 폰트로'
-  },
-  'report.noText': { en: 'No text embedded', ko: '진짜 폰트로 들어간 텍스트 없음' },
-  // 파일에 실제로 든 것을 말한다. 우리가 Figma 에 건넨 바이트는 중간 단계일 뿐이다 —
-  // Figma 가 PDF 로 내보내며 다시 인코딩해서, 23.4MB 로 넘긴 것이 1.7MB 로 들어간다.
-  'report.images': {
-    en: (p) => ` · ${n(Number(p.count), 'image', 'images')} ${p.size}`,
-    ko: ' · 이미지 {count}장 {size}'
-  },
   'report.substituted': {
     en: (p) =>
-      `${n(Number(p.count), 'character', 'characters')} the font lacks (${p.chars}) drawn with ${p.family}`,
-    ko: '폰트에 없는 글자 {count}개({chars})는 {family} 로 그렸습니다'
+      `${n(Number(p.count), 'character', 'characters')} missing from the font (${p.chars}): drawn with ${p.family}`,
+    ko: '폰트에 없는 글자 {count}개({chars}): 대체 폰트 {family}'
   },
   'char.thinSpace': { en: 'thin space', ko: '얇은 공백' },
   'char.narrowNbsp': { en: 'narrow no-break space', ko: '좁은 줄바꿈 없는 공백' },
   'char.nbsp': { en: 'no-break space', ko: '줄바꿈 없는 공백' },
-  'report.imagesShrunk': {
-    en: (p) => ` · ${p.count} shrunk`,
-    ko: ' · {count}장 줄임'
-  },
-  'report.outlines': {
-    en: (p) =>
-      Number(p.kinds) > 1
-        ? `${p.total} text nodes outlined · ${n(Number(p.kinds), 'reason', 'reasons')}`
-        : `${p.total} text nodes outlined`,
-    ko: (p) =>
-      Number(p.kinds) > 1
-        ? `아웃라인 처리된 텍스트 ${p.total}개 · 사유 ${p.kinds}가지`
-        : `아웃라인 처리된 텍스트 ${p.total}개`
-  },
-  'report.skipped': { en: 'Skipped — {name}: {reason}', ko: '건너뜀 — {name}: {reason}' },
-  // ── 그림이 된 글자의 무게 · 추출 미리보기 ─────────────
-  'report.outlineCost': {
-    en: (p) => ` · ${p.size}`,
-    ko: ' · {size}'
-  },
+  'report.skipped': { en: 'Skipped {name}: {reason}', ko: '{name} 건너뜀: {reason}' },
   'report.leak': {
-    en: 'Some invisible leftovers stayed in the file. The text may be read twice — please report this.',
-    ko: '보이지 않는 찌꺼기가 파일에 남았습니다. 글자가 두 번 읽힐 수 있습니다 — 제보해 주시면 고치겠습니다.'
+    en: 'Some invisible leftovers stayed in the file. The text may be read twice. Please report this so it can be fixed.',
+    ko: '보이지 않는 잔여 데이터가 파일에 남았습니다. 글자가 두 번 읽힐 수 있습니다. 제보해 주시면 고치겠습니다.'
   },
   'preview.empty': {
-    en: 'Export first — the text a parser reads will show up here.',
-    ko: '먼저 내보내 주세요. 파서가 읽어 갈 텍스트가 여기 나옵니다.'
+    en: 'There is no embedded text to display. Export a PDF with supported text to view it here.',
+    ko: '표시할 임베딩 텍스트가 없습니다. 지원하는 텍스트를 포함해 PDF를 내보내면 여기에서 확인할 수 있습니다.'
   },
-  'report.preview': { en: 'Check what a parser reads', ko: '파서가 읽을 내용 확인' },
   'preview.help': {
-    en: (p) =>
-      `${p.lines} lines embedded as real fonts. Outlined text is not listed — parsers drop or garble it.`,
-    ko: '진짜 폰트로 들어간 {lines}줄입니다. 아웃라인 처리된 텍스트는 빠져 있습니다 — 파서가 흘리거나 깨뜨리는 쪽입니다.'
+    en: '{lines} lines were embedded with fonts. Outlined text is not listed. This is not text extracted from the saved PDF.',
+    ko: 'PDF에 폰트와 함께 포함한 텍스트 {lines}줄입니다. 아웃라인 텍스트는 표시하지 않습니다. 저장한 PDF에서 다시 추출한 결과는 아닙니다.'
   },
   // ── 아웃라인 처리될 텍스트 화면 ─────────────────────────
   'text.help': {
-    en: 'These keep their exact look but go out as outlines. Remove the stroke or effect and they embed as real fonts. Click a reason to select those layers on the canvas.',
-    ko: '이 텍스트는 모양은 그대로지만 아웃라인으로 나갑니다. 선·효과를 빼면 진짜 폰트로 들어갑니다. 사유를 클릭하면 해당 레이어를 캔버스에서 선택합니다.'
+    en: 'These text layers will remain outlined to preserve their appearance. Select a reason to locate the affected layers, then review the font files or layer settings.',
+    ko: '원본 모양을 유지하기 위해 이 텍스트를 아웃라인으로 내보냅니다. 사유를 선택해 해당 레이어를 확인한 뒤, 폰트 파일이나 레이어 설정을 검토하세요.'
   },
-  'text.none': { en: 'Nothing will be outlined.', ko: '아웃라인 처리될 텍스트가 없습니다.' },
+  'text.none': { en: 'Nothing will be outlined.', ko: '아웃라인으로 내보낼 텍스트가 없습니다.' },
   'report.fitOk': {
-    en: 'Fits {target} — the best quality that stays under it',
-    ko: '{target} 안에 맞췄습니다 — 이 안에서 가장 좋은 화질입니다'
+    en: 'Fits {target}. This is the best quality that stays under it.',
+    ko: '{target} 안에 맞췄습니다. 이 안에서 가장 좋은 화질입니다.'
   },
   'report.fitAlready': {
-    en: 'Already under {target} — kept at the best quality that fits',
-    ko: '이미 {target} 이하입니다 — 이 안에서 가장 좋은 화질로 두었습니다'
+    en: 'Already under {target}. It was kept at the best quality that fits.',
+    ko: '이미 {target} 이하입니다. 이 안에서 가장 좋은 화질로 두었습니다.'
   },
   'report.fitOver': {
-    en: 'Over the {target} target — the file came out at {actual}. The estimate missed; try a lower target or a lighter preset.',
-    ko: '{target} 목표를 넘겼습니다 — 실제 파일은 {actual}입니다. 예측이 빗나갔으니 목표를 낮추거나 더 가벼운 프리셋을 써 보세요.'
+    en: 'The exported file is {actual}, above the {target} target. Try a lower target or the Smallest preset.',
+    ko: '내보낸 파일은 {actual}로, 목표 용량 {target}을 초과했습니다. 목표 용량을 낮추거나 최소 용량 프리셋을 선택해 다시 내보내세요.'
   },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",
@@ -607,7 +729,7 @@ const MESSAGES = {
   'main.exportFinished': { en: 'Export finished', ko: '내보내기가 끝났습니다' },
   'main.orphanCleaned': {
     en: (p) => `Cleaned up ${n(Number(p.count), 'orphaned font blob', 'orphaned font blobs')}.`,
-    ko: '저장소에 남아 있던 폰트 조각 {count}개를 정리했습니다.'
+    ko: '저장소에 남아 있던 폰트 데이터 {count}개를 정리했습니다.'
   },
   'main.leftoverCleaned': {
     en: (p) =>
@@ -615,88 +737,128 @@ const MESSAGES = {
     ko: '이전 실행의 임시 레이어 {count}개를 정리했습니다.'
   },
   'main.fontSaved': { en: '{family} {style} saved', ko: '{family} {style} 저장 완료' },
-  'main.fontSaveFailed': { en: 'Font save failed: {error}', ko: '폰트 저장 실패: {error}' },
-  'main.fontDeleteFailed': { en: 'Font delete failed: {error}', ko: '폰트 삭제 실패: {error}' },
+  'main.fontSaveFailed': {
+    en: 'Could not save the font file. Details: {error}',
+    ko: '폰트 파일을 저장하지 못했습니다. 상세 오류: {error}'
+  },
+  'main.fontsCleared': {
+    en: 'All saved font files were deleted.',
+    ko: '저장한 폰트 파일을 모두 지웠습니다.'
+  },
+  'main.fontDeleteFailed': {
+    en: 'Could not delete the saved font file. Details: {error}',
+    ko: '저장된 폰트 파일을 삭제하지 못했습니다. 상세 오류: {error}'
+  },
 
   // ── 텍스트 처리 제외 사유 ───────────────────────────────
-  'reject.hidden': { en: 'hidden node', ko: '숨겨진 노드' },
-  'reject.empty': { en: 'empty text', ko: '빈 텍스트' },
-  'reject.rotated': { en: 'rotated or flipped text', ko: '회전·반전된 텍스트' },
-  'reject.mixedFill': { en: 'mixed fills', ko: '채우기가 섞여 있음' },
-  'reject.noFill': { en: 'no fill', ko: '채우기 없음' },
-  'reject.nonSolidFill': {
-    en: 'non-solid fill (gradient/image)',
-    ko: '단색이 아닌 채우기 (그라데이션·이미지)'
+  'reject.hidden': {
+    en: 'Hidden layer',
+    ko: '숨겨진 레이어'
   },
-  'reject.stroked': { en: 'has strokes', ko: '선이 있음' },
-  'reject.effects': { en: 'has effects (shadow/blur)', ko: '효과가 있음 (그림자·흐림)' },
+  'reject.empty': {
+    en: 'Empty text layer',
+    ko: '내용이 없는 텍스트 레이어'
+  },
+  'reject.rotated': {
+    en: 'Rotated or flipped text',
+    ko: '회전 또는 반전된 텍스트'
+  },
+  'reject.mixedFill': {
+    en: 'Mixed fill settings',
+    ko: '서로 다른 채우기 설정'
+  },
+  'reject.noFill': {
+    en: 'No fill',
+    ko: '채우기 없음'
+  },
+  'reject.nonSolidFill': {
+    en: 'Gradient or image fill',
+    ko: '그라데이션 또는 이미지 채우기'
+  },
+  // node.strokes 다 — 밑줄·취소선(reject.decorated)과 다른 것이다.
+  // Figma 속성 패널의 이름(Stroke)을 병기해야 어느 값을 지워야 할지 찾을 수 있다.
+  'reject.stroked': {
+    en: 'Stroke on the text',
+    ko: '글자에 선(Stroke) 적용'
+  },
+  'reject.effects': {
+    en: 'Shadow or blur effect',
+    ko: '그림자 또는 흐림 효과 적용'
+  },
   'reject.decorated': {
-    en: 'underline/strikethrough (not supported yet)',
-    ko: '밑줄·취소선 텍스트 (미지원)'
+    en: 'Underline or strikethrough',
+    ko: '밑줄 또는 취소선'
   },
   'font.metricsDiffer': {
-    en: '{family} {style}: letter widths differ from Figma by {percent}% — a different build of the font, so the original outlines stay',
-    ko: '{family} {style}: 글자 폭이 Figma와 {percent}% 다름 — 다른 판의 폰트라 원본 아웃라인을 둠'
+    en: 'Text width for {family} {style} differs from Figma by {percent}%. The text will remain outlined to preserve its appearance.',
+    ko: '{family} {style}: Figma와 텍스트 폭이 {percent}% 차이 납니다. 원본 모양을 유지하기 위해 아웃라인으로 내보냅니다.'
   },
   'reject.mask': {
-    en: 'used as a mask, or inside a masked group',
-    ko: '마스크이거나 마스크 그룹 안에 있음'
+    en: 'Mask applied to the text or its group',
+    ko: '텍스트 또는 상위 그룹에 적용된 마스크'
   },
-  'reject.blend': { en: 'has a blend mode', ko: '블렌드 모드가 있음' },
+  'reject.blend': {
+    en: 'Non-default blend mode',
+    ko: '기본값이 아닌 혼합 모드'
+  },
   'reject.translucent': {
-    en: 'inside a translucent layer (opacity below 100%)',
-    ko: '반투명 레이어 안에 있음 (불투명도 100% 미만)'
+    en: 'Parent layer opacity below 100%',
+    ko: '상위 레이어의 불투명도가 100% 미만'
   },
   'reject.parentEffects': {
-    en: 'inside a layer with a blur or an unfilled shadow',
-    ko: '흐림이나 채움 없는 그림자가 있는 레이어 안에 있음'
+    en: 'Parent layer has a blur or a shadow without a fill',
+    ko: '상위 레이어에 적용된 흐림 효과 또는 채우기 없는 그림자'
   },
   'reject.clipped': {
-    en: 'runs outside a clipping frame',
-    ko: '클리핑 프레임 밖으로 나감'
+    en: 'Text extends beyond the clipping frame',
+    ko: '클리핑 영역을 벗어난 텍스트'
   },
   'reject.superscript': {
-    en: 'superscript/subscript (not supported yet)',
-    ko: '위첨자·아래첨자 텍스트 (미지원)'
+    en: 'Superscript or subscript is not supported',
+    ko: '지원하지 않는 위첨자 또는 아래첨자'
   },
   'reject.list': {
-    en: 'bulleted/numbered list (not supported yet)',
-    ko: '불릿·번호 목록 텍스트 (미지원)'
+    en: 'Bulleted or numbered lists are not supported',
+    ko: '지원하지 않는 글머리 기호 또는 번호 목록'
   },
-  'reject.noBounds': { en: 'cannot read bounding box', ko: '바운딩 박스를 읽을 수 없음' },
+  'reject.noBounds': {
+    en: 'Text bounds could not be determined',
+    ko: '텍스트 영역 확인 불가'
+  },
   // 체크리스트·텍스트 화면용 — export 리포트의 font.* 사유와 달리 미리 아는 것
   'reject.missingFont': {
-    en: 'no font file ({family} {style})',
-    ko: '폰트 없음 ({family} {style})'
+    en: 'Font file required: {family} {style}',
+    ko: '폰트 파일 필요: {family} {style}'
   },
-  // 체크리스트 요약용 — 서체마다 한 줄씩 늘어놓으면 "폰트 없음" 이 세 번 반복된다
-  'reject.missingFontAny': { en: 'no font file', ko: '폰트 없음' },
-  'reject.svgEmpty': { en: 'no text found in SVG', ko: 'SVG 에서 텍스트를 찾지 못함' },
+  'reject.svgEmpty': {
+    en: 'No text data found in the exported SVG',
+    ko: '내보낸 SVG에 텍스트 데이터 없음'
+  },
 
   // ── 폰트 구하기 실패 사유 ───────────────────────────────
   'font.needUpload': {
-    en: '{family} {style} has no file (add it yourself)',
-    ko: '{family} {style} 파일이 없습니다 (직접 넣어 주세요)'
+    en: 'A font file is required for {family} {style}. Select it in Fonts.',
+    ko: '{family} {style} 폰트 파일이 필요합니다. 폰트 화면에서 파일을 선택하세요.'
   },
   'font.loadFailed': {
     en: (p) =>
-      `could not load {family} {style}{why}`
+      `Could not load the font file for {family} {style}.{why}`
         .replace('{family}', String(p.family))
         .replace('{style}', String(p.style))
         .replace('{why}', p.why === '' ? '' : ` (${p.why})`),
     ko: (p) =>
-      `{family} {style} 을 불러오지 못했습니다{why}`
+      `{family} {style} 폰트 파일을 불러오지 못했습니다.{why}`
         .replace('{family}', String(p.family))
         .replace('{style}', String(p.style))
         .replace('{why}', p.why === '' ? '' : ` (${p.why})`)
   },
   'font.readFailed': {
-    en: 'could not read the file for {family} {style}',
-    ko: '{family} {style} 파일을 읽지 못했습니다'
+    en: 'Could not read the font file for {family} {style}.',
+    ko: '{family} {style} 폰트 파일을 읽지 못했습니다.'
   },
   'font.embedFailed': {
-    en: '{family} {style} embed failed — {error}',
-    ko: '{family} {style} 임베드 실패 — {error}'
+    en: 'Could not embed {family} {style} in the PDF. Details: {error}',
+    ko: '{family} {style} 폰트를 PDF에 포함하지 못했습니다. 상세 오류: {error}'
   },
   'font.missingGlyphs': {
     en: (p) =>
@@ -704,90 +866,102 @@ const MESSAGES = {
     ko: '폰트에 없는 글자 {count}개: {sample}'
   },
   'font.styleMissing': {
-    en: '{family} has no {style} file (available: {styles})',
-    ko: '{family} 의 {style} 파일이 없습니다 (있는 것: {styles})'
+    en: 'Could not find a font file for {family} {style}. Available styles: {styles}',
+    ko: '{family} {style} 폰트 파일을 찾지 못했습니다. 사용 가능한 스타일: {styles}'
   },
-  'font.noFile': { en: 'no file for {family} {style}', ko: '{family} {style} 파일이 없습니다' },
+  'font.noFile': {
+    en: 'No font file for {family} {style}',
+    ko: '{family} {style} 폰트 파일 없음'
+  },
   // ── 올린 폰트 파일 거절 ────────────────────────────────
   // 무엇이 잘못됐는지가 아니라 무엇을 올려야 하는지를 말한다
   'fontFile.variable': {
-    en: 'This is a variable font — one file holding every weight. The weight cannot be picked, so it would embed the wrong one. Upload the single-weight (static) file for this style.',
-    ko: '이 파일은 굵기를 한 파일에 다 담은 가변(Variable) 폰트입니다. 굵기를 고를 수 없어 엉뚱한 굵기가 들어갑니다. 이 스타일 하나짜리(static) 파일을 올려 주세요.'
+    en: 'Variable font files are not supported. Select a static font file for the required style. These files are often in the font download’s static folder.',
+    ko: '가변 폰트 파일은 지원하지 않습니다. 필요한 스타일의 정적(static) 폰트 파일을 선택하세요. 다운로드한 폰트의 static 폴더에서 찾을 수 있는 경우가 많습니다.'
   },
   'fontFile.noOutlines': {
-    en: 'No usable glyphs in this file. Upload a .ttf or .otf.',
-    ko: '이 파일에서 쓸 수 있는 글자 모양을 찾지 못했습니다. .ttf 나 .otf 파일을 올려 주세요.'
+    en: 'This file has no supported glyph outlines. Select another TTF or OTF font file.',
+    ko: '이 파일에는 지원하는 글자 윤곽 데이터가 없습니다. 다른 TTF 또는 OTF 폰트 파일을 선택하세요.'
   },
   'fontFile.restricted': {
-    en: "This font's license flag forbids embedding it in documents, so it stays as outlines. Use a font whose license allows embedding.",
-    ko: '이 폰트는 문서에 넣는 것을 금지하는 라이선스 플래그가 있어 아웃라인으로 남습니다. 임베드를 허용하는 폰트를 쓰세요.'
+    en: 'This font file restricts document embedding. Select a font file that permits embedding.',
+    ko: '이 폰트 파일은 문서 임베딩이 제한되어 있습니다. 임베딩을 허용하는 폰트 파일을 선택하세요.'
   },
   'fontFile.bitmapOnly': {
-    en: 'This font allows only bitmap embedding, so its outlines cannot go into a PDF.',
-    ko: '이 폰트는 비트맵 임베드만 허용해 글자 윤곽을 PDF 에 넣을 수 없습니다.'
+    en: 'This font file permits bitmap embedding only, which is not supported. Select another font file.',
+    ko: '이 폰트 파일은 비트맵 임베딩만 허용합니다. 이 방식은 지원하지 않으므로 다른 폰트 파일을 선택하세요.'
   },
   'fonts.fileVariable': {
-    en: 'Variable font file · {slotStyle} text will export in a different weight · replace with the {slotStyle} .ttf/.otf',
-    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 다른 굵기로 나갑니다 · {slotStyle} .ttf/.otf 로 교체하세요'
+    en: 'Variable font files are not supported. Replace this file with a static font file for {slotStyle}.',
+    ko: '가변 폰트 파일은 지원하지 않습니다. {slotStyle} 스타일의 정적(static) 폰트 파일로 교체하세요.'
   },
   'fonts.fileVariableAs': {
-    en: 'Variable font file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} .ttf/.otf',
-    ko: '가변 폰트 파일 · {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다 · {slotStyle} .ttf/.otf 로 교체하세요'
+    en: 'This variable font defaults to {fileStyle}. Select a static font file for {slotStyle}.',
+    ko: '이 가변 폰트의 기본 스타일은 {fileStyle}입니다. {slotStyle} 스타일의 정적(static) 폰트 파일을 선택하세요.'
   },
   'fonts.fileUnusable': {
-    en: 'This file cannot be embedded · replace with the {slotStyle} .ttf/.otf',
-    ko: '넣을 수 없는 파일 · {slotStyle} .ttf/.otf 로 교체하세요'
+    en: 'This file cannot be embedded. Select another font file for {slotStyle}.',
+    ko: '이 파일은 PDF에 포함할 수 없습니다. {slotStyle} 스타일의 다른 폰트 파일을 선택하세요.'
   },
   'fonts.fileRestricted': {
-    en: "{slotStyle}: this file's license flag forbids embedding — the text stays as outlines. Replace it with a font that allows embedding.",
-    ko: '{slotStyle}: 이 파일은 임베드를 금지해 텍스트가 아웃라인으로 나갑니다 · 임베드를 허용하는 폰트로 교체하세요'
+    en: 'Embedding is restricted for this font file ({slotStyle}). The text will remain outlined. Select a file with supported embedding permissions.',
+    ko: '이 폰트 파일({slotStyle})은 임베딩이 제한되어 텍스트를 아웃라인으로 유지합니다. 지원하는 임베딩 권한이 있는 파일을 선택하세요.'
   },
   'fonts.fileMismatch': {
-    en: '{fileStyle} file · {slotStyle} text will export as {fileStyle} · replace with the {slotStyle} file',
-    ko: '{fileStyle} 파일 · {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다 · {slotStyle} 파일로 교체하세요'
+    en: 'The selected file uses {fileStyle}, but the text requires {slotStyle}. Select a font file for {slotStyle}.',
+    ko: '선택한 파일은 {fileStyle} 스타일이며, 텍스트에 필요한 스타일은 {slotStyle}입니다. {slotStyle} 스타일의 파일로 교체하세요.'
   },
   'fontFile.weightMismatch': {
-    en: 'Saved — but this file is {fileStyle}, so {slotStyle} text will export as {fileStyle}.',
-    ko: '저장했습니다. 다만 이 파일은 {fileStyle} 굵기라, {slotStyle} 텍스트가 {fileStyle} 굵기로 나갑니다.'
+    en: 'The selected file uses {fileStyle}, which differs from the requested style, {slotStyle}.',
+    ko: '선택한 파일의 스타일은 {fileStyle}이며, 요청한 {slotStyle} 스타일과 다릅니다.'
   },
   'font.ttc': {
-    en: 'This is a font collection (TTC) — add it from the Fonts screen so the right face is picked.',
-    ko: '폰트 컬렉션(TTC)입니다 — 폰트 화면에서 넣으면 맞는 face 를 골라 줍니다.'
+    en: 'This is a font collection (TTC). Select it in Fonts to find the required style.',
+    ko: '여러 스타일이 포함된 폰트 컬렉션(TTC) 파일입니다. 폰트 화면에서 이 파일을 선택해 필요한 스타일을 찾으세요.'
   },
   'font.ttcNoFace': {
-    en: 'This collection has no {family} {style}. It contains: {faces}',
-    ko: '이 컬렉션에는 {family} {style} 이(가) 없습니다. 들어 있는 것: {faces}'
+    en: 'This collection does not contain {family} {style}. Available styles: {faces}',
+    ko: '이 컬렉션에서 {family} {style} 스타일을 찾지 못했습니다. 포함된 스타일: {faces}'
   },
 
   // ── 내보내기 실패 사유 ──────────────────────────────────
   'exporter.nodeGone': {
-    en: 'node not found (it may have been deleted)',
-    ko: '노드를 찾을 수 없습니다 (삭제됐을 수 있습니다)'
+    en: 'The layer could not be found. It may have been deleted.',
+    ko: '레이어를 찾을 수 없습니다. 삭제되었을 수 있습니다.'
   },
   'exporter.badType': {
-    en: 'type cannot be exported ({type})',
-    ko: '내보낼 수 없는 타입 ({type})'
+    en: 'This layer type cannot be exported: {type}',
+    ko: '내보내기를 지원하지 않는 레이어 유형입니다: {type}'
   },
-  'image.warn': { en: 'image {hash}: {detail}', ko: '이미지 {hash}: {detail}' },
+  'image.warn': {
+    en: 'Image {hash}: {detail}',
+    ko: '이미지 {hash}: {detail}'
+  },
   'image.missing': {
-    en: 'image {hash}: original not found',
-    ko: '이미지 {hash}: 원본을 찾을 수 없습니다'
+    en: 'Could not find the original image ({hash}).',
+    ko: '원본 이미지를 찾을 수 없습니다. 이미지 ID: {hash}'
   },
   'image.replaceFailed': {
-    en: 'image {hash}: replacement failed — {error}',
-    ko: '이미지 {hash}: 교체 실패 — {error}'
+    en: 'Could not replace image {hash}. Details: {error}',
+    ko: '이미지를 교체하지 못했습니다. 이미지 ID: {hash}. 상세 오류: {error}'
   },
-  'resize.noContext': { en: 'cannot create a 2d context', ko: '2d 컨텍스트를 만들 수 없습니다' },
-  'pdf.noParts': { en: 'no PDFs to merge', ko: '머지할 PDF 가 없습니다' },
+  'resize.noContext': {
+    en: 'Could not initialize image processing.',
+    ko: '이미지 처리를 시작하지 못했습니다.'
+  },
+  'pdf.noParts': {
+    en: 'No PDF pages are available to combine.',
+    ko: '병합할 PDF 페이지가 없습니다.'
+  },
   // 가공하지 않은 에러 메시지를 사유 구조에 실어 나를 때 쓴다
   'reason.raw': { en: '{message}', ko: '{message}' },
   'bridge.timeout': {
-    en: 'no UI response within {seconds}s ({reqId})',
-    ko: 'UI 응답이 {seconds}초 안에 오지 않았습니다 ({reqId})'
+    en: 'The plugin interface did not respond within {seconds} seconds. Request ID: {reqId}',
+    ko: '플러그인 화면이 {seconds}초 동안 응답하지 않았습니다. 요청 ID: {reqId}'
   },
   'timeout.notFinished': {
-    en: '{label}: did not finish within {seconds}s',
-    ko: '{label}: {seconds}초 안에 끝나지 않았습니다'
+    en: '{label} did not finish within {seconds} seconds.',
+    ko: '{label}: {seconds}초 내에 작업을 완료하지 못했습니다.'
   }
 } as const satisfies Record<string, Localized>
 

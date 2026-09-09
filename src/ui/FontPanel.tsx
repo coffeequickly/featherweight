@@ -1,38 +1,27 @@
 import {
   Button,
-  FileUploadButton,
   IconButton,
   IconClose24,
   IconFolder16,
-  IconTrash24,
+  IconWarning16,
   Muted,
-  Text,
-  VerticalSpace
+  Text
 } from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Fragment, JSX } from 'preact'
-import { useRef } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 
-import { formatReason, t } from '../lib/i18n'
-import { FontFacts, screenFontFile, weightMismatch } from '../lib/fontFile'
-import { fontKey, weightName } from '../lib/fontInventory'
-import { describeFileProblem } from './fontProblem'
-import { catalogEntry } from '../lib/fontCatalog'
-import { availabilityOf, FontAvailability, missingFonts } from '../lib/fontStatus'
+import { t } from '../lib/i18n'
+import { fontKey } from '../lib/fontInventory'
+import { fontFamilies } from '../lib/fontFamilies'
+import { missingFonts, uploadedProblems } from '../lib/fontStatus'
 import { fitsWithin, formatBytes, remainingBytes, upsertFont, usedBytes } from '../lib/fontStore'
-import {
-  CLIENT_STORAGE_LIMIT,
-  FontDeleteHandler,
-  FontSaveHandler,
-  FontUsage,
-  StoredFont
-} from '../lib/types'
+import { CLIENT_STORAGE_LIMIT, FontSaveHandler, FontUsage, StoredFont } from '../lib/types'
 import { findFontFiles } from './fontFolder'
+import { screenUpload } from './fontScreen'
 import { packFont } from './fontPack'
+import { FontFamilyRow } from './FontFamilyRow'
 import { Section } from './Section'
-import { collectionFaces, createProbe, factsOf, FontProbe, namesOf } from './fontkitAdapter'
-import { extractFace } from '../lib/fontCollection'
-import { rankFontFiles } from '../lib/fontFolder'
 import { awaitResponse, nextRequestId } from './bridge'
 import { saveFoundFonts, SaveReply, SaveRequest, scanIncompleteLine } from './fontScanSave'
 import {
@@ -43,7 +32,6 @@ import {
   countOutcomes,
   failScan,
   finishScan,
-  rowOutcomeFor,
   RowOutcome,
   ScanDisplay,
   setScanProgress,
@@ -52,14 +40,14 @@ import {
   useFontScanState
 } from './fontScanState'
 
-type Notice = { message: string; error: boolean }
-
 type Props = {
   fonts: FontUsage[]
   stored: StoredFont[]
   disabled: boolean
-  /** UI 안에서 난 일은 UI 가 띄운다 — emit('notice') 는 메인에 핸들러가 없어 죽는다 */
-  onNotice: (notice: Notice) => void
+  /** 패밀리 한 줄을 누르면 그 서체의 상세로 — 손보는 일은 전부 거기서 한다 */
+  onOpenFamily: (family: string) => void
+  /** 저장소는 지우는 화면이 따로 있다 — 다른 문서에서 넣은 것까지 보인다 */
+  onOpenStorage: () => void
 }
 
 /**
@@ -70,17 +58,44 @@ type Props = {
  * 파일에서 family/style 을 자동으로 읽어 자리를 정하지 않는 이유: variable 에서 뽑은 static
  * 인스턴스의 이름표가 Figma 가 부르는 이름과 어긋난다("Pretendard Variable SemiBold / Regular").
  *
- * 화면은 한 섹션에 저장 공간(한 번) → 한 줄 도움말 → 폴더 버튼 → 스캔 결과(두 줄) → 행(두 줄) 순이다.
- * 폴더 스캔의 결과는 행마다 남는다 — 찾았지만 저장 못 한 것을 "파일 없음" 으로 보여 주면 사용자는
- * 폴더를 계속 다시 고른다. 설명 문단을 늘어놓았더니 화면이 벽이 됐다(2026-09-08) — 문장은 하나씩만.
+ * 화면은 배너(해결로 가는 길) → 폴더 버튼 → 패밀리 목록 → 저장소 순이다. 손보는 일은
+ * 목록에 두지 않고 패밀리 상세로 내린다 — 아이콘 서넛이 줄마다 붙으면 상태가 안 읽힌다.
+ * 설명 문단을 늘어놓았더니 화면이 벽이 됐다(2026-09-08) — 문장은 하나씩만.
  */
-export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Element {
-  const states = fonts.map((font) => availabilityOf(font, stored))
+export function FontPanel({
+  fonts,
+  stored,
+  disabled,
+  onOpenFamily,
+  onOpenStorage
+}: Props): JSX.Element {
   const missing = missingFonts(fonts, stored)
+  const families = fontFamilies(fonts, stored)
   const scan = useFontScanState()
   const used = usedBytes(stored)
   const share = Math.min(1, used / CLIENT_STORAGE_LIMIT)
+  // 이 문서에서 안 쓰는 것 — 공간이 모자랄 때 제일 먼저 지울 후보다
+  const inUse = new Set(fonts.map((font) => fontKey(font)))
+  const unused = stored.filter((font) => !inUse.has(fontKey(font)))
+  const unusedBytes = unused.reduce((sum, font) => sum + font.byteLength, 0)
+  // 무엇이 들어 있는지 서체 이름으로. 5MB 한도라 몇 개 안 되므로 접지 않고 다 적는다
+  const storedFamilies = [...new Set(stored.map((font) => font.family))]
   const busy = disabled || scan.progress !== null
+
+  // 배너는 맨 위 한 자리다 — 무엇이 문제인지와 다음에 뭘 하는지를 여기서만 말한다
+  const files = uploadedProblems(fonts, stored)
+  const banner =
+    missing.length > 0
+      ? {
+          head: t('fonts.bannerMissing', { count: missing.length }),
+          detail: t('fonts.bannerMissingDetail')
+        }
+      : files.length > 0
+        ? {
+            head: t('fonts.bannerFiles', { count: files.length }),
+            detail: `${files[0].font.family} ${files[0].font.style}`
+          }
+        : null
 
   /**
    * 공간을 비운 뒤 다시 스캔 없이 — 들고 있던 압축본으로. 한도는 `have` 로 센다 — 여러 개를 이어서
@@ -120,8 +135,62 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
 
   return (
     <Fragment>
+      {/* 해결로 가는 길은 맨 위다 — 목록 아래에 두면 다 지나야 나온다.
+          스캔 전에는 무엇이 없는지, 스캔 뒤에는 무엇이 남았는지를 같은 자리가 말한다 */}
+      {banner === null ? null : (
+        <div class="fontBanner">
+          <div class="fontBannerIcon">
+            <IconWarning16 />
+          </div>
+          <div class="fontBannerBody">
+            <div class="fontBannerHead">
+              <Text>{banner.head}</Text>
+            </div>
+            <div class="fontBannerDetail">{banner.detail}</div>
+          </div>
+        </div>
+      )}
+
+      {fonts.length === 0 ? null : (
+        <FolderScan missing={missing} stored={stored} disabled={busy} progress={scan.progress} />
+      )}
+
+      {scan.display === null ? null : (
+        <ScanResultBox
+          display={scan.display}
+          pendingCount={scan.pending.size}
+          free={remainingBytes(stored)}
+          disabled={busy || scan.retrying.size > 0}
+          onRetryAll={() => {
+            void retryAll()
+          }}
+          onClose={clearScan}
+        />
+      )}
+
       <Section
         title={t('fonts.sectionThisFile')}
+        aside={
+          families.length === 0 ? undefined : (
+            <Muted>{t('fonts.familyCount', { count: fonts.length })}</Muted>
+          )
+        }
+      >
+        {families.length === 0 ? (
+          <Text>
+            <Muted>{t('fonts.none')}</Muted>
+          </Text>
+        ) : (
+          families.map((row) => (
+            <FontFamilyRow key={row.family} row={row} onOpen={() => onOpenFamily(row.family)} />
+          ))
+        )}
+      </Section>
+
+      {/* 저장소는 문서와 무관한 플러그인 단위 자산이다 — 선택이 없어도 같은 자리에 있다.
+          목록은 여기 두지 않는다. 지우는 일은 관리 페이지가 맡고, 여기서는 얼마나 찼는지만 */}
+      <Section
+        title={t('fonts.storageSection')}
         aside={
           <Muted>
             {t('fonts.storageUsage', {
@@ -137,52 +206,37 @@ export function FontPanel({ fonts, stored, disabled, onNotice }: Props): JSX.Ele
             style={`width: ${share * 100}%`}
           />
         </div>
-        <VerticalSpace space="extraSmall" />
-        <Text>
-          <Muted>{fonts.length === 0 ? t('fonts.none') : t('fonts.help')}</Muted>
-        </Text>
-        {missing.length === 0 ? null : (
-          <Fragment>
-            <VerticalSpace space="small" />
-            <FolderScan
-              missing={missing}
-              stored={stored}
-              disabled={busy}
-              progress={scan.progress}
-            />
-          </Fragment>
+        <div class="storageSummary">
+          <div class="storageNames">
+            <Text>
+              {storedFamilies.length === 0 ? (
+                <Muted>{t('fonts.storedNone')}</Muted>
+              ) : (
+                storedFamilies.join(' · ')
+              )}
+            </Text>
+          </div>
+          {stored.length === 0 ? null : (
+            <button type="button" class="linkButton" onClick={onOpenStorage}>
+              {t('fonts.storageManage')}
+            </button>
+          )}
+        </div>
+        {stored.length === 0 ? null : (
+          <div class="storageUnused">
+            <Text>
+              <Muted>
+                {unused.length === 0
+                  ? t('fonts.storedAllInUse')
+                  : t('fonts.storageUnused', {
+                      count: unused.length,
+                      size: formatBytes(unusedBytes)
+                    })}
+              </Muted>
+            </Text>
+          </div>
         )}
-        {scan.display === null ? null : (
-          <ScanResultBox
-            display={scan.display}
-            pendingCount={scan.pending.size}
-            free={remainingBytes(stored)}
-            disabled={busy || scan.retrying.size > 0}
-            onRetryAll={() => {
-              void retryAll()
-            }}
-            onClose={clearScan}
-          />
-        )}
-        {fonts.length === 0 ? null : <VerticalSpace space="small" />}
-        {fonts.map((font, index) => (
-          <FontRow
-            key={fontKey(font)}
-            font={font}
-            state={states[index]}
-            outcome={rowOutcomeFor(scan.display, font, states[index])}
-            all={stored}
-            disabled={busy}
-            retrying={scan.retrying.has(fontKey(font))}
-            onNotice={onNotice}
-            onRetry={() => {
-              void retry(fontKey(font), stored)
-            }}
-          />
-        ))}
       </Section>
-
-      <StoredFonts stored={stored} fonts={fonts} disabled={disabled} />
     </Fragment>
   )
 }
@@ -219,33 +273,28 @@ function ScanResultBox({
 
   return (
     <div class={warn ? 'scanBox warn' : 'scanBox'}>
-      <div class="rowBetween">
+      <div class="rowBetween scanBoxHead">
         <div class="ellipsis">
           <Text>
             {t('fonts.scanBoxTitle')} {parts.join(' · ')}
           </Text>
         </div>
-        <IconButton onClick={onClose}>
+        <IconButton
+          aria-label={t('fonts.scanBoxClose')}
+          onClick={onClose}
+          title={t('fonts.scanBoxClose')}
+        >
           <IconClose24 />
         </IconButton>
       </div>
-      {counts.needBytes > 0 || pendingCount > 0 ? (
-        <div class="scanBoxLine rowBetween">
-          <div class="ellipsis">
-            <Muted>
-              {counts.needBytes > 0
-                ? t('fonts.scanBoxStorage', {
-                    need: formatBytes(counts.needBytes),
-                    free: formatBytes(free)
-                  })
-                : ''}
-            </Muted>
-          </div>
-          {pendingCount > 0 ? (
-            <Button disabled={disabled} onClick={onRetryAll} secondary>
-              {t('fonts.scanBoxRetryAll', { count: pendingCount })}
-            </Button>
-          ) : null}
+      {counts.needBytes > 0 ? (
+        <div class="scanBoxLine">
+          <Muted>
+            {t('fonts.scanBoxStorage', {
+              need: formatBytes(counts.needBytes),
+              free: formatBytes(free)
+            })}
+          </Muted>
         </div>
       ) : null}
       {display.lines.map((line) => (
@@ -253,70 +302,14 @@ function ScanResultBox({
           <Muted>{line}</Muted>
         </div>
       ))}
+      {pendingCount > 0 ? (
+        <div class="scanBoxActions">
+          <Button disabled={disabled} onClick={onRetryAll} secondary>
+            {t('fonts.scanBoxRetryAll', { count: pendingCount })}
+          </Button>
+        </div>
+      ) : null}
     </div>
-  )
-}
-
-/**
- * 플러그인에 넣어 둔 폰트 전부 — 이 파일이 안 쓰는 것까지.
- *
- * 저장소는 파일별이 아니라 플러그인 하나에 5MB 다. 위 목록은 이 파일이 쓰는 폰트만 보여 주므로,
- * 다른 파일에서 넣은 것은 공간을 차지하면서도 지울 길이 없었다. 여기서 보이고 지운다.
- * 무엇을 지울지는 사용자가 고른다 — 이 파일이 안 쓰는 폰트가 사용자에게 필요 없는 폰트는 아니다.
- */
-function StoredFonts({
-  stored,
-  fonts,
-  disabled
-}: {
-  stored: readonly StoredFont[]
-  fonts: readonly FontUsage[]
-  disabled: boolean
-}): JSX.Element {
-  const inUse = new Set(fonts.map((font) => fontKey(font)))
-
-  return (
-    <Section title={t('fonts.storedTitle')} aside={<Muted>{t('fonts.storedAside')}</Muted>}>
-      {stored.length === 0 ? (
-        <Text>
-          <Muted>{t('fonts.storedNone')}</Muted>
-        </Text>
-      ) : (
-        stored.map((font) => (
-          <div class="fontRow" key={fontKey(font)}>
-            <div class="fontRowMain">
-              <div class="ellipsis">
-                <Text>
-                  {font.family} {font.style}
-                </Text>
-              </div>
-              <VerticalSpace space="extraSmall" />
-              <div class="ellipsis">
-                <Text>
-                  <Muted>
-                    {font.fileName} · {formatBytes(font.byteLength)}
-                    {inUse.has(fontKey(font)) ? t('fonts.storedInUse') : ''}
-                  </Muted>
-                </Text>
-              </div>
-            </div>
-            <div class="fontRowActions">
-              <IconButton
-                disabled={disabled}
-                onClick={() =>
-                  emit<FontDeleteHandler>('font:delete', {
-                    family: font.family,
-                    style: font.style
-                  })
-                }
-              >
-                <IconTrash24 />
-              </IconButton>
-            </div>
-          </div>
-        ))
-      )}
-    </Section>
   )
 }
 
@@ -350,6 +343,11 @@ function FolderScan({
   progress: { done: number; total: number } | null
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null)
+  /** 처음 한 번만 읽는 설명 — 늘 펼쳐 두면 매번 읽어야 할 것처럼 보인다 */
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  // 넣을 것이 없으면 버튼도 안내도 필요 없다 — 도움말 링크만 남긴다
+  const idle = missing.length === 0
 
   async function scan(files: File[]): Promise<void> {
     startScan()
@@ -401,36 +399,62 @@ function FolderScan({
 
   return (
     <Fragment>
-      <div class="rowBetween">
-        <Button
-          disabled={disabled}
-          onClick={() => {
-            const element = input.current
-            if (element === null) return
-            // Preact 는 `webkitdirectory` 를 프로퍼티로 넣는다 — JSX 의 '' 는 false 가 돼 폴더
-            // 모드가 안 켜지고 파일 여러 개 고르기 창이 떴다 (사용자 둘이 실측). 열기 직전에
-            // 속성으로 직접 켠다. 속성이 있으면 프로퍼티도 true 다.
-            element.setAttribute('webkitdirectory', '')
-            element.setAttribute('directory', '')
-            element.click()
-          }}
-          secondary
-        >
-          <span class="buttonWithIcon">
-            <IconFolder16 />
-            {t('fonts.scanFolder')}
-          </span>
-        </Button>
-        {progress === null ? null : (
+      <div class="scanRow">
+        {idle ? (
+          <span />
+        ) : (
+          <Button
+            disabled={disabled}
+            onClick={() => {
+              const element = input.current
+              if (element === null) return
+              // Preact 는 `webkitdirectory` 를 프로퍼티로 넣는다 — JSX 의 '' 는 false 가 돼 폴더
+              // 모드가 안 켜지고 파일 여러 개 고르기 창이 떴다 (사용자 둘이 실측). 열기 직전에
+              // 속성으로 직접 켠다. 속성이 있으면 프로퍼티도 true 다.
+              element.setAttribute('webkitdirectory', '')
+              element.setAttribute('directory', '')
+              element.click()
+            }}
+            secondary
+          >
+            <span class="buttonWithIcon">
+              <IconFolder16 />
+              {t('fonts.scanFolder')}
+            </span>
+          </Button>
+        )}
+        {progress === null ? (
+          <button
+            aria-expanded={helpOpen}
+            class="linkButton"
+            onClick={() => setHelpOpen(!helpOpen)}
+            type="button"
+          >
+            {t('fonts.whyFile')}
+          </button>
+        ) : (
           <Text>
             <Muted>{t('fonts.scanning', { current: progress.done, total: progress.total })}</Muted>
           </Text>
         )}
       </div>
-      <VerticalSpace space="extraSmall" />
-      <Text>
-        <Muted>{t('fonts.scanHint')}</Muted>
-      </Text>
+      {/* 설명은 줄 밖에 둔다. Fragment 는 DOM 을 만들지 않아서, 링크와 함께 줄 안에 두면
+          문단이 그대로 flex 아이템이 되어 폴더 버튼을 짓눌렀다 — 실기에서 버튼 글자가
+          세로로 접혔다 */}
+      {helpOpen ? (
+        <div class="scanHelp">
+          <Text>
+            <Muted>{t('fonts.help')}</Muted>
+          </Text>
+        </div>
+      ) : null}
+      {idle ? null : (
+        <div class="scanHelp">
+          <Text>
+            <Muted>{t('fonts.scanHint')}</Muted>
+          </Text>
+        </div>
+      )}
       <input
         ref={input}
         type="file"
@@ -442,284 +466,5 @@ function FolderScan({
         }}
       />
     </Fragment>
-  )
-}
-
-type UploadVerdict =
-  | { ok: true; save: SaveRequest; notice?: Notice }
-  | {
-      ok: false
-      notice: Notice
-      /** 공간 부족으로 막혔다 — 지우면 들어간다 */
-      storage?: boolean
-      /** 막혔어도 압축본은 있다 — 다시 넣기용 */
-      save?: SaveRequest
-    }
-
-/**
- * 파일 하나를 이 자리에 넣어도 되는가. 한 번 올리기와 폴더 스캔이 같은 문을 지난다.
- *
- * 파싱만 되면 통과시키면 안 된다 — OTF(CFF)는 텍스트 추출이 통째로 깨지고, 가변 폰트는
- * 굵기가 조용히 틀린다 (src/lib/fontFile.ts). 굵기가 어긋나도 막지는 않는다 —
- * 파일 이름표가 틀린 경우가 있다. 대신 알려 준다.
- */
-function screenUpload(
-  /** 실제로 저장되는 형태(압축) — 한도는 이걸로 센다 */
-  packed: Uint8Array,
-  fileName: string,
-  probe: FontProbe,
-  facts: FontFacts,
-  font: FontUsage,
-  all: readonly StoredFont[]
-): UploadVerdict {
-  const verdict = screenFontFile(facts)
-  if (!verdict.ok)
-    return { ok: false, notice: { message: formatReason(verdict.reason), error: true } }
-
-  const save: SaveRequest = {
-    font: {
-      family: font.family,
-      style: font.style,
-      weight: font.weight,
-      italic: font.italic,
-      byteLength: packed.length,
-      numGlyphs: probe.numGlyphs,
-      codePoints: probe.characterSet.length,
-      fileName,
-      facts
-    },
-    bytes: packed
-  }
-
-  if (!fitsWithin(all, font, packed.length)) {
-    return {
-      ok: false,
-      notice: {
-        message: t('fonts.storageFull', { size: formatBytes(packed.length) }),
-        error: true
-      },
-      storage: true,
-      save
-    }
-  }
-
-  const mismatch = weightMismatch(facts, { weight: font.weight, italic: font.italic })
-  const notice: Notice | undefined = mismatch.differs
-    ? {
-        message: t('fontFile.weightMismatch', {
-          fileStyle: weightName(mismatch.fileWeight, mismatch.fileItalic),
-          slotStyle: `${font.family} ${font.style}`
-        }),
-        // 주의 문구는 패널 띠에 — 토스트로 흘려보내면 굵기가 다른 채로 넣은 걸 놓친다
-        error: true
-      }
-    : undefined
-
-  return { ok: true, notice, save }
-}
-
-/** 못 찾은 행의 둘째 줄 — 스캔이 알아낸 이유 */
-function notFoundLabel(outcome: Extract<RowOutcome, { kind: 'not-found' }>): string {
-  switch (outcome.reason) {
-    case 'style-missing':
-      return t('fonts.rowStyleMissing')
-    case 'variable-only':
-      return t('fonts.rowVariableOnly')
-    case 'restricted':
-      return t('fonts.rowRestricted')
-    case 'unusable':
-      return t('fonts.rowUnusable')
-    case 'unchecked':
-      return t('fonts.rowUnchecked')
-    default:
-      return t('fonts.rowNotInFolder')
-  }
-}
-
-function FontRow({
-  font,
-  state,
-  outcome,
-  all,
-  disabled,
-  retrying,
-  onNotice,
-  onRetry
-}: {
-  font: FontUsage
-  state: FontAvailability
-  /** 마지막 폴더 스캔이 이 폰트에 대해 알아낸 것 — 없으면 null */
-  outcome: RowOutcome | null
-  all: StoredFont[]
-  disabled: boolean
-  /** 이 폰트를 다시 넣는 중 — 버튼을 잠가 두 번 세지 않는다 */
-  retrying: boolean
-  onNotice: (notice: Notice) => void
-  onRetry: () => void
-}): JSX.Element {
-  async function handleFiles(files: File[]): Promise<void> {
-    const file = files[0]
-    if (file === undefined) return
-
-    let bytes: Uint8Array = new Uint8Array(await file.arrayBuffer())
-    let fileName = file.name
-
-    let probe: FontProbe
-    try {
-      // 컬렉션(TTC)이면 이 자리에 맞는 face 를 골라 단일 폰트로 뽑는다 — macOS 기본 서체가 이 형식이다.
-      // 쓸 수 있는 face(가변 아님·윤곽 있음) 중에서 고르고, 이름은 맞는데 쓸 수 없으면 그 이유를 말한다
-      const faces = collectionFaces(bytes)
-      if (faces !== null) {
-        const candidates = faces.map((face, index) => {
-          const facts = factsOf(face)
-          return {
-            ...namesOf(face),
-            fileName: file.name,
-            weightClass: facts.weightClass,
-            italic: facts.italic,
-            index,
-            verdict: screenFontFile(facts)
-          }
-        })
-        const ranked = rankFontFiles(font, candidates)
-        const pick = ranked.find((candidate) => candidate.verdict.ok)
-        if (pick === undefined) {
-          const unusable = ranked[0]
-          if (unusable !== undefined && !unusable.verdict.ok) {
-            onNotice({ message: formatReason(unusable.verdict.reason), error: true })
-            return
-          }
-          const listed = candidates
-            .slice(0, 8)
-            .map((candidate) => `${candidate.family} ${candidate.subfamily}`)
-          if (candidates.length > 8) listed.push('…')
-          onNotice({
-            message: t('font.ttcNoFace', {
-              family: font.family,
-              style: font.style,
-              faces: listed.join(', ')
-            }),
-            error: true
-          })
-          return
-        }
-        bytes = extractFace(bytes, pick.index)
-        fileName = `${file.name} (${pick.subfamily})`
-      }
-      probe = createProbe(bytes)
-    } catch {
-      onNotice({ message: t('fonts.parseError', { file: file.name }), error: true })
-      return
-    }
-
-    const verdict = screenUpload(await packFont(bytes), fileName, probe, factsOf(probe), font, all)
-    if (!verdict.ok) {
-      onNotice(verdict.notice)
-      return
-    }
-    if (verdict.notice !== undefined) onNotice(verdict.notice)
-    emit<FontSaveHandler>('font:save', verdict.save)
-  }
-
-  const problem = state.kind === 'uploaded' ? describeFileProblem(state.font) : null
-  // 어떤 판을 넣는지 보여 준다 — 같은 이름의 다른 판(Inter 3.19 vs 4.0)은 폭·굵기가 다르다
-  const entry = state.kind === 'catalog' ? catalogEntry(font) : undefined
-  const build =
-    entry?.build === undefined
-      ? ''
-      : t(entry.figmaBundled === true ? 'fonts.detailFigmaBuild' : 'fonts.detailBuild', {
-          build: entry.build
-        })
-  const version =
-    state.kind === 'uploaded' && state.font.facts?.version !== undefined
-      ? t('fonts.detailVersion', { version: state.font.facts.version })
-      : ''
-
-  // 둘째 줄 — 상태 하나. 찾았지만 못 넣은 행은 이유를 먼저, 그다음 크기와 파일 — 한 줄이라 끝이 잘려도
-  // 이유는 남는다. 다음 행동(다시 넣기)은 버튼 자리에 둔다
-  const canRetry = outcome?.kind === 'unsaved' && outcome.retry
-  let second: JSX.Element
-  if (state.kind === 'catalog') {
-    second = <Muted>{t('fonts.detailCatalog') + build}</Muted>
-  } else if (state.kind === 'uploaded') {
-    second = (
-      <Muted>
-        {t('fonts.detailUploaded', {
-          file: state.font.fileName,
-          size: formatBytes(state.font.byteLength)
-        }) + version}
-      </Muted>
-    )
-  } else if (outcome === null) {
-    second = <Muted>{t('fonts.rowNoFile')}</Muted>
-  } else if (outcome.kind === 'not-found') {
-    second = <Muted>{notFoundLabel(outcome)}</Muted>
-  } else {
-    const tooBig = outcome.bytes !== undefined && outcome.bytes > CLIENT_STORAGE_LIMIT
-    const size = outcome.bytes === undefined ? '' : ` · ${formatBytes(outcome.bytes)}`
-    const why = tooBig
-      ? t('fonts.rowTooBig')
-      : outcome.storage
-        ? t('fonts.rowNoRoom')
-        : t('fonts.rowSaveFailed', { error: outcome.error })
-    const next = outcome.retry || tooBig ? '' : ` · ${t('fonts.rowRescan')}`
-    second = (
-      <span class="fontRowWarn">
-        {why}
-        {size} · {outcome.fileName}
-        {next}
-      </span>
-    )
-  }
-
-  return (
-    <div class="fontRow">
-      <div class="fontRowMain">
-        <div class="ellipsis">
-          <Text>
-            {font.family} {font.style}
-          </Text>
-        </div>
-        <VerticalSpace space="extraSmall" />
-        <div class="ellipsis">
-          <Text>{second}</Text>
-        </div>
-        {problem === null ? null : <div class="fontRowWarn">{problem}</div>}
-      </div>
-      <div class="fontRowActions">
-        {canRetry ? (
-          <Button disabled={disabled || retrying} onClick={onRetry} secondary>
-            {t('fonts.retry')}
-          </Button>
-        ) : state.kind === 'catalog' ? null : (
-          <FileUploadButton
-            acceptedFileTypes={[
-              'font/ttf',
-              'font/otf',
-              'font/collection',
-              '.ttf',
-              '.otf',
-              '.ttc',
-              '.otc'
-            ]}
-            disabled={disabled}
-            onSelectedFiles={(files: File[]) => {
-              void handleFiles(files)
-            }}
-            secondary
-          >
-            {state.kind === 'uploaded' ? t('fonts.replace') : t('fonts.add')}
-          </FileUploadButton>
-        )}
-        {state.kind === 'uploaded' ? (
-          <IconButton
-            disabled={disabled}
-            onClick={() => emit<FontDeleteHandler>('font:delete', font)}
-          >
-            <IconTrash24 />
-          </IconButton>
-        ) : null}
-      </div>
-    </div>
   )
 }

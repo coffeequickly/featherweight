@@ -80,12 +80,14 @@ brand name (the leading competitor does the same with "(PDF, PNG, JPG, WebP)").
 **Hard limit: 100 characters.** The form counts and truncates silently — check
 the counter before saving.
 
-> See what changes before you export. Real fonts, images sized to what you see, one checklist.
+> Real fonts, images sized to what you see, and a size you name. See it all before you export.
 
-91 characters (2.0). The 1.x line was "Name a size — say 5MB — and it hits it.
-Text stays selectable, searchable, ATS-ready." (85). Neither repeats
-"compressed PDF export with real fonts" — the plugin *name* already says that,
-so the tagline spends its budget on what the name can't carry.
+93 characters (3.0). The 2.x line ended "…one checklist" — 3.0 replaced the single
+screen with six tabs, so the word stopped being true. The 1.x line was "Name a
+size — say 5MB — and it hits it. Text stays selectable, searchable, ATS-ready."
+(85). None of them repeats "compressed PDF export with real fonts" — the plugin
+*name* already says that, so the tagline spends its budget on what the name can't
+carry.
 
 ### Description
 
@@ -106,9 +108,10 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 🪶 SMART IMAGE COMPRESSION
 Images are downscaled to the size they are actually displayed at, then
 re-encoded. Pick a preset — Sharp / Balanced / Smallest — and see the exact
-numbers it sets, or open Advanced settings for scale, an HD-to-4K cap and
-quality. Logos and already-small images pass through untouched, so nothing
-that was sharp gets muddy.
+numbers it sets, or open the Images tab for resolution (1× to 4×, up to 288 DPI
+for print) and quality. Every image is listed with the size it starts at and the
+size it ends up, so you can see the setting land before you export. Logos and
+already-small images pass through untouched, so nothing that was sharp gets muddy.
 
 🪶 FIT TO A TARGET SIZE
 Have a 5MB upload limit? Type the number. Featherweight exports once to measure,
@@ -118,14 +121,21 @@ gives you the smallest possible file and tells you what that floor is, instead
 of quietly wrecking your images.
 
 🪶 KNOW BEFORE YOU EXPORT
-One checklist on the main screen: how many images will shrink, which fonts are
-ready, and exactly which text layers would stay as outlines and why — with a
-link to the layer. Fix it, or export anyway. No surprises after the fact.
+Six tabs follow the work: Start, Order, Fonts, Images, Options, Result. Start
+shows only what needs you — a missing font, text that would stay outlined and
+why — and a tab turns amber when there is something in it to look at. Follow it,
+or export anyway. No surprises after the fact.
+
+🪶 SEE WHAT YOU SHIPPED
+Result opens on the finished PDF: its first page, its size, how many text layers
+went in with fonts and how many stayed as outlines — each reason clickable to
+find the layer on canvas. It also shows the text a parser will actually read, so
+you can check your name and contact details made it through before you submit.
 
 🪶 FIGMA SLIDES TOO
-Run it in a deck and every slide becomes a page, in deck order — with real
-fonts and downscaled images, where Slides' own PDF export outlines the text
-and keeps every image at full size.
+Run it in a deck and every slide becomes a page, in deck order — with real fonts
+and downscaled images, where Slides' own PDF export outlines the text and keeps
+every image at full size.
 
 Together these make a real difference: a 12-page portfolio went from 22.7MB
 to 4.0MB with the same pages and the same look.
@@ -135,18 +145,19 @@ HOW IT WORKS
 1. Select frames and run Featherweight — in Figma Slides, run it with nothing
    selected to export the whole deck
 2. Pick a preset — or Target, and type the size you need
-3. Read the checklist; follow a warning to arrange pages, add a font, or find
-   the layer
-4. Export — the save dialog is pre-filled with a timestamped file name
+3. Check the Start tab; follow a warning to the tab that fixes it
+4. Export — the save dialog is pre-filled with a timestamped file name, and
+   Result tells you what went in
 
 WHAT MAKES IT DIFFERENT
 
 1. 60 open-license font families embed automatically, starting with Inter —
    Figma's own default — then Roboto, Open Sans, Montserrat, Lato, Poppins and
    37 more Latin faces, plus 17 Korean ones (Pretendard, Noto Sans KR, Nanum,
-   Gothic A1, Spoqa…). Every weight, roman and italic. For anything else,
-   point it at your font folder once — the matching TTFs are picked out for
-   you.
+   Gothic A1, Spoqa…). Every weight, roman and italic. For anything else, point
+   it at your font folder once — the matching files (.ttf, .otf and .ttc, macOS
+   and Windows system fonts included) are picked out for you, and the Fonts tab
+   says per font what was found and why it wasn't added.
 2. Never substitutes fonts. Anything it can't embed keeps its original
    outlines — identical look, honestly reported with a reason you can click
    to locate the exact layer on canvas.
@@ -160,13 +171,18 @@ GOOD TO KNOW
 1. Always proofread the exported PDF before submitting it anywhere. Text is
    redrawn with real fonts and may differ subtly from Figma's rendering. You
    are responsible for the files you produce.
-2. Fonts you add yourself are embedded as-is — static TTF only, one file per
-   weight (no variable fonts, no OTF). Confirming that your font's license
-   permits document embedding is your responsibility. All auto-downloaded
-   fonts are SIL OFL and permit embedding.
+2. Fonts you add yourself are embedded as-is: static .ttf/.otf files, one per
+   weight, or a .ttc collection (the right face is picked). Variable fonts are
+   skipped — use the static files from the download. A font whose own embedding
+   flag forbids it (the OS/2 "Restricted License" bit, the rule Acrobat and
+   browsers follow) is refused and stays as outlines. That flag is the font's
+   word, not a license review: confirming that your font's license permits
+   document embedding is your responsibility. All auto-downloaded fonts are
+   SIL OFL and permit embedding. Storage for added fonts is 5MB, shared across
+   every file; the Fonts tab shows what is in it and lets you clear it.
 3. Rotated text, gradient/stroke/effect text and underlines keep their
-   original outlines (by design — never silently altered). The checklist
-   names them before you export.
+   original outlines (by design — never silently altered). Start names them
+   before you export.
 4. Text is embedded in an extractable form, but no specific ATS parsing
    result is guaranteed. Not affiliated with Figma, Inc.
 
@@ -191,10 +207,12 @@ any of these projects. Font names are trademarks of their respective owners.
 Figma 기본 PDF 내보내기는 글자를 아웃라인으로 바꿔 선택·검색이 안 되고, 글 위주
 문서는 10~20MB로 불어납니다. Featherweight는 텍스트를 진짜 폰트로 다시 넣고
 (Pretendard·Noto Sans KR·나눔 등 한글 17종 포함 60종 자동), 이미지는 보이는 크기에
-맞춰 줄이고, 목표 용량(예: 5MB)에 맞춰 줍니다. 내보내기 전 체크리스트가 무엇이
-바뀌고 어떤 텍스트가 아웃라인으로 남는지 먼저 알려 줍니다. 문서는 컴퓨터 밖으로
-나가지 않습니다. 무료·오픈소스. 플러그인 화면은 Figma 언어 설정에 따라 한국어로
-나옵니다. 자세한 한국어 안내: github.com/coffeequickly/featherweight#한국어-안내
+맞춰 줄이고, 목표 용량(예: 5MB)에 맞춰 줍니다. 시작·정렬·폰트·이미지·옵션·결과
+여섯 탭이 작업 순서대로 놓여 있고, 손볼 것이 있는 탭은 색으로 알려 줍니다. 내보낸
+뒤에는 결과 탭이 무엇이 폰트와 함께 들어갔고 무엇이 아웃라인으로 남았는지, 그리고
+파서가 실제로 읽을 텍스트를 보여 줍니다. 문서는 컴퓨터 밖으로 나가지 않습니다.
+무료·오픈소스. 플러그인 화면은 Figma 언어 설정에 따라 한국어로 나옵니다.
+자세한 한국어 안내: github.com/coffeequickly/featherweight#한국어-안내
 
 The Community listing takes one language; this footer is what makes Korean
 searches ("이력서 PDF 용량") hit the page. The full Korean write-up lives in
@@ -225,12 +243,13 @@ Stored in `docs/brand/`, all rendered from source so they can be regenerated:
 | `media-1.png` | BEFORE YOU EXPORT — "Know before you export." (board-checklist.html, ui-main.png) — first, because it is what changed in 2.0 |
 | `media-2.png` | REAL FONTS — "Real fonts, not outlines." (board-fonts.html, ui-fonts.png) |
 | `media-3.png` | TARGET SIZE — "Name a size. It hits it." (board-target.html, ui-target.png) |
-| `media-4.png` | IMAGE SIZE — "See what your images become." (board-chart.html, ui-settings.png) |
+| `media-4.png` | IMAGE SIZE — "See what your images become." (board-chart.html, ui-images.png) |
 
 All four boards share one grid: brand row, warm-gradient eyebrow, two-line
 headline, gradient bar, one paragraph — and a 470×599 card on the right holding
-a UI capture taken at exactly 400×510 (2×). Keep every capture at that size or
-the cards stop lining up across the carousel.
+a UI capture taken at exactly 440×560 (2×), the plugin window's real size since
+3.0. Keep every capture at that size or the cards stop lining up across the
+carousel.
 
 The 1.x brand board ("Keep text real. Keep files light.") and the editorial
 board with the mock résumé were dropped in 2.0 — they repeated the cover
@@ -240,15 +259,17 @@ Everything is rendered from source in `docs/brand/src/` (plain HTML + `tokens.cs
 so any of it can be regenerated or restyled:
 
 ```bash
-# 1. UI screenshots → docs/brand/src/ui-{main,target,settings,fonts}.png
+# 1. UI screenshots → docs/brand/src/ui-{main,target,images,fonts}.png
 npm run ui:preview
-#    all four at w=400&h=510, 2× device scale, lang=en-US&theme=dark:
-#    ui-main:     &fonts=ready
+#    all four at w=440&h=560&bare=1, 2× device scale, lang=en-US:
+#    ui-main:     &screen=start&fonts=ready
 #    ui-fonts:    &screen=fonts
-#    ui-target:   &fit=1&fonts=ready&text=clean
-#    ui-settings: &screen=settings&wide=1&edge=3840
-#    w=400 matters — the preview defaults to 380 and hides overflow
-#    theme=dark matters — the boards are dark, a light capture glares
+#    ui-target:   &screen=start&fit=1&fonts=ready&text=clean
+#    ui-images:   &screen=images
+#    440×560 is the real window since 3.0 — scaled into the 470px card it lands
+#    at 598px, which is the card's 599px height. Capture at any other size and
+#    the cards stop lining up across the carousel.
+#    3.0 is dark-only, so &theme= no longer does anything.
 
 # 2. render each src/*.html at 1920×960 with headless Chrome
 #    cover.html → cover-1920x960.png, board-*.html → media-1…4.png (order above)
@@ -301,6 +322,7 @@ Match the existing version history — one line, leading with the change type:
 - 2.0: "New: one-screen redesign with a pre-flight checklist — see what shrinks, what's ready and what would be outlined before you export. Find missing fonts in a folder. Presets as tiles; HD/FHD/QHD/4K caps."
 - 2.1: "New: works in Figma Slides — every slide a page, with real fonts and smaller images. Selecting a section exports its frames. Selecting many frames no longer freezes the canvas; image-heavy exports are faster."
 - 2.1.1: "Fix: a font file added by an older version that doesn't match its slot (a variable font, or a different weight) is now flagged before export instead of silently changing the weight."
+- 3.0: "Feature: 3.0 — six tabs, in the order you work: Start, Order, Fonts, Images, Options, Result. Start lists only what needs you, and the tab that fixes it turns amber. Order sorts by canvas position, name or layer order. Fonts groups by family with a page per style and storage you can empty. Images adds 3× and 4× for print (216 and 288 DPI) and lists every image with the size it starts at and the size it ends up. Result opens on the finished PDF — first page, what went in with fonts, what stayed outlined and why, and the text a parser reads. Dark interface, and page thumbnails fill in as they draw instead of all at the end."
 - 2.6.2: "Fix: a font that can't be embedded no longer stops the export — its text is kept as outlines, as it always should have been. Retrying a font that didn't fit can no longer be double-counted, and a folder scan that hits a broken font file keeps going and says what happened."
 - 2.6.1: "Fix: a font whose own license flag forbids embedding (the OS/2 \"Restricted License\" bit — the rule Acrobat and browsers follow) is now refused when added and kept as outlines if it was stored earlier, with the reason shown. Fonts that allow preview-and-print embedding still work."
 - 2.6: "Feature: font collections (.ttc) can be added — macOS system fonts such as Helvetica Neue and Apple SD Gothic Neo, and Windows ones such as Gulim, Batang or Meiryo, are found in your font folder. Google Fonts static files named \"Inter 18pt\" or \"Merriweather 24pt\", and Condensed variants, are matched to the family Figma shows. The Fonts screen keeps the folder-scan result and says per font what was found and why it wasn't added, with Retry once you free storage. Thanks to Robyn for reporting fonts not being found."

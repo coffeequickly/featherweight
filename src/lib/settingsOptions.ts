@@ -6,7 +6,11 @@
 
 import { DEFAULT_SETTINGS, Settings } from './types'
 
-export const MULTIPLIERS: ReadonlyArray<Settings['multiplier']> = [1, 1.5, 2]
+/**
+ * 배율 = DPI/72. 3×(216)·4×(288)는 인쇄용이다 — 2×(144)가 천장이던 동안
+ * "인쇄·확대" 라는 프리셋 부제가 인쇄 표준(300 DPI)에 못 미쳤다.
+ */
+export const MULTIPLIERS: ReadonlyArray<Settings['multiplier']> = [1, 1.5, 2, 3, 4]
 export const MAX_EDGES: ReadonlyArray<Settings['maxEdge']> = [1280, 1920, 2560, 3840]
 /** 이 크기 이하는 어떤 문서에서도 손대지 않는다. 로고·아이콘을 지키는 절대 하한. */
 export const MIN_EDGES: ReadonlyArray<Settings['minEdge']> = [640, 1024, 1600]

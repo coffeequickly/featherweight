@@ -17,23 +17,15 @@ import { useEffect, useState } from 'preact/hooks'
 import { clampTargetMb, MAX_TARGET_MB, MIN_TARGET_MB } from '../lib/fitToSize'
 import { t } from '../lib/i18n'
 import { applyPreset, IMAGE_MODE_IDS, imageModeOf } from '../lib/presets'
-import { edgeTag } from '../lib/settingsOptions'
 import { Settings } from '../lib/types'
-import {
-  BalanceGlyph,
-  CompressGlyph,
-  EdgeGlyph,
-  ImageGlyph,
-  ResetGlyph,
-  ScaleGlyph,
-  SparkleGlyph,
-  TargetGlyph
-} from './glyphs'
+import { BalanceGlyph, CompressGlyph, ImageGlyph, SparkleGlyph, TargetGlyph } from './glyphs'
 
 type Props = {
   settings: Settings
   disabled: boolean
   onChange: (next: Settings) => void
+  /** 값 줄 오른쪽 끝 — 숫자를 직접 만지러 가는 곳 */
+  onOpenImages: () => void
 }
 
 /** 프리셋마다 픽토그램 하나. 왼쪽이 화질, 오른쪽으로 갈수록 용량 쪽이다. */
@@ -60,7 +52,7 @@ const MODE_DETAIL = {
   fit: 'presets.detailFit'
 } as const
 
-export function PresetBar({ settings, disabled, onChange }: Props): JSX.Element {
+export function PresetBar({ settings, disabled, onChange, onOpenImages }: Props): JSX.Element {
   const mode = imageModeOf(settings)
 
   return (
@@ -95,56 +87,64 @@ export function PresetBar({ settings, disabled, onChange }: Props): JSX.Element 
         })}
       </div>
 
-      <div class="chips">
+      {/* 값은 테두리를 두르지 않는다 — 눌리지 않는 것이 버튼처럼 보이면 안 된다.
+          진짜 눌리는 것(스테퍼·되돌리기·이미지 탭)만 테두리나 링크 색을 갖는다. */}
+      <div class="valueRow">
         {mode === 'fit' ? (
           <Fragment>
             <FitField settings={settings} disabled={disabled} onChange={onChange} />
-            <span class="chip chipAuto" title={t('chip.autoTip')}>
+            <span class="valueItem" title={t('chip.autoTip')}>
               <ImageGlyph />
               {t('chip.auto')}
             </span>
           </Fragment>
         ) : (
-          <ValueChips settings={settings} />
+          <Fragment>
+            {/* "직접" 은 고를 수 있는 칸이 아니라 상태다 — 이름이 없으면
+                왜 아무 타일도 안 켜졌는지 알 수 없다 */}
+            {mode === 'custom' ? (
+              <span class="stateName">
+                <Text>{t('presets.custom')}</Text>
+              </span>
+            ) : null}
+            <ValueItem label={t('images.multiplier')} value={`${settings.multiplier}×`} />
+            <ValueItem
+              label={t('images.quality')}
+              value={`${Math.round(settings.quality * 100)}%`}
+            />
+            {mode === 'custom' ? (
+              <button
+                type="button"
+                class="linkButton"
+                disabled={disabled}
+                title={t('presets.resetTip')}
+                onClick={() => onChange(applyPreset(settings, 'balanced'))}
+              >
+                {t('presets.reset')}
+              </button>
+            ) : null}
+          </Fragment>
         )}
-        {mode === 'custom' ? (
-          <span
-            class={`chip chipLink${disabled ? ' chipDisabled' : ''}`}
-            title={t('presets.resetTip')}
-            onClick={disabled ? undefined : () => onChange(applyPreset(settings, 'balanced'))}
-          >
-            <ResetGlyph />
-            {t('presets.reset')}
-          </span>
-        ) : null}
+        <span class="valuePush" />
+        <button type="button" class="linkButton" onClick={onOpenImages}>
+          {t('tab.images')}
+        </button>
       </div>
     </div>
   )
 }
 
-/**
- * 눌렀을 때 실제로 바뀌는 숫자 세 개. 문장 대신 아이콘 + 값이다 — 뜻은 툴팁과,
- * 고급 설정에서 같은 아이콘이 라벨 옆에 붙어 있는 것으로 이어진다.
- */
-function ValueChips({ settings }: { settings: Settings }): JSX.Element {
+/** 라벨 + 값. 테두리도 배경도 없다 — 이것은 값이지 버튼이 아니다. */
+function ValueItem({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <Fragment>
-      <span class="chip" title={t('chip.scaleTip', { multiplier: settings.multiplier })}>
-        <ScaleGlyph />
-        {settings.multiplier}×
+    <span class="valueItem">
+      <span class="valueKey">
+        <Text>
+          <Muted>{label}</Muted>
+        </Text>
       </span>
-      <span
-        class="chip"
-        title={t('chip.edgeTip', { maxEdge: settings.maxEdge, fhd: edgeTag(settings.maxEdge) })}
-      >
-        <EdgeGlyph />
-        {settings.maxEdge}px
-      </span>
-      <span class="chip" title={t('images.qualitySays', { quality: settings.quality })}>
-        <ImageGlyph />
-        {Math.round(settings.quality * 100)}%
-      </span>
-    </Fragment>
+      <Text>{value}</Text>
+    </span>
   )
 }
 
@@ -154,12 +154,18 @@ export function stepTarget(value: number, direction: -1 | 1): number {
   return clampTargetMb(value <= 1 ? MIN_TARGET_MB : Math.ceil(value) - 1)
 }
 
+type FitFieldProps = {
+  settings: Settings
+  disabled: boolean
+  onChange: (next: Settings) => void
+}
+
 /**
  * 목표 용량 입력. 입력 중에는 아무것도 막지 않는다 — 라이브러리 숫자 입력은 하한 아래
  * 글자를 안 받아서 "0.8" 을 칠 수 없었다. 확정(blur·Enter)할 때만 범위로 자르고,
  * 비워 두면 원래 값으로 돌아간다 — 빈칸이 조용히 0.5 가 되면 안 된다.
  */
-function FitField({ settings, disabled, onChange }: Props): JSX.Element {
+function FitField({ settings, disabled, onChange }: FitFieldProps): JSX.Element {
   const [draft, setDraft] = useState(String(settings.fitTargetMb))
 
   // 설정이 밖에서 바뀌면(스테퍼·다른 문서·저장값) 입력칸도 따라간다
