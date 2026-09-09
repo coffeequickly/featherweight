@@ -24,7 +24,7 @@ function usage(
   height: number,
   scaleMode: ImageUsage['scaleMode'] = 'FILL'
 ): ImageUsage {
-  return { nodeId, imageHash, width, height, scaleMode }
+  return { nodeId, imageHash, name: nodeId, width, height, scaleMode }
 }
 
 describe('targetFor', () => {

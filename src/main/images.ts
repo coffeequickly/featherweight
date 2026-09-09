@@ -127,6 +127,7 @@ export function imageUsagesOf(node: SceneNode): ImageUsage[] {
     usages.push({
       nodeId: node.id,
       imageHash: paint.imageHash,
+      name: node.name,
       width: node.width * scale.x,
       height: node.height * scale.y,
       scaleMode: paint.scaleMode

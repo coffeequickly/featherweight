@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
-import { compareNatural, sortByName, sortByPosition } from '../src/lib/order'
+import {
+  compareNatural,
+  sortByLayer,
+  sortByName,
+  sortByPosition,
+  sortItems
+} from '../src/lib/order'
 
-type Item = { id: string; name: string; x: number; y: number; height: number }
+type Item = {
+  id: string
+  name: string
+  x: number
+  y: number
+  height: number
+  layerIndex: number
+}
 
-function item(id: string, name: string, x: number, y: number, height = 1000): Item {
-  return { id, name, x, y, height }
+function item(id: string, name: string, x: number, y: number, height = 1000, layerIndex = 0): Item {
+  return { id, name, x, y, height, layerIndex }
 }
 
 describe('sortByPosition', () => {
@@ -82,5 +95,43 @@ describe('compareNatural', () => {
 
   it('숫자 구간은 수로 비교한다', () => {
     expect(compareNatural('p2', 'p10')).toBeLessThan(0)
+  })
+})
+
+describe('sortByLayer', () => {
+  it('레이어 패널에서 위에 있는 것부터', () => {
+    const out = sortByLayer([
+      item('c', 'C', 0, 0, 100, 2),
+      item('a', 'A', 0, 0, 100, 0),
+      item('b', 'B', 0, 0, 100, 1)
+    ])
+    expect(out.map((row) => row.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('같은 자리면 캔버스 위치가 정한다 — 부모를 못 찾아 전부 0 인 경우', () => {
+    const out = sortByLayer([item('b', 'B', 0, 300), item('a', 'A', 0, 0)])
+    expect(out.map((row) => row.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('sortItems', () => {
+  const rows = [
+    item('b', '02 B', 200, 0, 100, 1),
+    item('a', '01 A', 0, 0, 100, 2),
+    item('c', '03 C', 400, 0, 100, 0)
+  ]
+
+  it("'selection' 은 정렬하지 않는다 — 고른 차례가 곧 순서다", () => {
+    expect(sortItems(rows, 'selection').map((row) => row.id)).toEqual(['b', 'a', 'c'])
+  })
+
+  it('뒤집기는 기준과 별개다', () => {
+    expect(sortItems(rows, 'name').map((row) => row.id)).toEqual(['a', 'b', 'c'])
+    expect(sortItems(rows, 'name', true).map((row) => row.id)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('원본 배열을 건드리지 않는다', () => {
+    sortItems(rows, 'position', true)
+    expect(rows.map((row) => row.id)).toEqual(['b', 'a', 'c'])
   })
 })

@@ -1,4 +1,8 @@
 // 선택 목록 정렬. Figma·DOM 의존 금지. (PRD FR-1)
+//
+// 기준(넷)과 방향(뒤집기)을 나눠 둔다 — 여덟 조합을 칸으로 늘어놓으면 고를 수 없다.
+
+import { SortMode } from './types'
 
 export type Positioned = {
   id: string
@@ -6,6 +10,8 @@ export type Positioned = {
   x: number
   y: number
   height: number
+  /** 레이어 패널에서 위에서 몇 번째인가 */
+  layerIndex: number
 }
 
 /**
@@ -69,9 +75,27 @@ function tokenize(value: string): Array<string | number> {
   return parts.map((part) => (/^\d+$/.test(part) ? Number(part) : part.toLowerCase()))
 }
 
+/** 레이어 패널 순서. 같은 값이면(부모를 못 찾은 경우) 캔버스 위치가 정한다 */
+export function sortByLayer<T extends Positioned>(items: readonly T[]): T[] {
+  return [...items].sort((a, b) => a.layerIndex - b.layerIndex || a.y - b.y || a.x - b.x)
+}
+
+/**
+ * 기준 하나와 방향 하나. 'selection' 은 메인이 보낸 순서 그대로라 정렬하지 않는다 —
+ * 사용자가 고른 차례가 곧 순서다.
+ */
 export function sortItems<T extends Positioned>(
   items: readonly T[],
-  mode: 'position' | 'name'
+  mode: SortMode,
+  reversed = false
 ): T[] {
-  return mode === 'name' ? sortByName(items) : sortByPosition(items)
+  const sorted =
+    mode === 'name'
+      ? sortByName(items)
+      : mode === 'layer'
+        ? sortByLayer(items)
+        : mode === 'selection'
+          ? [...items]
+          : sortByPosition(items)
+  return reversed ? sorted.reverse() : sorted
 }

@@ -94,8 +94,21 @@ export function listItems(nodes: readonly ExportableNode[]): FrameItem[] {
     x: node.x,
     y: node.y,
     imageCount: 0,
-    textCount: 0
+    textCount: 0,
+    layerIndex: layerIndexOf(node)
   }))
+}
+
+/**
+ * 레이어 패널에서 위에서 몇 번째인가. children 은 아래에서 위 순서라 뒤집는다 —
+ * 사용자가 보는 순서와 다르면 "레이어 순서" 라는 이름이 거짓말이 된다.
+ * 부모를 못 찾으면(페이지 직속이 아닌 경우) 0 — 그때는 다른 기준이 순서를 정한다.
+ */
+function layerIndexOf(node: SceneNode): number {
+  const siblings = node.parent?.children
+  if (siblings === undefined) return 0
+  const index = siblings.indexOf(node)
+  return index < 0 ? 0 : siblings.length - 1 - index
 }
 
 /**
@@ -142,6 +155,7 @@ export async function scanSelection(
       height: Math.round(node.height),
       x: node.x,
       y: node.y,
+      layerIndex: layerIndexOf(node),
       imageCount: new Set(scan.images.map((usage) => usage.imageHash)).size,
       textCount: scan.textCount
     })

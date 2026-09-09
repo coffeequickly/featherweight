@@ -23,7 +23,12 @@ export const CLIENT_STORAGE_LIMIT = 5 * 1024 * 1024
 export type Settings = {
   version: 2
   quality: number // 0.5–1.0
-  multiplier: 1 | 1.5 | 2
+  /**
+   * 이 이미지가 캔버스에서 차지하는 크기의 몇 배까지 픽셀을 남길지.
+   * PDF 는 1pt = 1/72인치라 배율이 곧 DPI다 — 1× = 72, 2× = 144, 4× = 288.
+   * 3·4 는 인쇄용으로 뒤에 넣었다. 옛 저장값(1·1.5·2)은 그대로 유효하다.
+   */
+  multiplier: 1 | 1.5 | 2 | 3 | 4
   /** 긴 변 상한 — HD · FHD · QHD · 4K. 옛 값(1024·1600·2048·4096)은 settingsOptions.snapSettings 가 옮긴다 */
   maxEdge: 1280 | 1920 | 2560 | 3840
   /** 원본이 이 픽셀 이하면 아예 손대지 않는다 — 로고·아이콘을 지키는 절대 하한 */
@@ -55,7 +60,11 @@ export const DEFAULT_SETTINGS: Settings = {
   fitTargetMb: 5
 }
 
-export type SortMode = 'position' | 'name'
+/**
+ * 정렬 기준. 방향(뒤집기)은 따로 둔다 — 넷 × 둘을 여덟 칸으로 늘어놓으면 고를 수 없다.
+ * 'selection' 은 메인이 보낸 순서 그대로다(Figma 가 준 선택 순서).
+ */
+export type SortMode = 'position' | 'name' | 'layer' | 'selection'
 
 export type FrameItem = {
   id: string
@@ -66,6 +75,11 @@ export type FrameItem = {
   y: number
   imageCount: number
   textCount: number
+  /**
+   * 레이어 패널에서 위에서 몇 번째인가. Figma 의 children 은 아래에서 위 순서라
+   * 뒤집어 담는다 — 화면에서 보는 순서와 같아야 "레이어 순서" 라는 말이 맞는다.
+   */
+  layerIndex: number
   thumb?: Uint8Array
 }
 
@@ -244,7 +258,11 @@ export interface FrameThumbsHandler extends EventHandler {
 /** 썸네일은 정렬 화면을 열 때만 만든다 — 31장 렌더가 캔버스를 버벅이게 했다 */
 export interface FrameThumbsRequestHandler extends EventHandler {
   name: 'frames:thumbs:request'
-  handler: () => void
+  /**
+   * limit 은 앞에서부터 몇 장까지 그릴지. 시작 탭은 확인용으로 몇 장만 보여주므로
+   * 서른 장을 다 그리면 여는 속도만 버린다 — 전체는 정렬 탭이 요청한다.
+   */
+  handler: (limit?: number) => void
 }
 
 /**
@@ -260,6 +278,8 @@ export interface FrameMetaHandler extends EventHandler {
 export type ImageUsage = {
   nodeId: string
   imageHash: string
+  /** 레이어 이름 — 이미지 목록에서 어느 그림인지 가리키는 유일한 단서다 */
+  name: string
   /** 노드의 표시 크기 (px) */
   width: number
   height: number

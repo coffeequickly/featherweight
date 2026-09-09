@@ -5,7 +5,7 @@
 // 규칙이 갈라지면 예고와 결과가 어긋나고, 그 순간 예고는 믿을 수 없는 것이 된다.
 
 import { missingFonts } from './fontStatus'
-import { needsDownscale, planImageTargets, skipFloor } from './imageTarget'
+import { MIN_TARGET_LONG_EDGE, needsDownscale, planImageTargets, skipFloor } from './imageTarget'
 import { FontUsage, FrameItem, Preflight, Reason, Settings, StoredFont, TextReject } from './types'
 
 export type ImageForecast = {
@@ -50,6 +50,79 @@ export function forecastImages(preflight: Preflight, settings: Settings): ImageF
   }
 
   return { total: all.size, shrink: shrink.size, tiny, unsized }
+}
+
+export type ImageRow = {
+  imageHash: string
+  /** 이 이미지를 가장 크게 쓰는 레이어의 이름 — 목록에서 어느 그림인지 가리키는 단서 */
+  name: string
+  /** 원본 긴 변(px). 아직 못 읽었으면 null */
+  original: number | null
+  /** 지금 설정으로 남길 긴 변(px) */
+  target: number
+  /** 손대지 않고 그대로 나가는가 */
+  kept: boolean
+  /**
+   * 배율이 아니라 한 장 상한(maxEdge)이 목표를 정했는가.
+   * 이때는 고른 배율이 그대로 적용되지 않는다 — 화면이 그 사실을 말해야 한다.
+   */
+  capped: boolean
+}
+
+/**
+ * 이미지 탭의 목록 — 어떤 그림이 몇 픽셀에서 몇 픽셀이 되는지.
+ *
+ * 설정이 무엇을 하는지는 그림(상한 비교표)보다 이 목록이 정확하게 말한다. 배율을 올리면
+ * 오른쪽 숫자가 전부 따라 움직이고, 손대지 않는 것(로고·아이콘)은 그대로 남는다.
+ *
+ * 같은 사진을 여러 자리에 쓰면 가장 크게 쓰는 자리에 맞춘다 — 작은 쪽에 맞추면 큰 자리가
+ * 뭉개진다(planImageTargets 와 같은 규칙). 이름도 그 자리의 것을 쓴다.
+ *
+ * 정렬은 줄어드는 것 먼저, 그 안에서 많이 줄어드는 순서다. 그대로 나가는 것은 뒤로 민다 —
+ * 볼 이유가 있는 줄이 위에 있어야 한다.
+ */
+export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[] {
+  /** 해시별로 가장 큰 목표와, 그 목표를 만든 자리의 이름·표시 크기·기준선 */
+  const best = new Map<string, { name: string; shown: number; target: number; floor: number }>()
+
+  for (const frame of preflight.frames) {
+    const floor = skipFloor(settings, frame.longEdge)
+    const nameOf = new Map<string, { name: string; edge: number }>()
+    for (const usage of frame.images) {
+      const edge = Math.max(usage.width, usage.height)
+      const found = nameOf.get(usage.imageHash)
+      if (found === undefined || edge > found.edge) {
+        nameOf.set(usage.imageHash, { name: usage.name, edge })
+      }
+    }
+
+    for (const plan of planImageTargets(frame.images, settings)) {
+      const found = best.get(plan.imageHash)
+      if (found !== undefined && found.target >= plan.targetLongEdge) continue
+      const at = nameOf.get(plan.imageHash)
+      best.set(plan.imageHash, {
+        name: at?.name ?? '',
+        shown: at?.edge ?? 0,
+        target: plan.targetLongEdge,
+        floor
+      })
+    }
+  }
+
+  const rows: ImageRow[] = []
+  for (const [imageHash, { name, shown, target, floor }] of best) {
+    const edge = preflight.imageEdges[imageHash]
+    const original = edge === undefined ? null : edge
+    // 기준선 이하는 어떤 문서에서도 손대지 않는다 — 로고·아이콘을 지키는 자리다
+    const kept = original === null ? false : !(original > floor && needsDownscale(original, target))
+    const wanted = Math.max(Math.ceil(shown * settings.multiplier), MIN_TARGET_LONG_EDGE)
+    rows.push({ imageHash, name, original, target, kept, capped: settings.maxEdge < wanted })
+  }
+
+  return rows.sort((a, b) => {
+    if (a.kept !== b.kept) return a.kept ? 1 : -1
+    return (b.original ?? 0) - (a.original ?? 0)
+  })
 }
 
 /**
