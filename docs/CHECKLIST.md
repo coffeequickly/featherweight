@@ -7,68 +7,104 @@ verify:catalog` for the real CDN plus a full text-pipeline run against real
 fonts).
 
 Work through this before publishing a new version to the Community.
-Run `npm run install:local` first, then reopen the plugin and confirm the version
-in the header is the build you mean to ship.
+Run `npm run install:local` first (or point Figma at the repo's `manifest.json`
+directly), then reopen the plugin and confirm the version at the bottom of the
+Options tab is the build you mean to ship.
 
-## Layout & states
+## Tabs & states
 
-- [ ] One main screen: preset tiles, value chips, "Before you export"
-      checklist. No header of its own (Figma's title bar already says
-      Featherweight). The gear next to the export button opens Advanced
-      settings and disappears while exporting; the button and progress stay
-      visible from every sub-screen; "‹" returns to the main screen
-- [ ] Every checklist row has a title and exactly one detail line, in every
-      preset including Target — the four rows line up
-- [ ] Presets: four square tiles (icon · name · one-line tag); the chosen one
-      has a blue border and tint; picking one changes the three chips; touching
-      a number in Advanced settings deselects every tile and adds a "Reset"
-      chip; Target puts the MB field and a single "auto" chip in the same row —
-      the checklist below never moves when switching presets
-- [ ] After an export the result card appears under the checklist on the main
-      screen (you are brought back there from any sub-screen); ✕ closes it;
-      "Check what a parser reads" opens the Text check screen
+- [ ] Six tabs across the top — Start · Order · Fonts · Images · Options ·
+      Result — equal width, label only, the current one underlined. A tab with
+      something to fix is amber with a dot; the dot takes no width, so labels
+      never shift. No header of its own (Figma's title bar already says
+      Featherweight). The export button and progress stay visible from every tab
+      and subpage
+- [ ] Window opens at 440×560 and is resizable; the interface is dark whatever
+      Figma's own theme is set to
+- [ ] Order is disabled with fewer than two pages, and switching to it from a
+      disabled state does not bounce you back to Start mid-scan
+- [ ] Subpages (outlined text, embedded text, a font family, font storage) open
+      under the tab bar with a "‹ title" header that returns to the tab
+- [ ] Start: four preset tiles (icon · name · one-line tag), the chosen one with
+      a blue border and tint; below them one row of values — Scale, Quality, and
+      a link to Images. Picking Target swaps that row for the MB field without
+      changing its height
+- [ ] Start lists **only** what needs attention, under "Needs attention". A
+      document with nothing wrong shows no heading and no cards — just the grey
+      fact line. Each card is a real button: the whole card highlights on hover,
+      shows a pointer, and Tab reaches it
+- [ ] The grey fact line reads as short noun phrases joined by "·" — frames,
+      size, "5 of 10 images downscaled", "4 fonts embedded" — and never claims
+      readiness
+- [ ] Pages to export: up to four square thumbnails, each fitted inside its box
+      (a portrait page leaves side margins). Every box fills — none stays empty
 - [ ] Target on an image-heavy deck (the 31-slide Playground, 9.5 MB) lands
-      within about 1.5 MB under the target, never over it, and the report says
-      "Fits 9.5MB — the best quality that stays under it"; a text-only document
-      with a generous target keeps Balanced ("Already under…")
+      within about 1.5 MB under the target, never over it, and Result says
+      "Fits 9.5MB. This is the best quality that stays under it"; a text-only
+      document with a generous target keeps Balanced ("Already under…")
 - [ ] Target: typing "0.8" works, an emptied field falls back to the previous
-      value (never silently 0.5), and −/+ step by 1 MB (0.5 ↔ 1 at the bottom)
-- [ ] Checklist matches reality: frame count and size; "N of M images will be
-      downscaled" appears a moment after the list (it arrives with the
-      thumbnails); a font outside the catalog turns the Fonts row orange with
-      the font's name and "Add fonts ›" (the Fonts row states the cause only);
-      the Text row alone states the outcome, counting stroked/gradient/effect
-      texts and texts in missing fonts together, with "Show layers ›"
+      value (never silently 0.5), and −/+ step by 1 MB (0.5 ↔ 1 at the bottom).
+      Resolution and quality are locked in the Images tab with a line saying why
 - [ ] Selecting 30 frames shows the list at once and the canvas keeps
-      responding while the counts and checklist fill in; thumbnails appear only
-      after opening Arrange; clicking around inside the same frames (or inside a
+      responding while the counts fill in; thumbnails arrive in batches rather
+      than all at the end; clicking around inside the same frames (or inside a
       slide in Slides) does not re-run the scan or reset a custom order
 - [ ] Selecting a section lists the frames inside it, not the section itself
 - [ ] Figma Slides: with nothing selected the whole deck is listed in grid
       order and the rows say "slides"; selecting a slide row lists its slides;
       the exported PDF embeds real fonts (`pdffonts` shows CIDFontType2, no
       Type 3) and no temporary slide flashes or is left behind
-- [ ] Arrange: clicking a row reveals that frame on the canvas
-      (selection unchanged); dragging reorders; ↑↓ still work; ✕ excludes and
-      the excluded list restores individually; the Frames row then says
-      "Custom order · 1 excluded"
-- [ ] Advanced settings opens with the resolution chart: HD / FHD / QHD / 4K
-      nested from the bottom-left, the chosen cap tinted, and a dashed box for
-      frame × scale (in the frame's own aspect). When the dashed box pokes out
-      of the tinted one it turns amber and the line below says the cap
-      decides, not the scale. Every choice (Scale, Max edge, Keep under) is a row of buttons in
-      the same style as the preset tiles — no segmented controls; Max edge is
-      HD / FHD / QHD / 4K with the pixel count as the tag. A 1.4 install that
-      had 2048 / 4096 / 1600 stored comes up as FHD / 4K / HD, not unselected;
-      "Reset" in the header restores defaults; in Target mode
-      the Size and Compression sections are replaced by a note; "Export all
-      text as outlines" is **off** by default and turning it on makes the Text
-      row orange with a "Turn off" action; the version is shown at the bottom
+- [ ] Order: sort by Canvas position / Name / Layer order, with a separate
+      button to reverse. **Layer order matches Figma's layers panel top to
+      bottom** — the list is not upside down. Reordering by hand shows a
+      "Custom" chip with an undo
+- [ ] Order rows: each row is a box — grip, number, thumbnail, name, meta, ✕.
+      The grip shows a grab cursor and moves the row with ↑↓ from the keyboard;
+      a long frame name ends in "…" and never overflows or clips its descenders;
+      clicking a row reveals that frame on the canvas (selection unchanged);
+      ✕ excludes and the excluded list restores individually
+- [ ] Images: resolution is 1× / 1.5× / 2× / 3× / 4× with a line saying what it
+      means ("Stays sharp when zoomed to 150%. That is 108 DPI in print."). A
+      1.4 install that had 2048 / 4096 / 1600 stored comes up on the nearest
+      step, not unselected
+- [ ] Images lists this document's images — name, the size it starts at, the
+      size it ends up — and moving the resolution moves the whole column. An
+      image the per-image cap decides (not the scale) is called out
+- [ ] Options: hyperlinks and fallback characters as plain toggles; "Export all
+      text as outlines" sits apart under "Use with care", is **off** by default,
+      and turning it on says the Fonts tab no longer applies — Start then shows
+      that as its only card, pointing at Options
+- [ ] Result before an export says nothing has been exported yet and what will
+      appear; after one it opens automatically
+- [ ] Result: a file card with the finished PDF's first page as a 1:1
+      thumbnail, its name, size, pages and seconds. Text and Images are
+      accordions — the head carries the summary, right-aligned in both — and
+      open by default only when something in them needs attention
+- [ ] Result reasons are noun phrases, not sentences ("Nexa Heavy font file
+      missing", not "There is no usable font file for…"), each a row with a
+      count and a chevron; clicking one selects those layers on canvas.
+      Image warnings live under Images, not under Text
+- [ ] Result shows the first lines of the embedded text with "See all" — and
+      **See all actually opens the subpage**, where the text can be selected and
+      copied
+- [ ] Fonts: families are boxed rows — name, then the state right next to it,
+      styles as badges below, a chevron on the right. The whole box is the hit
+      area; a family with a problem has an amber border. Opening one shows a
+      card per style with how much it is used, what is wrong and what happens if
+      it is left
+- [ ] Fonts: "Choose font folder…" reads .ttf/.otf/.ttc and adds the matching
+      ones; the scan result box stays until closed or the next scan and says per
+      font what was found and why it was not added. Expanding "Why is a font
+      file required?" pushes the explanation **below** the row — it must not
+      squeeze the folder button
+- [ ] Font storage: reachable any time from the Fonts tab. Lists every stored
+      font (including ones added in another file) with file name, size and
+      whether this document uses it, right-aligned next to the trash button.
+      "Delete all" asks once before emptying, and the meter frees at once
 - [ ] A font file added by an old version that today's screen would refuse (a
       variable .ttf, or a file whose weight differs from its slot) is flagged on
-      open: the Fonts row turns orange with "1 added file doesn't match its
-      slot", and the row on the Fonts screen shows why in orange under the file
-      name; replacing the file clears both
+      open: Start shows a card, and the style's card on the Fonts detail page
+      says why; replacing the file clears both
 - [ ] Latin headings match Figma's width (pair kerning): "Forward Deployed"
       in a kerned font is not wider than the native export
 - [ ] A layer with a stylistic set on (e.g. SUIT ss18 arrow) exports that
@@ -78,37 +114,29 @@ in the header is the build you mean to ship.
 - [ ] Korean body text with word joiners (U+2060) exports as real text, and a
       line's last word lands where Figma put it (letter-spacing counts joiners)
 - [ ] A layer containing an em dash or thin space the font lacks stays real
-      text — only that character comes from Inter (Pretendard if it is CJK); the
-      report says "N characters the font lacks (…) drawn with Inter"; turning
-      off "Draw missing characters with a fallback font" in Advanced makes
-      that layer outlined again, and the checklist warns before export
+      text — only that character comes from Inter (Pretendard if it is CJK);
+      Result says "3 characters missing from the font (…): drawn with Inter";
+      turning off "Draw missing characters with a fallback font" in Options
+      makes that layer outlined again, and Start warns before export
 - [ ] A heading inside a component instance with vertical auto layout (hug)
       and a divider below it exports with the divider still below the heading,
       not on top of it; same for a text inside a group inside an auto-layout
       column
 - [ ] Hyperlinks: a text layer with a URL link on part of its text exports as a
       clickable area over exactly those characters (Preview: hover shows the
-      URL); "Keep hyperlinks" off in Advanced removes them; it is greyed out
+      URL); "Keep hyperlinks" off in Options removes them; it is greyed out
       when "Export all text as outlines" is on
-- [ ] An .otf (CFF) font file is accepted by Add and by the folder picker,
-      `pdffonts` shows it as "CID Type 0C" with no "Mismatch" warning from
+- [ ] An .otf (CFF) font file is accepted by the folder picker and by a per-style
+      pick, `pdffonts` shows it as "CID Type 0C" with no "Mismatch" warning from
       `pdftotext`, and the text is selectable
-- [ ] Advanced settings → Fonts → "Manage stored fonts…" opens the Fonts screen
-      even with nothing selected; the screen is three sections (this file /
-      add missing / stored) with dividers
-- [ ] Stored fonts: the Fonts screen ends with "Stored fonts · X / 5.0MB", a
-      meter, and every stored font (including ones added in another file) with
-      a trash button; deleting one frees the meter at once; a newly added .ttf
-      shows a stored size well under the file's size (compressed)
-- [ ] Fonts: the font list and Add button work; "Find in a font folder…" opens
-      a folder picker, reads the .ttf files and adds the matching ones (one
-      canvas toast says how many fonts were added — not one per font; adding a
-      single file toasts that font; problems stay in the in-panel banner); clicking a path
-      copies it (toast confirms)
-- [ ] Empty state: the card asks for a selection, the promise line is shown, no
+- [ ] Empty state: Start asks for a selection, the promise line is shown, no
       "(0 pages)" in the button
+- [ ] Every control that does something shows a pointer cursor — preset tiles,
+      status cards, font rows, reason rows, links, and the library buttons
+      ("Delete saved copy", "Select a different file…"). Nothing that does
+      nothing shows one
 - [ ] Nothing is clipped — Hangul ascenders/descenders and Latin g/j/y tails;
-      English checklist details wrap to two lines instead of being cut
+      English detail lines wrap instead of being cut; long names end in "…"
 
 ## Language & platform
 
