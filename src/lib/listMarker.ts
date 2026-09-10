@@ -167,7 +167,7 @@ export type MarkerPlan = {
   fontSize: number
 }
 
-type MarkerRun = { text: string; x: number; fontSize: number }
+type MarkerRun = { text: string; x: number; y: number; fontSize: number }
 
 /**
  * 목록 마커를 어디에 그릴지 정한다.
@@ -186,17 +186,25 @@ export function planMarkers(
     runText: string
   ) => { start: number; end: number } | null
 ): MarkerPlan[] {
+  // Figma 는 런을 읽는 순서가 아니라 **스타일별로 묶어** 내보낸다. 한 문단 안에 크기가
+  // 섞이면 뒤쪽 글자가 먼저 나오는 일이 생긴다(실측: ["bravo charlie 1", "…2", "Alpha "]).
+  // 원문과 맞추는 커서는 앞으로만 가므로, 그대로 훑으면 첫 문단을 놓치고 마커가 엉뚱한
+  // 줄에 붙는다. 맞추기 전에 읽는 순서(줄 → 왼쪽)로 세운다. 그리는 순서는 그대로다.
+  const inReadingOrder = runs
+    .map((run, runIndex) => ({ run, runIndex }))
+    .sort((a, b) => a.run.y - b.run.y || a.run.x - b.run.x)
+
   const heads: Array<{ runIndex: number; at: number; run: MarkerRun }> = []
   let cursor = 0
-  runs.forEach((run, runIndex) => {
-    if (run.text === '') return
+  for (const { run, runIndex } of inReadingOrder) {
+    if (run.text === '') continue
     const located = locate(characters, cursor, run.text)
-    if (located === null) return
+    if (located === null) continue
     cursor = located.end
     if (startsParagraph(characters, located.start)) {
       heads.push({ runIndex, at: located.start, run })
     }
-  })
+  }
 
   const segmentAt = (at: number): { listType: string; indentation: number } | undefined =>
     segments.find((segment) => at >= segment.start && at < segment.end)

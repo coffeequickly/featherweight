@@ -108,9 +108,9 @@ describe('planMarkers — 줄이 아니라 문단마다 붙는다', () => {
     // 한 문단이 두 줄로 접혔다 — 마커는 첫 줄에만
     const characters = '가나다라마바\n사아자'
     const runs = [
-      { text: '가나다', x: 18, fontSize: 12 },
-      { text: '라마바', x: 18, fontSize: 12 },
-      { text: '사아자', x: 18, fontSize: 12 }
+      { text: '가나다', x: 18, y: 10, fontSize: 12 },
+      { text: '라마바', x: 18, y: 20, fontSize: 12 },
+      { text: '사아자', x: 18, y: 30, fontSize: 12 }
     ]
     const plans = planMarkers(characters, [seg(0, 10, 'UNORDERED')], runs, locateRun)
     expect(plans.map((p) => p.runIndex)).toEqual([0, 2])
@@ -120,9 +120,9 @@ describe('planMarkers — 줄이 아니라 문단마다 붙는다', () => {
   it('번호 목록은 문단 순서대로 센다', () => {
     const characters = '하나\n둘\n셋'
     const runs = [
-      { text: '하나', x: 18, fontSize: 12 },
-      { text: '둘', x: 18, fontSize: 12 },
-      { text: '셋', x: 18, fontSize: 12 }
+      { text: '하나', x: 18, y: 40, fontSize: 12 },
+      { text: '둘', x: 18, y: 50, fontSize: 12 },
+      { text: '셋', x: 18, y: 60, fontSize: 12 }
     ]
     const plans = planMarkers(characters, [seg(0, 8, 'ORDERED')], runs, locateRun)
     expect(plans.map((p) => p.text)).toEqual(['1.', '2.', '3.'])
@@ -132,9 +132,9 @@ describe('planMarkers — 줄이 아니라 문단마다 붙는다', () => {
   it('중첩 단계는 제 단계에서 따로 센다', () => {
     const characters = '하나\n안하나\n둘'
     const runs = [
-      { text: '하나', x: 18, fontSize: 12 },
-      { text: '안하나', x: 36, fontSize: 12 },
-      { text: '둘', x: 18, fontSize: 12 }
+      { text: '하나', x: 18, y: 70, fontSize: 12 },
+      { text: '안하나', x: 36, y: 80, fontSize: 12 },
+      { text: '둘', x: 18, y: 90, fontSize: 12 }
     ]
     const segments = [seg(0, 3, 'ORDERED', 1), seg(3, 7, 'ORDERED', 2), seg(7, 9, 'ORDERED', 1)]
     const plans = planMarkers(characters, segments, runs, locateRun)
@@ -144,19 +144,35 @@ describe('planMarkers — 줄이 아니라 문단마다 붙는다', () => {
   it('목록이 아닌 문단은 건너뛴다', () => {
     const characters = '제목\n항목'
     const runs = [
-      { text: '제목', x: 0, fontSize: 12 },
-      { text: '항목', x: 18, fontSize: 12 }
+      { text: '제목', x: 0, y: 100, fontSize: 12 },
+      { text: '항목', x: 18, y: 110, fontSize: 12 }
     ]
     const segments = [seg(0, 3, 'NONE', 0), seg(3, 5, 'UNORDERED', 1)]
     const plans = planMarkers(characters, segments, runs, locateRun)
     expect(plans.map((p) => p.runIndex)).toEqual([1])
   })
 
+  it('스타일이 섞여 런 순서가 뒤집혀도 문단을 제대로 찾는다', () => {
+    // Figma 는 런을 읽는 순서가 아니라 스타일별로 묶어 내보낸다. 한 문단 안에 크기가
+    // 섞이면 뒤쪽 글자가 먼저 나온다 — 실측한 배열이 ["bravo…1", "…2", "Alpha "] 였다.
+    // 커서를 앞으로만 미는 매칭은 첫 문단을 놓치고 마커가 엉뚱한 줄에 붙는다.
+    const characters = 'Alpha bravo 1\nAlpha bravo 2'
+    const runs = [
+      { text: 'bravo 1', x: 40, y: 10, fontSize: 12 }, // 줄 1 의 뒷부분
+      { text: 'Alpha bravo 2', x: 18, y: 24, fontSize: 12 }, // 줄 2
+      { text: 'Alpha ', x: 18, y: 10, fontSize: 20 } // 줄 1 의 앞부분인데 맨 뒤에 왔다
+    ]
+    const plans = planMarkers(characters, [seg(0, 30, 'UNORDERED')], runs, locateRun)
+    // 두 문단이니 마커도 둘. 첫 문단의 마커는 줄 1 의 **왼쪽** 런(인덱스 2)에 붙는다
+    expect(plans.map((p) => p.runIndex).sort()).toEqual([1, 2])
+    expect(plans.find((p) => p.runIndex === 2)?.x).toBe(18 - 0.75 * 20)
+  })
+
   it('마커 x 는 그 줄의 텍스트 시작에서 잰다 — 실측 상수', () => {
     const plans = planMarkers(
       '항목',
       [seg(0, 2, 'UNORDERED')],
-      [{ text: '항목', x: 18, fontSize: 12 }],
+      [{ text: '항목', x: 18, y: 120, fontSize: 12 }],
       locateRun
     )
     expect(plans[0].edge).toBe('center')
