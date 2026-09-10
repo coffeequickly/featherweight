@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { inkWidthOf, widthMismatch } from '../src/lib/textMetrics'
+import { inkOffsets, inkWidthOf, widthMismatch } from '../src/lib/textMetrics'
 
 const glyph = (minX: number, maxX: number) => ({ bbox: { minX, maxX } })
 const at = (xAdvance: number, xOffset = 0) => ({ xAdvance, xOffset })
@@ -68,5 +68,37 @@ describe('widthMismatch', () => {
 
   it('짧은 줄은 판단하지 않는다', () => {
     expect(widthMismatch(10, 20)).toBeNull()
+  })
+})
+
+describe('inkOffsets — 마커를 펜 좌표로 옮기는 데 쓴다', () => {
+  it('좌측 베어링만큼 펜보다 오른쪽에서 잉크가 시작한다', () => {
+    // 1000upem 글리프: 베어링 100, 잉크 100~400, 진폭 500
+    const layout = {
+      glyphs: [{ bbox: { minX: 100, maxX: 400 } }],
+      positions: [{ xAdvance: 500, xOffset: 0 }]
+    }
+    expect(inkOffsets(layout, 1000, 10)).toEqual({ left: 1, right: 4 })
+  })
+
+  it('두 글자면 두 번째 글리프까지 재고, 자간도 센다', () => {
+    const layout = {
+      glyphs: [{ bbox: { minX: 0, maxX: 500 } }, { bbox: { minX: 0, maxX: 500 } }],
+      positions: [
+        { xAdvance: 500, xOffset: 0 },
+        { xAdvance: 500, xOffset: 0 }
+      ]
+    }
+    expect(inkOffsets(layout, 1000, 10, 2)).toEqual({ left: 0, right: 12 })
+  })
+
+  it('잉크가 없으면 null', () => {
+    expect(
+      inkOffsets(
+        { glyphs: [{ bbox: { minX: 0, maxX: 0 } }], positions: [{ xAdvance: 300, xOffset: 0 }] },
+        1000,
+        10
+      )
+    ).toBeNull()
   })
 })

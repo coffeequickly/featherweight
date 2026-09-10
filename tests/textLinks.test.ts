@@ -14,7 +14,9 @@ function segment(start: number, end: number, url: string | null): TextSegment {
     textDecoration: 'NONE',
     textCase: 'ORIGINAL',
     features: {},
-    hyperlink: url === null ? null : { type: 'URL', value: url }
+    hyperlink: url === null ? null : { type: 'URL', value: url },
+    listType: 'NONE',
+    indentation: 0
   }
 }
 

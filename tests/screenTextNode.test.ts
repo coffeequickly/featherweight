@@ -86,16 +86,16 @@ describe('screenTextNode — 위첨자·목록', () => {
     expect(screenTextNode(fakeText([{ openTypeFeatures: { SUPS: false } }]))).toEqual({ ok: true })
   })
 
-  it('목록(번호·불릿)이면 아웃라인으로 남긴다 — 마커를 다시 그릴 재료가 없다', () => {
-    expect(screenTextNode(fakeText([{ listOptions: { type: 'ORDERED' } }]))).toEqual({
-      ok: false,
-      reason: { code: 'reject.list' }
-    })
+  it('목록은 통과시킨다 — 마커 자리를 실측해 우리가 그린다(lib/listMarker)', () => {
+    // 0.2.0~3.0 은 여기서 막았다. 마커가 characters·SVG·잉크 경계 어디에도 없어 다시 그릴
+    // 재료가 없었기 때문인데, 프레임 래스터에서 자리를 재어 공식을 세우면서 풀었다.
+    // 실기 문서에서 이 거부 하나가 파일의 대부분을 벡터 패스로 만들고 있었다.
+    expect(screenTextNode(fakeText([{ listOptions: { type: 'ORDERED' } }]))).toEqual({ ok: true })
     expect(
       screenTextNode(
         fakeText([{ listOptions: { type: 'NONE' } }, { listOptions: { type: 'UNORDERED' } }])
       )
-    ).toEqual({ ok: false, reason: { code: 'reject.list' } })
+    ).toEqual({ ok: true })
   })
 
   it('openTypeFeatures·listOptions 가 없는 옛 API 응답도 통과한다', () => {

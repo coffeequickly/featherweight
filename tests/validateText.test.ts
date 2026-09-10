@@ -41,7 +41,9 @@ function segment(family: string, style: string): TextSegment {
     textDecoration: 'NONE',
     textCase: 'ORIGINAL',
     features: {},
-    hyperlink: null
+    hyperlink: null,
+    listType: 'NONE',
+    indentation: 0
   }
 }
 

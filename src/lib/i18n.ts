@@ -817,9 +817,10 @@ const MESSAGES = {
     en: 'Superscript or subscript is not supported',
     ko: '지원하지 않는 위첨자 또는 아래첨자'
   },
+  /** 목록은 이제 우리가 그린다 — 자리를 모르는 경우(오른쪽에서 왼쪽으로 쓰는 글)만 남았다 */
   'reject.list': {
-    en: 'Bulleted or numbered lists are not supported',
-    ko: '지원하지 않는 글머리 기호 또는 번호 목록'
+    en: 'Lists in right-to-left scripts keep their outlines',
+    ko: '오른쪽에서 왼쪽으로 쓰는 글의 목록은 아웃라인으로 남깁니다'
   },
   'reject.noBounds': {
     en: 'Text bounds could not be determined',

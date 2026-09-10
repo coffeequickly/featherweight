@@ -30,7 +30,9 @@ import { fallbackFontsFor, splitByCoverage } from '../lib/glyphFallback'
 import { isIgnorable } from '../lib/ignorable'
 import { kernAdjustments } from '../lib/kerning'
 import { needsShaping } from '../lib/shaping'
-import { LinkSpan, linkSpansForRun } from '../lib/textLinks'
+import { hasRtlListParagraph, MarkerPlan, planMarkers } from '../lib/listMarker'
+import { LinkSpan, linkSpansForRun, locateRun } from '../lib/textLinks'
+import { inkOffsets } from '../lib/textMetrics'
 import { FontRef, Reason, StoredFont, TextRunSource } from '../lib/types'
 import { createProbe, factsOf, FontProbe, pdfLibFontkit } from './fontkitAdapter'
 
@@ -161,7 +163,15 @@ export async function drawTextLayer(
   const pageHeight = page.getHeight()
 
   for (const source of sources) {
-    const runs = parseSvgText(source.svg, parse)
+    const parsed = parseSvgText(source.svg, parse)
+    // 목록 마커는 Figma 가 SVG 에 안 싣는다 — 우리가 런으로 만들어 끼운다.
+    // 여기서 끼우면 폰트 해석·글리프 커버리지·대체 폰트·임베딩이 전부 그대로 따라온다.
+    const marked = withMarkers(parsed, source)
+    if (marked.blocked !== null) {
+      result.fallbacks.push({ nodeId: source.nodeId, reason: marked.blocked })
+      continue
+    }
+    const runs = marked.runs
     if (runs.length === 0) {
       result.fallbacks.push({ nodeId: source.nodeId, reason: { code: 'reject.svgEmpty' } })
       continue
@@ -182,18 +192,16 @@ export async function drawTextLayer(
 
       const missing = resolved.covers(codePointsOf([run]))
       if (missing.length === 0) {
-        planned.push({
-          run,
-          chunks: [
-            {
-              text: run.text,
-              start: 0,
-              font: resolved.font,
-              probe: resolved.probe,
-              features: style.features
-            }
-          ]
-        })
+        const solo = [
+          {
+            text: run.text,
+            start: 0,
+            font: resolved.font,
+            probe: resolved.probe,
+            features: style.features
+          }
+        ]
+        planned.push({ run: penPlaced(run, solo), chunks: solo })
         continue
       }
 
@@ -232,7 +240,7 @@ export async function drawTextLayer(
           features: chunk.fallback ? {} : style.features
         }
       })
-      planned.push({ run, chunks })
+      planned.push({ run: penPlaced(run, chunks), chunks })
     }
 
     if (reason !== null) {
@@ -247,6 +255,9 @@ export async function drawTextLayer(
     for (const { run, chunks } of planned) {
       const positions = drawRun(page, run, source.offset, pageHeight, chunks)
       if (!options.links) continue
+      // 마커는 원문에 없는 글자다 — 링크를 찾겠다고 원문에서 뒤지면 `1.` 같은 것이 엉뚱한
+      // 자리에 맞아 커서가 앞질러 가고, 그다음 줄들의 링크가 통째로 밀린다
+      if (markerAnchorOf(run) !== undefined) continue
       const { spans, next } = linkSpansForRun(source.characters, cursor, run.text, source.segments)
       cursor = next
       for (const span of spans) addLink(page, run, source.offset, pageHeight, positions, span)
@@ -497,4 +508,86 @@ function showKerned(
     if (adjustment !== undefined && adjustment !== 0) array.push(PDFNumber.of(adjustment))
   })
   return PDFOperator.of(PDFOperatorNames.ShowTextAdjusted, [array])
+}
+
+/**
+ * 마커 런의 x 를 잉크 기준에서 펜 기준으로 옮긴다.
+ *
+ * 실측한 자리는 잉크의 끝이고 그리는 쪽은 펜 시작점을 받는다. 그 사이가 좌측 베어링인데
+ * 글리프마다 달라서 폰트가 정해진 다음에야 뺄 수 있다. 글머리는 왼쪽 끝을, 번호는
+ * 오른쪽 끝을 맞춘다 — 번호는 자릿수에 따라 폭이 변하므로 왼쪽을 고정하면 두 자리부터
+ * 텍스트를 밀고 들어온다. 잉크를 못 재면(글리프가 없거나 빈 글자) 자리를 그대로 둔다.
+ */
+function penPlaced(run: SvgRun, chunks: readonly DrawChunk[]): SvgRun {
+  const anchor = markerAnchorOf(run)
+  if (anchor === undefined) return run
+  // **그 글자를 실제로 그리는** 폰트로 재야 한다. 주 폰트로 재면 안 된다 — 한글 서체에는
+  // 가운뎃점(U+2022)이 없는 일이 흔해서 마커가 대체 폰트로 떨어지는데, 그때 주 폰트로
+  // 재면 글리프가 없어 잉크가 null 이 되고 보정이 통째로 건너뛰어진다. 실기에서 SUIT +
+  // Inter 대체가 정확히 그 경우였고, 마커가 Inter 의 좌측 베어링만큼(0.72pt) 밀렸다.
+  const probe = chunks[0]?.probe
+  if (probe === undefined) return run
+  let ink = null
+  try {
+    ink = inkOffsets(probe.layout(run.text), probe.unitsPerEm, run.fontSize, run.letterSpacing)
+  } catch {
+    ink = null
+  }
+  if (ink === null) return run
+  // 글머리는 잉크의 가운데를, 번호는 오른쪽 끝을 anchor 에 맞춘다
+  const at = anchor.edge === 'center' ? (ink.left + ink.right) / 2 : ink.right
+  return { ...run, x: anchor.x - at }
+}
+
+/** 마커 런은 잉크 기준 자리를 달고 다닌다 — 펜 좌표는 폰트가 정해진 뒤에야 알 수 있다 */
+type MarkerAnchor = { edge: 'center' | 'right'; x: number }
+
+/** 이 런이 우리가 만든 마커인가 */
+function markerAnchorOf(run: SvgRun): MarkerAnchor | undefined {
+  return (run as SvgRun & { markerAnchor?: MarkerAnchor }).markerAnchor
+}
+
+/**
+ * 문단마다 마커 런을 하나씩 만들어 원래 런들 앞에 끼운다.
+ *
+ * 마커의 x 는 아직 정하지 못한다. 실측한 자리는 **잉크** 기준인데(픽셀을 훑어 잰 값이라
+ * 그럴 수밖에 없다) 그리는 쪽은 펜 시작점을 받고, 그 사이의 좌측 베어링은 글리프마다
+ * 다르기 때문이다. 폰트가 정해지는 계획 단계에서 채운다.
+ */
+function withMarkers(
+  runs: readonly SvgRun[],
+  source: TextRunSource
+): { runs: SvgRun[]; blocked: Reason | null } {
+  // 오른쪽에서 왼쪽으로 쓰는 글은 마커가 반대쪽에 붙는데 자리를 아직 모른다 —
+  // 잘못 그리느니 예전처럼 통째로 아웃라인으로 남긴다.
+  //
+  // 계획이 섰는지와 무관하게 먼저 본다. run 과 원문이 안 맞아 계획이 비는 경우가 있는데
+  // (대소문자 변환·묶음문자 등) 그때도 목록인 것은 사실이라 그냥 통과시키면 마커가
+  // 통째로 사라진다. 목록 문단만 본다 — 목록 아닌 아랍어 본문은 그대로 그린다.
+  if (hasRtlListParagraph(source.characters, source.segments)) {
+    return { runs: [...runs], blocked: { code: 'reject.list' } }
+  }
+
+  const plans: MarkerPlan[] = planMarkers(source.characters, source.segments, runs, locateRun)
+  if (plans.length === 0) return { runs: [...runs], blocked: null }
+
+  const out: SvgRun[] = []
+  const byRun = new Map<number, MarkerPlan>()
+  for (const plan of plans) byRun.set(plan.runIndex, plan)
+
+  runs.forEach((run, index) => {
+    const plan = byRun.get(index)
+    if (plan !== undefined) {
+      out.push({
+        ...run,
+        text: plan.text,
+        // 잉크가 앉을 자리. 펜 좌표는 계획 단계에서 이 값으로부터 되민다
+        x: plan.x,
+        markerAnchor: { edge: plan.edge, x: plan.x },
+        gaps: undefined
+      } as SvgRun)
+    }
+    out.push(run)
+  })
+  return { runs: out, blocked: null }
 }

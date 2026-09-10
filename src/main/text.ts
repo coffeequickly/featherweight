@@ -74,14 +74,13 @@ export function screenTextNode(
   // 있는 글자와 없는 글자가 섞이면 전부 합성으로 통일한다. 우리는 OpenType sups/subs 를 켜서
   // 그릴 뿐이라 숫자는 폰트의 위첨자 글리프, 쉼표는 본문 크기 기준선으로 남았다(사용자 제보).
   // 그 규칙을 흉내 내기 전까지는 원래 모양(아웃라인)으로 둔다.
-  // 목록: 번호·불릿은 characters 에도 SVG export 에도 없어 다시 그릴 재료가 없다 — 숨기면 사라진다.
-  for (const segment of node.getStyledTextSegments(['openTypeFeatures', 'listOptions'])) {
+  //
+  // 목록은 이제 우리가 그린다. 마커가 characters 에도 SVG 에도 없는 것은 그대로지만,
+  // 자리를 실측해 공식을 세웠다(lib/listMarker). 어긋나면 그리는 쪽에서 물러선다.
+  for (const segment of node.getStyledTextSegments(['openTypeFeatures'])) {
     const features = (segment.openTypeFeatures ?? {}) as Partial<Record<string, boolean>>
     if (features.SUPS === true || features.SUBS === true) {
       return { ok: false, reason: { code: 'reject.superscript' } }
-    }
-    if (segment.listOptions !== undefined && segment.listOptions.type !== 'NONE') {
-      return { ok: false, reason: { code: 'reject.list' } }
     }
   }
 
@@ -176,7 +175,9 @@ export async function extractText(
         'textDecoration',
         'textCase',
         'hyperlink',
-        'openTypeFeatures'
+        'openTypeFeatures',
+        'listOptions',
+        'indentation'
       ])
       .map((segment): TextSegment => ({
         start: segment.start,
@@ -194,6 +195,8 @@ export async function extractText(
           value: segment.letterSpacing.value
         },
         textDecoration: String(segment.textDecoration),
+        listType: segment.listOptions?.type ?? 'NONE',
+        indentation: segment.indentation ?? 0,
         textCase: String(segment.textCase),
         hyperlink:
           segment.hyperlink !== null && segment.hyperlink.type === 'URL'
