@@ -129,6 +129,13 @@ export type TextSegment = {
    * Figma 가 기본으로 켜 두는데 사용자가 끌 수 있다 — 끈 것도 따라야 같은 모양이 나온다
    */
   features: Record<string, boolean>
+  /**
+   * 글머리·번호 목록. Figma 는 마커를 어디로도 주지 않아서(lib/listMarker 참고)
+   * 이 두 값으로 우리가 만들어 그린다. 목록이 아니면 'NONE' 과 0 이다.
+   */
+  listType: 'ORDERED' | 'UNORDERED' | 'NONE'
+  /** 들여쓰기 단계(1 부터). 텍스트 시작이 이만큼 밀린다 */
+  indentation: number
 }
 
 export type TextRunSource = {

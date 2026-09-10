@@ -41,6 +41,37 @@ export function inkWidthOf(
   return maxX > minX ? maxX - minX : null
 }
 
+/**
+ * 펜 시작점에서 잉크의 좌우 끝까지의 거리(pt).
+ *
+ * 목록 마커를 놓는 데 쓴다. 실측으로 얻은 마커 자리는 **잉크** 기준인데(픽셀을 훑어 잰
+ * 값이라 그럴 수밖에 없다) 그리는 쪽은 펜 시작점을 받는다 — 그 사이를 글리프의 좌측
+ * 베어링이 메운다. 잉크가 없으면(공백뿐) null.
+ */
+export function inkOffsets(
+  layout: LayoutLike,
+  unitsPerEm: number,
+  size: number,
+  letterSpacing = 0
+): { left: number; right: number } | null {
+  const scale = size / unitsPerEm
+  let pen = 0
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+
+  layout.glyphs.forEach((glyph, index) => {
+    const position = layout.positions[index]
+    if (position === undefined) return
+    if (glyph.bbox.maxX > glyph.bbox.minX) {
+      minX = Math.min(minX, pen + (position.xOffset + glyph.bbox.minX) * scale)
+      maxX = Math.max(maxX, pen + (position.xOffset + glyph.bbox.maxX) * scale)
+    }
+    pen += position.xAdvance * scale + letterSpacing
+  })
+
+  return maxX > minX ? { left: minX, right: maxX } : null
+}
+
 /** 폭 대조 허용치 — 이 안이면 같은 판으로 본다. 렌더 경계의 반올림·힌팅 차이를 덮을 만큼만 */
 export const WIDTH_TOLERANCE = { ratio: 0.025, absolute: 1.5 }
 /** 이보다 짧은 줄은 오차가 커서 근거로 삼지 않는다 (pt) */

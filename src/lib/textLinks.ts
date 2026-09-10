@@ -15,7 +15,7 @@ import { TextSegment } from './types'
 export type LinkSpan = { start: number; end: number; url: string }
 
 /** 원문에서 run 의 글자가 시작·끝나는 자리(원문 인덱스). 원문의 무시 문자는 건너뛴다. */
-function locate(
+export function locateRun(
   characters: string,
   cursor: number,
   runText: string
@@ -46,7 +46,7 @@ export function linkSpansForRun(
   segments: readonly TextSegment[]
 ): { spans: LinkSpan[]; next: number } {
   if (runText === '') return { spans: [], next: cursor }
-  const located = locate(characters, cursor, runText)
+  const located = locateRun(characters, cursor, runText)
   if (located === null) return { spans: [], next: cursor }
   const { start: at, end: runEnd } = located
 
