@@ -51,18 +51,24 @@ export function probeItemsFrom(
   return items
 }
 
-/** 인코딩 결과 하나. `original` 은 줄여도 안 작아져 원본을 쓰기로 한 것(keepsOriginal) */
-export type Encoded = { bytes: number; mime: string }
+/**
+ * 인코딩 결과 하나. `bytes` 는 우리가 만든 파일 크기 — 원본을 그대로 둘지, 조각을 쓸지는 export 가
+ * 이걸로 정하므로 예측도 같은 값으로 정한다. `sized` 는 그 파일이 PDF 안에서 차지할 크기(Figma 가
+ * 다시 인코딩한 뒤, resize.figmaSizeOf) — 더할 때는 이걸 쓴다. 없으면 bytes 그대로
+ */
+export type Encoded = { bytes: number; mime: string; sized?: number }
 
 /** UI 가 인코딩해 둔 것을 찾아 주는 창구. 없으면(캐시에 없거나 실패) null */
 export type EncodedLookup = {
-  whole: (imageHash: string, targetLongEdge: number) => Encoded | 'original' | null
+  whole: (imageHash: string, targetLongEdge: number) => Encoded | null
   piece: (imageHash: string, crop: CropRect, targetLongEdge: number) => Encoded | null
+  /** 원본을 그대로 둘 때 PDF 안에서 차지할 크기. 못 쟀으면 null — 원본 파일 크기로 센다 */
+  original: (imageHash: string) => number | null
 }
 
 export type ProbeTally = {
   totalBytes: number
-  /** 우리가 만든 JPEG — PDF 에 그대로(DCT) 실린다 */
+  /** JPEG 로 실리는 몫 */
   jpegBytes: number
   /** 캐시에 없어 재보지 못한 항목 — 원본 크기로 셌다 */
   failed: number
@@ -81,8 +87,13 @@ export function tallyProbe(items: readonly ImageProbeItem[], lookup: EncodedLook
   const tally: ProbeTally = { totalBytes: 0, jpegBytes: 0, failed: 0, cropped: 0, recovered: 0 }
 
   for (const item of items) {
-    if (item.skip || item.originalBytes <= KEEP_BYTES_FLOOR) {
+    if (item.originalBytes <= KEEP_BYTES_FLOOR) {
       tally.totalBytes += item.originalBytes
+      continue
+    }
+    // 줄일 필요가 없어 원본 그대로 가는 자리 — Figma 는 그것도 다시 인코딩하므로 그 크기로
+    if (item.skip) {
+      tally.totalBytes += lookup.original(item.imageHash) ?? item.originalBytes
       continue
     }
     const whole = lookup.whole(item.imageHash, item.targetLongEdge)
@@ -91,8 +102,9 @@ export function tallyProbe(items: readonly ImageProbeItem[], lookup: EncodedLook
       tally.failed += 1
       continue
     }
-    if (whole === 'original' || keepsOriginal(item.originalBytes, whole.bytes)) {
-      tally.totalBytes += item.originalBytes
+    // 줄여도 안 작아지면 export 는 원본을 그대로 넣는다 — Figma 는 그것도 다시 인코딩하므로 그 크기로
+    if (keepsOriginal(item.originalBytes, whole.bytes)) {
+      tally.totalBytes += lookup.original(item.imageHash) ?? item.originalBytes
       continue
     }
 
@@ -113,8 +125,9 @@ export function tallyProbe(items: readonly ImageProbeItem[], lookup: EncodedLook
       }
     }
     for (const piece of chosen) {
-      tally.totalBytes += piece.bytes
-      if (piece.mime === 'image/jpeg') tally.jpegBytes += piece.bytes
+      const bytes = piece.sized ?? piece.bytes
+      tally.totalBytes += bytes
+      if (piece.mime === 'image/jpeg') tally.jpegBytes += bytes
     }
   }
 

@@ -79,11 +79,16 @@ const item = (extra: Partial<ImageProbeItem> = {}): ImageProbeItem => ({
   ...extra
 })
 const lookup = (
-  wholeBytes: Encoded | 'original' | null,
-  pieceBytes: Array<Encoded | null>
+  wholeBytes: Encoded | null,
+  pieceBytes: Array<Encoded | null>,
+  sizedOriginal: number | null = null
 ): EncodedLookup => {
   let at = 0
-  return { whole: () => wholeBytes, piece: () => pieceBytes[at++] ?? null }
+  return {
+    whole: () => wholeBytes,
+    piece: () => pieceBytes[at++] ?? null,
+    original: () => sizedOriginal
+  }
 }
 
 describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
@@ -151,11 +156,56 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
       failed: 1
     })
     expect(
-      tallyProbe([item({ pieces })], lookup('original', [{ bytes: 1, mime: 'image/jpeg' }]))
-    ).toMatchObject({ totalBytes: 3_000_000, cropped: 0 })
-    expect(
       tallyProbe([item({ pieces })], lookup({ bytes: 3_000_000, mime: 'image/jpeg' }, []))
     ).toMatchObject({ totalBytes: 3_000_000, cropped: 0 })
+  })
+
+  it('원본을 그대로 두는 자리는 원본이 PDF 안에서 차지할 크기(original)로 — 못 쟀으면 원본 파일 크기', () => {
+    // 줄일 필요가 없는 것(skip)
+    expect(tallyProbe([item({ skip: true })], lookup(null, [], 1_100_000))).toMatchObject({
+      totalBytes: 1_100_000,
+      failed: 0
+    })
+    expect(tallyProbe([item({ skip: true })], lookup(null, [], null))).toMatchObject({
+      totalBytes: 3_000_000,
+      failed: 0
+    })
+    // 아주 작은 것은 재지 않는다 — 원본 크기 그대로
+    expect(
+      tallyProbe([item({ skip: true, originalBytes: KEEP_BYTES_FLOOR })], lookup(null, [], 1))
+    ).toMatchObject({ totalBytes: KEEP_BYTES_FLOOR })
+    // 줄여도 안 작아지는 것
+    const notSmaller: Encoded = { bytes: 3_000_000, mime: 'image/jpeg', sized: 2_000_000 }
+    expect(tallyProbe([item()], lookup(notSmaller, [], 1_100_000))).toMatchObject({
+      totalBytes: 1_100_000,
+      jpegBytes: 0
+    })
+    expect(tallyProbe([item()], lookup(notSmaller, [], null))).toMatchObject({
+      totalBytes: 3_000_000
+    })
+  })
+
+  it('정하기는 우리 바이트(bytes)로, 더하기는 Figma 가 다시 인코딩한 크기(sized)로', () => {
+    // 줄인 것이 원본보다 작으니 쓴다 — 더하는 값은 sized
+    const whole: Encoded = { bytes: 2_900_000, mime: 'image/jpeg', sized: 1_500_000 }
+    expect(tallyProbe([item()], lookup(whole, [], 1_100_000))).toMatchObject({
+      totalBytes: 1_500_000,
+      jpegBytes: 1_500_000
+    })
+    // 조각 채택도 bytes 끼리 비교(export 와 같다) — 더할 때는 조각의 sized
+    const w: Encoded = { bytes: 500_000, mime: 'image/jpeg', sized: 480_000 }
+    const piece: Encoded = { bytes: 300_000, mime: 'image/jpeg', sized: 250_000 }
+    expect(
+      tallyProbe(
+        [item({ pieces: [{ targetLongEdge: 640, crop: rect }], densityGain: 1 })],
+        lookup(w, [piece])
+      )
+    ).toMatchObject({ totalBytes: 250_000, jpegBytes: 250_000, cropped: 1 })
+    // sized 가 없으면 bytes 그대로
+    expect(tallyProbe([item()], lookup({ bytes: 700_000, mime: 'image/png' }, []))).toMatchObject({
+      totalBytes: 700_000,
+      jpegBytes: 0
+    })
   })
 
   it('같은 원본을 쪽마다 다르게 쓰면 쪽마다 따로 — 한 쪽은 조각, 한 쪽은 W₀', () => {
@@ -258,7 +308,8 @@ describe('같은 조각 계획이라도 채택은 칸마다 다르다 — 절감
   })
   const lookup = (wholeBytes: number, pieceBytes: number): EncodedLookup => ({
     whole: () => ({ bytes: wholeBytes, mime: 'image/jpeg' }),
-    piece: () => ({ bytes: pieceBytes, mime: 'image/jpeg' })
+    piece: () => ({ bytes: pieceBytes, mime: 'image/jpeg' }),
+    original: () => null
   })
 
   it('기준: 전체본 1,000,000 · 조각 970,000(3%) → 전체본. 한 칸 위: 1,200,000 · 980,000(18%) → 조각 — 더 선명한데 더 작다', () => {

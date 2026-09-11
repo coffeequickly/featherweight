@@ -8,7 +8,7 @@
 // 오래 안 쓴 것부터 버린다. export 가 끝나면 즉시 비운다.
 
 import { Encoded, ProbeTally, tallyProbe } from '../lib/imageProbe'
-import { KEEP_BYTES_FLOOR } from '../lib/imageTarget'
+import { KEEP_BYTES_FLOOR, keepsOriginal } from '../lib/imageTarget'
 import { CropRect, ImageProbeItem } from '../lib/types'
 import { cloneBitmap, decodeImage, encodePiece, figmaSizeOf, isPng, resizeDecoded } from './resize'
 
@@ -16,6 +16,8 @@ import { cloneBitmap, decodeImage, encodePiece, figmaSizeOf, isPng, resizeDecode
 const MAX_CACHE_BYTES = 200 * 1024 * 1024
 
 const originals = new Map<string, Uint8Array>()
+// 원본을 그대로 넣을 때 PDF 안에서 차지할 크기 — 한 번 재면 실행 내내 같다
+const sizedOriginals = new Map<string, number>()
 let cachedBytes = 0
 
 export function rememberOriginal(imageHash: string, bytes: Uint8Array): void {
@@ -32,12 +34,14 @@ export function rememberOriginal(imageHash: string, bytes: Uint8Array): void {
     if (oldest.done === true) break
     const dropped = originals.get(oldest.value)
     originals.delete(oldest.value)
+    sizedOriginals.delete(oldest.value)
     cachedBytes -= dropped === undefined ? 0 : dropped.length
   }
 }
 
 export function forgetOriginals(): void {
   originals.clear()
+  sizedOriginals.clear()
   cachedBytes = 0
 }
 
@@ -68,8 +72,14 @@ export async function probeImageBytes(
   // 1) 원본마다 무엇을 만들어야 하는지 모은다
   type Want = { targets: Set<number>; pieces: Map<string, { crop: CropRect; target: number }> }
   const wants = new Map<string, Want>()
+  // 줄이지 않고 원본 그대로 가는 것 — 인코딩은 없지만 PDF 안에서 차지할 크기는 재야 한다
+  const kept = new Set<string>()
   for (const item of items) {
-    if (item.skip || item.originalBytes <= KEEP_BYTES_FLOOR) continue
+    if (item.originalBytes <= KEEP_BYTES_FLOOR) continue
+    if (item.skip) {
+      kept.add(item.imageHash)
+      continue
+    }
     const want = wants.get(item.imageHash) ?? { targets: new Set(), pieces: new Map() }
     want.targets.add(item.targetLongEdge)
     for (const piece of item.pieces ?? []) {
@@ -81,8 +91,16 @@ export async function probeImageBytes(
     wants.set(item.imageHash, want)
   }
 
-  // 2) 원본마다 한 번 디코드해 전부 인코딩한다. 실패는 항목 단위로 null — 집계가 알아서 물러선다
-  const wholes = new Map<string, Encoded | 'original' | null>()
+  // 2) 원본 그대로 가는 것은 그 크기만 잰다 — 한 번 재면 실행 내내 같다(sizedOriginals)
+  for (const imageHash of kept) {
+    if (sizedOriginals.has(imageHash)) continue
+    const original = originals.get(imageHash)
+    if (original === undefined) continue // 캐시에 없다 — lookup 이 null 을 주고 원본 크기로 센다
+    sizedOriginals.set(imageHash, await figmaSizeOf(original))
+  }
+
+  // 3) 원본마다 한 번 디코드해 전부 인코딩한다. 실패는 항목 단위로 null — 집계가 알아서 물러선다
+  const wholes = new Map<string, Encoded | null>()
   const pieces = new Map<string, Encoded | null>()
   for (const [imageHash, want] of wants) {
     const original = originals.get(imageHash)
@@ -108,8 +126,12 @@ export async function probeImageBytes(
             reencodeOpaquePng,
             quality
           )
-          // 재는 값은 우리 바이트가 아니라 Figma 가 다시 인코딩한 뒤의 크기
-          pieces.set(`${imageHash}|${key}`, { bytes: await figmaSizeOf(out.bytes), mime: out.mime })
+          // 더하는 값은 우리 바이트가 아니라 Figma 가 다시 인코딩한 뒤의 크기(sized)
+          pieces.set(`${imageHash}|${key}`, {
+            bytes: out.bytes.length,
+            mime: out.mime,
+            sized: await figmaSizeOf(out.bytes)
+          })
         } catch {
           pieces.set(`${imageHash}|${key}`, null)
         }
@@ -129,9 +151,21 @@ export async function probeImageBytes(
             quality,
             reencodeOpaquePng
           )
-          if (!result.ok) wholes.set(key, null)
-          // 손대지 않은 원본도 Figma 는 다시 인코딩한다 — 원본 파일 크기가 아니라 그 크기로 센다
-          else wholes.set(key, { bytes: await figmaSizeOf(result.bytes), mime: result.mime })
+          if (!result.ok) {
+            wholes.set(key, null)
+            continue
+          }
+          // 원본을 그대로 넣게 되는 자리(안 줄였거나, 줄여도 안 작아졌다)는 원본이 PDF 안에서
+          // 차지할 크기가 필요하다 — Figma 는 손대지 않은 원본도 다시 인코딩한다
+          const keeps = !result.changed || keepsOriginal(original.length, result.bytes.length)
+          if (keeps && !sizedOriginals.has(imageHash)) {
+            sizedOriginals.set(imageHash, await figmaSizeOf(original))
+          }
+          wholes.set(key, {
+            bytes: result.bytes.length,
+            mime: result.mime,
+            sized: keeps ? sizedOriginals.get(imageHash) : await figmaSizeOf(result.bytes)
+          })
         } catch {
           wholes.set(key, null)
         }
@@ -141,10 +175,17 @@ export async function probeImageBytes(
     }
   }
 
-  // 3) export 와 같은 규칙으로 더한다
-  return tallyProbe(items, {
+  // 4) export 와 같은 규칙으로 더한다
+  const tally = tallyProbe(items, {
     whole: (imageHash, targetLongEdge) => wholes.get(`${imageHash}|${targetLongEdge}`) ?? null,
     piece: (imageHash, crop, targetLongEdge) =>
-      pieces.get(`${imageHash}|${pieceKeyOf(crop, targetLongEdge)}`) ?? null
+      pieces.get(`${imageHash}|${pieceKeyOf(crop, targetLongEdge)}`) ?? null,
+    original: (imageHash) => sizedOriginals.get(imageHash) ?? null
   })
+  // 후보 하나가 어떻게 더해졌는지는 여기서만 볼 수 있다(플러그인 콘솔)
+  console.log(
+    `[probe] q${quality} items ${items.length} (originals ${wants.size}) → ${tally.totalBytes} B` +
+      ` cropped ${tally.cropped} failed ${tally.failed} recovered ${tally.recovered}`
+  )
+  return tally
 }
