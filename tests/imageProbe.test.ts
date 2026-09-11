@@ -246,3 +246,29 @@ describe('조각 관문은 사다리 칸마다 다르다 — 목표 용량 탐�
     expect(sharper[0].pieces).toHaveLength(6)
   })
 })
+
+describe('같은 조각 계획이라도 채택은 칸마다 다르다 — 절감률 문턱(검토 재현, 실측 아님)', () => {
+  const item = (target: number, pieceTarget: number): ImageProbeItem => ({
+    imageHash: 'photo',
+    targetLongEdge: target,
+    skip: false,
+    originalBytes: 3_000_000,
+    pieces: [{ crop: { x0: 0, y0: 0, w: 1000, h: 1000 }, targetLongEdge: pieceTarget }],
+    densityGain: 1.2
+  })
+  const lookup = (wholeBytes: number, pieceBytes: number): EncodedLookup => ({
+    whole: () => ({ bytes: wholeBytes, mime: 'image/jpeg' }),
+    piece: () => ({ bytes: pieceBytes, mime: 'image/jpeg' })
+  })
+
+  it('기준: 전체본 1,000,000 · 조각 970,000(3%) → 전체본. 한 칸 위: 1,200,000 · 980,000(18%) → 조각 — 더 선명한데 더 작다', () => {
+    expect(tallyProbe([item(2048, 1024)], lookup(1_000_000, 970_000))).toMatchObject({
+      totalBytes: 1_000_000,
+      cropped: 0
+    })
+    expect(tallyProbe([item(2560, 1050)], lookup(1_200_000, 980_000))).toMatchObject({
+      totalBytes: 980_000,
+      cropped: 1
+    })
+  })
+})

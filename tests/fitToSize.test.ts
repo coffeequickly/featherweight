@@ -7,7 +7,7 @@ import {
   chooseProfile,
   clampTargetMb,
   fixedBytes,
-  hasNewCrops,
+  probeOrder,
   MAX_QUALITY,
   MIN_MIN_EDGE,
   MAX_TARGET_MB,
@@ -287,12 +287,23 @@ describe('PROFILE_LADDER 의 하한', () => {
   })
 })
 
-describe('hasNewCrops — 기준이 목표를 넘어도 재봐야 하는 더 선명한 칸', () => {
-  it('기준에 없던 "쪽|해시" 조각 계획이 하나라도 붙으면 참, 부분집합이면 거짓', () => {
-    const baseline = new Set(['p1|a', 'p2|b'])
-    expect(hasNewCrops(new Set(['p1|a', 'p2|b', 'p3|c']), baseline)).toBe(true)
-    expect(hasNewCrops(new Set(['p1|a']), baseline)).toBe(false)
-    expect(hasNewCrops(new Set(), baseline)).toBe(false)
-    expect(hasNewCrops(new Set(['p1|a']), new Set())).toBe(true)
+describe('probeOrder — 잘라 넣기가 켜져 있으면 기준이 목표를 넘어도 더 선명한 칸을 재본다', () => {
+  it('기준 안이면 선명한 쪽만, 넘으면 센 쪽만 — 잘라 넣기 켬이면 선명한 쪽을 앞에 세운다', () => {
+    expect(probeOrder(BASELINE_INDEX, true, false)).toEqual([0, 1, 2])
+    expect(probeOrder(BASELINE_INDEX, true, true)).toEqual([0, 1, 2])
+    expect(probeOrder(BASELINE_INDEX, false, false)).toEqual([4, 5, 6, 7])
+    expect(probeOrder(BASELINE_INDEX, false, true)).toEqual([0, 1, 2, 4, 5, 6, 7])
+  })
+
+  it('같은 계획·다른 채택 — 기준은 절감 부족으로 전체본 1,000KB, 한 칸 위는 조각 980KB. 목표 990KB 면 위 칸이 답이다', () => {
+    const KB = 1000
+    // 재본 값(검토 재현 — 실측 아님). 기준(3번 칸)은 1,000KB
+    const probes: Probe[] = [
+      { profile: PROFILE_LADDER[2], bytes: { total: 980 * KB, jpeg: 980 * KB } },
+      { profile: PROFILE_LADDER[4], bytes: { total: 900 * KB, jpeg: 900 * KB } }
+    ]
+    const outcome = chooseProfile(probes, 0, 990 * KB, { total: 1000 * KB, jpeg: 1000 * KB })
+    expect(outcome.kind).toBe('fits')
+    if (outcome.kind === 'fits') expect(sharpnessOrder(outcome.profile, PROFILE_LADDER[2])).toBe(0)
   })
 })

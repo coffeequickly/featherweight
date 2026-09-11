@@ -221,22 +221,6 @@ export function chooseProfile(
  *
  * 두 경우 다 좋은 쪽부터 재고, 처음 목표 안에 드는 것에서 멈추면 된다.
  */
-/**
- * 후보 프로필에 기준에는 없던 조각 계획이 붙었는가. 키는 "쪽|해시".
- *
- * 기준이 목표를 넘으면 더 선명한 칸은 볼 이유가 없다는 전제는 조각 계획이 같을 때만 참이다 —
- * 조각 관문(픽셀 합 ≤ W₀ 픽셀, 목표 ≥ 원본이면 안 함)은 칸마다 달라서, 2048 에서는 관문에 걸려
- * 통째였던 원본이 2560 에서는 조각으로 바뀌어 더 선명하면서 더 작을 수 있다(검토 재현: 4096²
- * 원본에 25% 창 여섯). 그런 칸만 골라 재본다. 계획이 같은 칸은 픽셀도 품질도 기준 이상이라 크다.
- */
-export function hasNewCrops(
-  candidate: ReadonlySet<string>,
-  baseline: ReadonlySet<string>
-): boolean {
-  for (const key of candidate) if (!baseline.has(key)) return true
-  return false
-}
-
 export function candidateIndices(
   baselineIndex: number,
   direction: 'sharper' | 'smaller'
@@ -264,4 +248,24 @@ export function clampTargetMb(value: number): number {
   if (!Number.isFinite(value)) return 5
   const rounded = Math.round(value * 10) / 10
   return Math.min(MAX_TARGET_MB, Math.max(MIN_TARGET_MB, rounded))
+}
+
+/**
+ * 재볼 칸의 순서(좋음 → 작음). 처음 목표에 드는 칸에서 멈추면 그게 가장 선명한 답이다.
+ *
+ * - 기준이 목표 안이면 더 선명한 쪽만 — 남은 예산을 화질로 쓴다.
+ * - 넘으면 더 센 쪽만. 단 잘라 넣기가 켜져 있으면 더 선명한 쪽도 앞에 세운다 — 조각 채택은 계획이
+ *   아니라 인코딩 뒤 절감률(chooseCrop)로 정해져 칸마다 다르다. 같은 계획이라도 기준은 절감 3% 로
+ *   전체본(1,000KB), 한 칸 위는 절감 18% 로 조각(980KB)일 수 있어 더 선명한데 더 작다(검토 재현).
+ *   "계획이 새로 붙는 칸만" 으로 거르는 것은 근거가 안 된다 — 생략하려면 그 칸이 목표에 못 드는
+ *   하한이 필요한데 계획만으로는 그런 하한이 없다. 값은 UI 인코딩 최대 세 번이다.
+ */
+export function probeOrder(
+  baselineIndex: number,
+  baselineFits: boolean,
+  cropToVisible: boolean
+): number[] {
+  if (baselineFits) return candidateIndices(baselineIndex, 'sharper')
+  const smaller = candidateIndices(baselineIndex, 'smaller')
+  return cropToVisible ? [...candidateIndices(baselineIndex, 'sharper'), ...smaller] : smaller
 }
