@@ -46,6 +46,11 @@ export type Settings = {
   keepLinks: boolean
   /** 폰트에 없는 글자를 대체 폰트(Inter → Pretendard)로 그린다. 끄면 그 텍스트는 아웃라인 */
   glyphFallback: boolean
+  /**
+   * 보이는 창만 잘라 넣기 (docs/IMAGE-CROP.md). 끄면 예전처럼 이미지를 통째로 줄인다 —
+   * 내보내기와 목표 용량 예측이 같이 꺼진다. 첫 배포의 도망갈 길.
+   */
+  cropToVisible: boolean
   /** 목표 용량에 맞춰 압축을 자동으로 고른다 (docs/FIT-TO-SIZE.md) */
   fitToSize: boolean
   fitTargetMb: number
@@ -64,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   embedText: true,
   keepLinks: true,
   glyphFallback: true,
+  cropToVisible: true,
   fitToSize: false,
   fitTargetMb: 5
 }
@@ -212,6 +218,10 @@ export type StoredFont = FontRef & {
 
 export type PartStats = {
   imagesProcessed: number
+  /** 그중 보이는 창만 잘라 넣은 원본 수 — 품질을 지키고도 바이트가 줄 때만 (lib/imageCrop.ts) */
+  imagesCropped: number
+  /** 조각을 만들다 실패해 기존 방식(W₀)으로 물러선 원본 수 — 출력은 정상 */
+  imagesRecovered: number
   /** 우리가 만든 JPEG 출력 바이트 — PDF 에 그대로(DCT) 실린다. 나머지는 Figma 가 다시 넣는다 */
   bytesJpeg: number
   /** 이 쪽의 서로 다른 이미지 해시. 쪽마다 합쳐 "이미지 N장" 을 체크리스트와 같은 기준으로 센다 */
@@ -229,6 +239,7 @@ export type PartStats = {
 // create-figma-plugin 의 emit/on 용 핸들러 시그니처.
 // (타입만 가져온다 — lib 은 런타임 의존을 갖지 않는다.)
 import type { EventHandler } from '@create-figma-plugin/utilities'
+import type { Transform } from './imageTarget'
 
 export interface UiReadyHandler extends EventHandler {
   name: 'ui:ready'
@@ -302,12 +313,23 @@ export type ImageUsage = {
   /** 노드의 표시 크기 (px) */
   width: number
   height: number
+  /** FILL의 창 계산용 로컬 상자. 화면 배율을 적용한 width/height와 구분한다. */
+  localSize?: { width: number; height: number }
   scaleMode: 'FILL' | 'FIT' | 'CROP' | 'TILE'
   /**
    * CROP 일 때 원본의 몇 분의 몇이 이 자리에 보이는가(축별, 0~1).
    * 없으면 온전히 보이는 것으로 본다.
    */
   crop?: { x: number; y: number }
+  /**
+   * 이 fill 이 노드의 몇 번째인가 — 조각으로 갈아끼울 때 자리를 집는 데 쓴다.
+   * 선택 시점 예고에는 없어도 되므로 선택이다.
+   */
+  fillIndex?: number
+  /** CROP 의 imageTransform 그대로 — 창을 자르고 T′ 를 만들려면 비뿐 아니라 원점이 필요하다 */
+  cropTransform?: Transform
+  /** FILL·FIT 의 회전(도). 0 이 아니면 창이 축에 나란하지 않아 잘라 넣지 않는다 */
+  paintRotation?: number
   /**
    * 클립 안에 남는 넓이의 비(0~1). 1 이면 온전히 보인다.
    *
@@ -469,6 +491,9 @@ export interface NoticeHandler extends EventHandler {
   handler: (payload: { message: string; error: boolean }) => void
 }
 
+/** 원본 안에서 잘라 낼 정수 사각형(px) */
+export type CropRect = { x0: number; y0: number; w: number; h: number }
+
 export type ResizeRequestPayload = {
   reqId: string
   bytes: Uint8Array
@@ -499,6 +524,33 @@ export type ResizeResultPayload =
 export interface ImageResizeResultHandler extends EventHandler {
   name: 'image:resize:result'
   handler: (payload: ResizeResultPayload) => void
+}
+
+/** 한 원본에서 조각 여럿 — UI 가 한 번만 디코드하고 job 마다 자르고 줄이고 인코딩한다 */
+export type ResizeManyRequestPayload = {
+  reqId: string
+  bytes: Uint8Array
+  quality: number
+  reencodeOpaquePng: boolean
+  jobs: Array<{ targetLongEdge: number; crop: CropRect }>
+}
+
+export interface ImageResizeManyHandler extends EventHandler {
+  name: 'image:resizeMany'
+  handler: (payload: ResizeManyRequestPayload) => void
+}
+
+export type ResizeManyResultPayload =
+  | {
+      reqId: string
+      ok: true
+      results: Array<{ bytes: Uint8Array; mime: string; width: number; height: number }>
+    }
+  | { reqId: string; ok: false; reason: string }
+
+export interface ImageResizeManyResultHandler extends EventHandler {
+  name: 'image:resizeMany:result'
+  handler: (payload: ResizeManyResultPayload) => void
 }
 
 /** UI 가 clientStorage 의 폰트 바이트를 요청한다 (clientStorage 는 메인 전용). */
@@ -533,6 +585,11 @@ export interface TextValidateResultHandler extends EventHandler {
  * 목표 용량 탐색용. 캐시된 원본을 주어진 설정으로 재인코딩해 바이트 합계만 돌려준다.
  * 실제 fill 교체도, Figma 왕복도 없다 — 그래서 후보를 여러 개 재도 싸다.
  */
+/**
+ * 목표 용량 예측 항목 — **쪽마다 하나**. PDF 에는 쪽마다 부분 PDF 를 따로 뽑아 합치므로 같은 원본도
+ * 쪽마다 한 벌씩 실리고, 창·목표는 쪽마다 다를 수 있다. 같은 결과만 인코딩 캐시로 재사용한다.
+ * 채택(W₀ 인가 조각인가)은 export 와 같은 규칙(lib/imageCrop chooseCrop)으로 tallyProbe 가 정한다.
+ */
 export type ImageProbeItem = {
   imageHash: string
   targetLongEdge: number
@@ -540,11 +597,10 @@ export type ImageProbeItem = {
   skip: boolean
   /** 원본 바이트 수. skip 이거나 캐시에 없을 때 이 값으로 센다. */
   originalBytes: number
-  /**
-   * 이 이미지를 쓰는 쪽(프레임) 수. 인코딩은 한 번이지만 쪽마다 부분 PDF 를 따로 뽑아
-   * 합치므로 PDF 에는 쪽 수만큼 실린다 — 기준 측정이 쪽별로 더한 것과 같은 단위로 세야 한다
-   */
-  uses: number
+  /** 이 쪽에서 조각으로 바꿀 수 있는 계획. 없으면 W₀ 그대로 */
+  pieces?: Array<{ targetLongEdge: number; crop: CropRect }>
+  /** 조각들의 최소 밀도 이득(기존 대비 배) — chooseCrop 의 인자 */
+  densityGain?: number
 }
 
 /**

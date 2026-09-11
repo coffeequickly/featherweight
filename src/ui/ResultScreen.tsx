@@ -244,6 +244,22 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
                   <Text>{t('result.imagesShrunk', { count: report.imagesProcessed })}</Text>
                 </div>
                 <div class="outcomeChildren">
+                  {report.imagesCropped === 0 ? null : (
+                    <div class="outcomeNote">
+                      <Text>
+                        <Muted>{t('result.imagesCropped', { count: report.imagesCropped })}</Muted>
+                      </Text>
+                    </div>
+                  )}
+                  {report.imagesRecovered === 0 ? null : (
+                    <div class="outcomeNote">
+                      <Text>
+                        <Muted>
+                          {t('result.imagesRecovered', { count: report.imagesRecovered })}
+                        </Muted>
+                      </Text>
+                    </div>
+                  )}
                   <div class="outcomeNote">
                     <Text>
                       <Muted>

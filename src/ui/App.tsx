@@ -274,6 +274,7 @@ function AppBody(): JSX.Element {
                 preflight={preflight}
                 disabled={exporter.busy}
                 onChange={main.applySettings}
+                onGoOptions={() => setTab('options')}
               />
             ) : null}
 

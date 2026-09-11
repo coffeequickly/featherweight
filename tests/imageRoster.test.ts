@@ -131,3 +131,129 @@ describe('설정을 바꿔도 흔들리지 않는 것', () => {
     expect(roster[0].nodeIds).toEqual(['node-h'])
   })
 })
+
+describe('쓰는 영역 · 잘라냄 — 목록의 숫자는 export 의 계획과 같다', () => {
+  const sizes = {
+    crop: { width: 3000, height: 4000 },
+    band: { width: 3000, height: 4000 },
+    whole: { width: 3000, height: 4000 }
+  }
+  /** 창 10%×7.5% 를 100px 상자에 — 감싸는 사각형 302×302(여백 1px) */
+  const cropped: ImageUsage = {
+    ...usage('crop', 'crop', 100),
+    scaleMode: 'CROP',
+    fillIndex: 0,
+    crop: { x: 0.1, y: 0.075 },
+    cropTransform: [
+      [0.1, 0, 0.45],
+      [0, 0.075, 0.4625]
+    ]
+  }
+  /** 가로띠 FILL — 세로의 25% 만 보인다, 감싸는 사각형 3000×1002 */
+  const band: ImageUsage = {
+    ...usage('band', 'band', 300, 100),
+    fillIndex: 0,
+    localSize: { width: 300, height: 100 }
+  }
+  const whole: ImageUsage = {
+    ...usage('whole', 'whole', 150, 200),
+    fillIndex: 0,
+    localSize: { width: 150, height: 200 }
+  }
+  const unknown: ImageUsage = {
+    ...usage('unknown', 'unknown', 300, 100),
+    fillIndex: 0,
+    localSize: { width: 300, height: 100 }
+  }
+  function sheetOf(images: ImageUsage[], settings = SETTINGS) {
+    const preflight = {
+      frames: [{ id: 'f', longEdge: 842, images }],
+      imageEdges: { crop: 4000, band: 4000, whole: 4000, unknown: 4000, photo: 4000 },
+      imageSizes: { ...sizes, photo: sizes.crop }
+    } as unknown as Preflight
+    return Object.fromEntries(imageRoster(preflight, settings).map((row) => [row.imageHash, row]))
+  }
+
+  it('일부만 쓰는 자리는 쓰는 영역 비와 조각(저장 긴 변·버리는 비·픽셀), 통째로 쓰는 자리는 조각이 없다', () => {
+    const rows = sheetOf([cropped, band, whole, unknown])
+    expect(rows.crop.partial).toBe(true)
+    expect(rows.crop.used).toBeCloseTo(0.0075, 6)
+    expect(rows.crop.crop).toEqual({
+      target: 302,
+      cut: 1 - (302 * 302) / 12_000_000,
+      width: 302,
+      height: 302
+    })
+    expect(rows.crop.pixels).toBe(12_000_000)
+    expect(rows.crop.storedPixels).toBe(302 * 302)
+
+    expect(rows.band.partial).toBe(true)
+    expect(rows.band.used).toBeCloseTo(0.25, 6)
+    expect(rows.band.crop?.target).toBe(640)
+    expect(rows.band.crop?.cut).toBeCloseTo(1 - (3000 * 1002) / 12_000_000, 6)
+    expect(rows.band.crop?.width).toBe(640)
+    expect(rows.band.storedPixels).toBe(640 * (rows.band.crop?.height ?? 0))
+
+    expect(rows.whole.partial).toBe(false)
+    expect(rows.whole.used).toBe(1)
+    expect(rows.whole.crop).toBeNull()
+    expect(rows.whole.storedPixels).toBe(480 * 640) // 통째 W₀ = scaledSize(3000×4000, 640)
+
+    // 크기를 모르면 아무것도 단정하지 않는다
+    expect(rows.unknown).toMatchObject({
+      partial: false,
+      used: null,
+      crop: null,
+      pixels: null,
+      storedPixels: null
+    })
+  })
+
+  it('같은 그림을 통째로 쓰는 자리가 하나라도 있으면 조각이 없다 — 규칙상 W₀ 가 남아야 해서', () => {
+    const small: ImageUsage = {
+      ...usage('photo', 'whole', 60, 80),
+      nodeId: 'b',
+      fillIndex: 0,
+      localSize: { width: 60, height: 80 }
+    }
+    const rows = sheetOf([{ ...cropped, imageHash: 'photo', nodeId: 'a' }, small])
+    expect(rows.photo.partial).toBe(false)
+    expect(rows.photo.crop).toBeNull()
+    expect(rows.photo.used).toBeCloseTo(0.0075, 6) // 가장 크게 놓인 자리(100px 상자)의 것
+    // 통째 W₀ — 10% 창을 100px 상자에 쓰는 자리의 밀도 보정이 T₀ 를 상한(1920)에 붙인다
+    expect(rows.photo.target).toBe(1920)
+    expect(rows.photo.storedPixels).toBe(1440 * 1920)
+  })
+
+  it('잘라 넣기를 끄면 조각이 없고 통째 픽셀로 센다 — partial 은 남아 "통째로" 의 이유를 말한다', () => {
+    const rows = sheetOf([band], { ...SETTINGS, cropToVisible: false })
+    expect(rows.band.partial).toBe(true)
+    expect(rows.band.crop).toBeNull()
+    expect(rows.band.storedPixels).toBe(480 * 640)
+  })
+
+  it('이미지를 상자보다 작게 놓은 CROP(원본 밖 창)은 잘라 넣지 않지만 쓰는 영역은 겹치는 만큼 말한다', () => {
+    const loose: ImageUsage = {
+      ...cropped,
+      cropTransform: [
+        [1, 0, 0.5],
+        [0, 1, 0.5]
+      ]
+    }
+    const rows = sheetOf([loose])
+    expect(rows.crop.crop).toBeNull()
+    expect(rows.crop.partial).toBe(false)
+    expect(rows.crop.used).toBeCloseTo(0.25, 6)
+  })
+
+  it('프레임 밖으로 넘치면 쓰는 영역은 창 × 프레임 안에 남는 비 — 조각은 창 기준 그대로', () => {
+    const rows = sheetOf([
+      { ...band, visible: 0.5 },
+      { ...whole, visible: 0.19 }
+    ])
+    expect(rows.band.used).toBeCloseTo(0.125, 6)
+    expect(rows.band.crop?.target).toBe(640)
+    expect(rows.whole.used).toBeCloseTo(0.19, 6)
+    expect(rows.whole.crop).toBeNull()
+  })
+})

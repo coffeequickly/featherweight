@@ -54,9 +54,11 @@ export function SizeDiagram({ rows, onFocus }: Props): JSX.Element | null {
     )
   }
 
+  // 잘라 넣는 그림은 조각의 크기 — 목록의 "저장" 열과 같은 숫자여야 한다
   const finalOf = (row: ImageRow): number => {
     const original = row.original as number
-    return row.kept ? original : Math.min(original, row.target)
+    if (row.kept) return original
+    return row.crop === null ? Math.min(original, row.target) : row.crop.target
   }
 
   // 같은 원본 크기는 한 번만.
@@ -103,6 +105,11 @@ export function SizeDiagram({ rows, onFocus }: Props): JSX.Element | null {
       {picks.map(({ row, count }) => {
         const original = row.original as number
         const final = finalOf(row)
+        // 조각은 제 모양대로 — 통째 비율로 그리면 잘라낸 것이 안 보인다
+        const next =
+          row.crop === null
+            ? { width: final, height: final * row.aspect }
+            : { width: row.crop.width, height: row.crop.height }
         return (
           <button
             key={row.imageHash}
@@ -118,7 +125,7 @@ export function SizeDiagram({ rows, onFocus }: Props): JSX.Element | null {
               />
               <span
                 class={`repBox repNext${row.kept ? ' repKept' : ''}`}
-                style={`width: ${final * unit}px; height: ${final * row.aspect * unit}px`}
+                style={`width: ${next.width * unit}px; height: ${next.height * unit}px`}
               />
             </span>
             {/* 개수를 이름 줄에 붙여 한 줄을 줄인다 — 여기 글자는 상자를 거드는 것이지

@@ -1793,22 +1793,13 @@ button.statusCard:hover {
   margin-top: 24px;
 }
 
-/* 상한이 배율을 이겼다 — 고른 값이 그대로 안 나간다는 사실은 조용히 두면 안 된다 */
-.saysWarn {
-  margin-top: 24px;
-  color: var(--figma-color-text-warning, #b86200);
-}
-
-.saysWarn * {
-  color: inherit;
-}
-
-/* 이름 · 원본 · 결과 · 표시. 설정이 무엇을 하는지 그림보다 이 줄들이 정확하게 말한다.
-   flex 로 두면 이름 길이와 자릿수에 따라 화살표가 줄마다 다른 x 에 서서 열이 흐트러진다 —
-   그리드로 못 박아 숫자와 화살표가 세로로 맞게 한다. 이름만 남는 폭을 먹는다. */
+/* 이름 · 쓰는 영역 · 원본 · 저장 · 잘라냄. 설정이 무엇을 하는지 그림보다 이 줄들이 정확하게 말한다.
+   flex 로 두면 이름 길이와 자릿수에 따라 숫자가 줄마다 다른 x 에 서서 열이 흐트러진다 —
+   그리드로 못 박는다. 숫자 열 넷은 같은 폭으로 나눠 갖고(내용보다 좁아지지는 않게) 이름은
+   그 두 배 — 이름은 단서일 뿐 숫자가 내용이라, 이름이 남는 폭을 다 먹으면 비어 보인다(제보). */
 .imageList {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 2fr) repeat(4, minmax(max-content, 1fr));
   /* baseline 이면 빈 칸(배지 없는 줄의 경고 자리)에 기준선이 없어 그 칸만 낮게 그려진다 —
      호버 배경이 줄 끝에서 한 단 꺼진다. 늘려서 네 칸 높이를 맞춘다 */
   align-items: stretch;
@@ -1850,32 +1841,34 @@ button.statusCard:hover {
   border-radius: 0 4px 4px 0;
 }
 
+/* 열 이름 줄 — 줄과 같은 칸에 서야 숫자 위에 온다. 버튼이 아니라 호버도 없다 */
+.imageHead {
+  display: contents;
+}
+
+.imageHead > * {
+  padding: 0 5px 3px;
+}
+
 .imageName {
   min-width: 0;
   padding-left: 6px;
 }
 
-.imageClipped {
+.imageCut {
   padding-right: 6px;
 }
 
+/* 숫자 칸 — 정렬은 Text 의 align="right" 가 한다(컴포넌트가 제 클래스로 왼쪽 정렬을 박는다) */
+.imageUsed,
 .imageFrom,
 .imageTo,
-.imageClipped {
+.imageCut {
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
-.imageFrom,
-.imageTo {
-  text-align: right;
-}
-
-/* 잘리는 그림의 표시 — 줄 오른쪽 끝, 앰버. 목록에서 눈에 걸려야 의미가 있다.
-   자리는 늘 비워 둔다(빈 칸도 열을 차지한다) — 있는 줄만 밀려나면 그게 더 어수선하다 */
-.imageClipped {
-  min-width: 62px;
-  text-align: right;
+/* 일부만 보이는데 통째로 가는 줄 — 앰버. 목록에서 눈에 걸려야 의미가 있다 */
+.imageWhole * {
   color: var(--figma-color-text-warning, #b86200);
 }
 
@@ -2108,20 +2101,47 @@ button.statusCard:hover {
   color: var(--figma-color-text-brand);
 }
 
+/* 설명 줄들 — 한 덩어리. 줄마다 24px 을 띄우니 문단마다 빈 줄이 낀 것처럼 보였다(제보).
+   줄 사이는 grid 의 row-gap 하나로 정하고, 문단 마진은 쓰지 않는다.
+   Text 는 제 상자를 9px 줄이고 4px 내려 그리므로(text.module.css) 눈에 보이는 간격은
+   row-gap 보다 좁다 — 그만큼 얹은 값이다 */
 .chartLegend {
+  display: grid;
+  row-gap: 12px;
   margin-top: 12px;
 }
 
 .chartLegend p {
   margin: 0;
+  line-height: 1.6;
 }
 
-/* 한 문단 안의 줄 간격(19px)보다 넓어야 두 문단으로 읽힌다.
-   Text 는 제 상자를 9px 줄이므로(text.module.css) 마진에서 그만큼이 먹힌다 — 얹어서 준다.
-   `.chartLegend p`(0,1,1) 가 `.chartWhy`(0,1,0) 를 이겨서 이 간격이 통째로 죽어 있었다 —
-   같은 자리에서 겨루도록 앞에 부모를 붙인다 */
-.chartLegend .chartWhy {
-  margin-top: 24px;
+/* 상한이 배율을 이겼다 — 고른 값이 그대로 안 나간다는 사실은 조용히 두면 안 된다 */
+.chartLegend .chartWarn,
+.chartLegend .chartWarn * {
+  color: var(--figma-color-text-warning, #b86200);
+}
+
+/* 줄 전체가 버튼인 설명 줄 — 글자는 설명처럼, 끝의 낱말만 링크처럼 */
+.linkLine {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.linkLine .linkWord {
+  color: var(--figma-color-text-brand, #0d99ff);
+  white-space: nowrap;
+}
+
+.linkLine:hover .linkWord {
+  text-decoration: underline;
 }
 
 /* ── 옵션 탭 ───────────────────────────────── */

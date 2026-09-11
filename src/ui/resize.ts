@@ -2,6 +2,7 @@
 
 import { t } from '../lib/i18n'
 import { keepsOriginal, scaledSize } from '../lib/imageTarget'
+import { CropRect } from '../lib/types'
 
 export type ResizeRequest = {
   bytes: Uint8Array
@@ -21,6 +22,25 @@ export type ResizeResult =
     }
   | { ok: false; reason: string }
 
+export type ResizeManyRequest = {
+  bytes: Uint8Array
+  quality: number
+  reencodeOpaquePng: boolean
+  jobs: Array<{ targetLongEdge: number; crop: CropRect }>
+}
+
+export type ResizeManyResult =
+  | {
+      ok: true
+      results: Array<{
+        bytes: Uint8Array
+        mime: 'image/jpeg' | 'image/png'
+        width: number
+        height: number
+      }>
+    }
+  | { ok: false; reason: string }
+
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47]
 
 export function isPng(bytes: Uint8Array): boolean {
@@ -29,12 +49,39 @@ export function isPng(bytes: Uint8Array): boolean {
 
 export async function resizeImage(request: ResizeRequest): Promise<ResizeResult> {
   const { bytes, targetLongEdge, quality, reencodeOpaquePng } = request
+  let decoded: ImageBitmap | undefined
+  try {
+    decoded = await decodeImage(bytes)
+    return await resizeDecoded(decoded, bytes, targetLongEdge, quality, reencodeOpaquePng)
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
+}
 
-  // 어느 경로로 나가든 디코딩한 픽셀은 놓아준다 — 닫은 비트맵을 다시 닫는 것은 무해하다
-  let bitmap: ImageBitmap | undefined
+/** 원본 바이트를 비트맵으로. 실패는 throw — 부르는 쪽이 원본으로 물러선다 */
+export function decodeImage(bytes: Uint8Array): Promise<ImageBitmap> {
+  return createImageBitmap(new Blob([bytes as BlobPart]))
+}
+
+/** 같은 원본을 여러 번 줄일 때 — 인코딩은 비트맵을 닫으므로 한 벌 복사해 준다 */
+export function cloneBitmap(decoded: ImageBitmap): Promise<ImageBitmap> {
+  return createImageBitmap(decoded)
+}
+
+/**
+ * 디코드된 원본을 줄여 인코딩한다. 비트맵은 여기서 닫힌다(어느 경로로 나가든).
+ * 원본 바이트는 "그대로 둔다" 로 물러설 때 돌려주려고 받는다.
+ */
+export async function resizeDecoded(
+  decoded: ImageBitmap,
+  bytes: Uint8Array,
+  targetLongEdge: number,
+  quality: number,
+  reencodeOpaquePng: boolean
+): Promise<ResizeResult> {
+  let bitmap: ImageBitmap | undefined = decoded
   try {
     const sourcePng = isPng(bytes)
-    bitmap = await createImageBitmap(new Blob([bytes as BlobPart]))
     // close() 뒤에는 width/height 가 0 이 된다. 원본 크기를 먼저 붙잡아 둔다.
     const originalWidth = bitmap.width
     const originalHeight = bitmap.height
@@ -53,28 +100,10 @@ export async function resizeImage(request: ResizeRequest): Promise<ResizeResult>
       }
     }
 
-    if (mustResize) bitmap = await stepDown(bitmap, size.width, size.height)
-
-    const canvas = new OffscreenCanvas(size.width, size.height)
-    // 알파를 확인할 때만 getImageData 로 픽셀을 되읽는다. 그 canvas 는 CPU 쪽에 두는 편이
-    // 낫다 — GPU 텍스처에서 되읽으면 장마다 동기 전송이 걸린다(Chrome 이 콘솔로 경고한다).
-    const willReadFrequently = sourcePng && reencodeOpaquePng
-    const context = canvas.getContext('2d', { willReadFrequently })
-    if (context === null) return { ok: false, reason: t('resize.noContext') }
-    context.drawImage(bitmap, 0, 0, size.width, size.height)
-    bitmap.close()
-
-    // 투명이 있는 PNG 를 JPEG 로 바꾸면 배경이 검게 탄다. 알파가 있으면 PNG 를 유지한다.
-    const keepPng =
-      sourcePng &&
-      (!reencodeOpaquePng ||
-        hasAlphaPixels(context.getImageData(0, 0, size.width, size.height).data))
-
-    // 인코딩은 한 형식만 만든다. 예전에 "PNG 가 더 작으면 PNG" 를 넣었다가
-    // 이미지가 통째로 사라지는 사고가 났다 — 절감 이득보다 위험이 크다. (v1.0.1)
-    const mime: 'image/png' | 'image/jpeg' = keepPng ? 'image/png' : 'image/jpeg'
-    const blob = await canvas.convertToBlob(keepPng ? { type: mime } : { type: mime, quality })
-    const out = new Uint8Array(await blob.arrayBuffer())
+    const encoded = await encodeBitmap(bitmap, size, sourcePng, reencodeOpaquePng, quality)
+    bitmap = undefined // encodeBitmap 이 닫았다
+    const { mime } = encoded
+    const out = encoded.bytes
 
     // 줄였는데 오히려 커지는 경우가 있다 (이미 잘 압축된 JPEG 등)
     if (keepsOriginal(bytes.length, out.length)) {
@@ -92,7 +121,104 @@ export async function resizeImage(request: ResizeRequest): Promise<ResizeResult>
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
   } finally {
+    // 어느 경로로 나가든 디코딩한 픽셀은 놓아준다 — 닫은 비트맵을 다시 닫는 것은 무해하다
     bitmap?.close()
+  }
+}
+
+/**
+ * 디코드된 원본에서 창을 잘라 줄이고 인코딩한다 — 조각. 원본 비트맵은 닫지 않는다(부르는 쪽 것).
+ * 조각은 원본으로 물러설 수 없으니(창만 있는 그림이 결과다) 언제나 인코딩한 것을 돌려준다.
+ * 실패는 throw.
+ *
+ * 메모리(가장 큰 순간): 디코드된 원본(w×h×4B, 4096² 이면 64MB) + 잘린 조각 비트맵(창 크기) +
+ * 절반씩 줄이는 중간 비트맵 하나 + 출력 canvas. 조각은 하나씩 만들고 닫으므로 창 크기만큼만 더 든다.
+ */
+export async function encodePiece(
+  decoded: ImageBitmap,
+  crop: CropRect,
+  targetLongEdge: number,
+  sourcePng: boolean,
+  reencodeOpaquePng: boolean,
+  quality: number
+): Promise<{ bytes: Uint8Array; mime: 'image/jpeg' | 'image/png'; width: number; height: number }> {
+  // 자르기는 디코드된 비트맵에서 — 잘린 만큼만 새로 올라온다
+  const piece = await createImageBitmap(decoded, crop.x0, crop.y0, crop.w, crop.h)
+  const size = scaledSize(piece.width, piece.height, targetLongEdge)
+  const encoded = await encodeBitmap(piece, size, sourcePng, reencodeOpaquePng, quality)
+  return { bytes: encoded.bytes, mime: encoded.mime, width: size.width, height: size.height }
+}
+
+/**
+ * 비트맵 하나를 size 로 줄여 인코딩한다. 비트맵은 여기서 닫는다.
+ * 투명이 있는 PNG 를 JPEG 로 바꾸면 배경이 검게 탄다 — 알파가 있으면 PNG 를 유지한다.
+ * 인코딩은 한 형식만 만든다. 예전에 "PNG 가 더 작으면 PNG" 를 넣었다가 이미지가 통째로
+ * 사라지는 사고가 났다 — 절감 이득보다 위험이 크다. (v1.0.1)
+ */
+async function encodeBitmap(
+  source: ImageBitmap,
+  size: { width: number; height: number },
+  sourcePng: boolean,
+  reencodeOpaquePng: boolean,
+  quality: number
+): Promise<{ bytes: Uint8Array; mime: 'image/jpeg' | 'image/png' }> {
+  let bitmap = source
+  const mustResize = size.width !== bitmap.width || size.height !== bitmap.height
+  if (mustResize) bitmap = await stepDown(bitmap, size.width, size.height)
+
+  const canvas = new OffscreenCanvas(size.width, size.height)
+  // 알파를 확인할 때만 getImageData 로 픽셀을 되읽는다. 그 canvas 는 CPU 쪽에 두는 편이
+  // 낫다 — GPU 텍스처에서 되읽으면 장마다 동기 전송이 걸린다(Chrome 이 콘솔로 경고한다).
+  const willReadFrequently = sourcePng && reencodeOpaquePng
+  const context = canvas.getContext('2d', { willReadFrequently })
+  if (context === null) {
+    bitmap.close()
+    throw new Error(t('resize.noContext'))
+  }
+  context.drawImage(bitmap, 0, 0, size.width, size.height)
+  bitmap.close()
+
+  const keepPng =
+    sourcePng &&
+    (!reencodeOpaquePng || hasAlphaPixels(context.getImageData(0, 0, size.width, size.height).data))
+  const mime: 'image/png' | 'image/jpeg' = keepPng ? 'image/png' : 'image/jpeg'
+  const blob = await canvas.convertToBlob(keepPng ? { type: mime } : { type: mime, quality })
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), mime }
+}
+
+/**
+ * 한 원본에서 조각 여럿. 원본은 한 번만 디코드하고 job 마다 그 비트맵에서 잘라 줄이고 인코딩한다 —
+ * 조각마다 다시 디코드하면 12MP JPEG 하나에 조각 넷이 600ms, 한 번이면 170ms 였다(2026-09-10).
+ */
+export async function resizeMany(request: ResizeManyRequest): Promise<ResizeManyResult> {
+  const { bytes, quality, reencodeOpaquePng, jobs } = request
+  let decoded: ImageBitmap | undefined
+  try {
+    const sourcePng = isPng(bytes)
+    decoded = await decodeImage(bytes)
+    const results: Array<{
+      bytes: Uint8Array
+      mime: 'image/jpeg' | 'image/png'
+      width: number
+      height: number
+    }> = []
+    for (const job of jobs) {
+      results.push(
+        await encodePiece(
+          decoded,
+          job.crop,
+          job.targetLongEdge,
+          sourcePng,
+          reencodeOpaquePng,
+          quality
+        )
+      )
+    }
+    return { ok: true, results }
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  } finally {
+    decoded?.close()
   }
 }
 

@@ -34,6 +34,10 @@ export type ExportReport = {
   elapsedMs: number
   skipped: DoneReport['skipped']
   imagesProcessed: number
+  /** 그중 보이는 창만 잘라 넣은 원본 수 */
+  imagesCropped: number
+  /** 조각을 만들다 실패해 기존 방식으로 물러선 원본 수 — 출력은 정상 */
+  imagesRecovered: number
   textDrawn: number
   /** 아웃라인으로 남은 텍스트 — 노드별 사유. 이미지 경고는 섞지 않는다(길이가 텍스트 수다) */
   fallbacks: Array<{ nodeId: string; reason: Reason }>
@@ -250,6 +254,8 @@ export function useExport(
             elapsedMs: Date.now() - startedAt.current,
             skipped: done.skipped,
             imagesProcessed: 0,
+            imagesCropped: 0,
+            imagesRecovered: 0,
             textDrawn: 0,
             fallbacks: [],
             imageWarnings: [],
@@ -289,11 +295,15 @@ export function useExport(
         const stats = collected.reduce(
           (sum, part) => ({
             imagesProcessed: sum.imagesProcessed + part.stats.imagesProcessed,
+            imagesCropped: sum.imagesCropped + part.stats.imagesCropped,
+            imagesRecovered: sum.imagesRecovered + part.stats.imagesRecovered,
             fallbacks: [...sum.fallbacks, ...part.stats.fallbacks],
             imageWarnings: [...sum.imageWarnings, ...part.stats.imageWarnings]
           }),
           {
             imagesProcessed: 0,
+            imagesCropped: 0,
+            imagesRecovered: 0,
             fallbacks: [] as Array<{ nodeId: string; reason: Reason }>,
             imageWarnings: [] as Array<{ nodeId: string; reason: Reason }>
           }
@@ -309,6 +319,8 @@ export function useExport(
           elapsedMs: Date.now() - startedAt.current,
           skipped: done.skipped,
           imagesProcessed: stats.imagesProcessed,
+          imagesCropped: stats.imagesCropped,
+          imagesRecovered: stats.imagesRecovered,
           textDrawn: merged.textDrawn,
           substitutions: groupSubstitutions(merged.textSubstitutions),
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],

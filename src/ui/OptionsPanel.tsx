@@ -57,6 +57,18 @@ export function OptionsPanel({
         <Says text={t('settings.glyphFallbackSays')} />
       </Section>
 
+      <Section title={t('settings.sectionImages')}>
+        {/* 기본 켬. 규칙이 보수적이라 끌 이유가 드물지만 첫 배포의 도망갈 길로 둔다 (docs/IMAGE-CROP.md) */}
+        <Checkbox
+          disabled={disabled}
+          onValueChange={(value: boolean) => onChange({ ...settings, cropToVisible: value })}
+          value={settings.cropToVisible}
+        >
+          <Text>{t('settings.cropToVisible')}</Text>
+        </Checkbox>
+        <Says text={t('settings.cropToVisibleSays')} />
+      </Section>
+
       <Section title={t('settings.sectionCareful')}>
         <div class={`dangerBox${outlineAll ? ' dangerBoxOn' : ''}`}>
           {/* 폰트를 PDF에 포함하는 건 기본 기능이다 — 여기 옵션은 그 반대를 켜는 쪽이다 */}

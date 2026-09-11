@@ -2,19 +2,24 @@
 //
 // export 옵션으로는 이미지 품질을 못 건드리므로(C2) export 전에 fill 자체를 바꾼다.
 
-import { intersect, Rect, visibleFraction } from '../lib/clipRect'
+import { EMPTY_CLIP, intersect, Rect, visibleFraction } from '../lib/clipRect'
+import { chooseCrop, CropPlan, frameImagePlan, pieceKey } from '../lib/imageCrop'
+import { probeItemsFrom } from '../lib/imageProbe'
 import { cropFractions, PixelSize } from '../lib/imageDensity'
 import {
   ImagePlan,
   KEEP_BYTES_FLOOR,
-  planImageTargets,
   shouldShrink,
   settleDelayMs,
+  Transform,
   transformScale
 } from '../lib/imageTarget'
 import {
+  ImageProbeItem,
   ImageUsage,
   Reason,
+  ResizeManyRequestPayload,
+  ResizeManyResultPayload,
   ResizeRequestPayload,
   ResizeResultPayload,
   Settings
@@ -25,6 +30,10 @@ import { awaitResponse, nextRequestId } from './bridge'
 
 export type ImageStats = {
   processed: number
+  /** processed 중 보이는 창만 잘라 넣은 원본 — 품질을 지키고도 바이트가 줄 때만 (lib/imageCrop.ts) */
+  cropped: number
+  /** 조각을 만들다 실패해 W₀ 로 물러선 원본 — 출력은 정상이다. 경고가 아니라 안내 */
+  recovered: number
   bytesBefore: number
   bytesAfter: number
   /** bytesAfter 중 우리가 만든 JPEG — PDF 에 그대로 실린다 (목표 용량 예측의 보정 제외분) */
@@ -70,8 +79,16 @@ type Replacement = {
 }
 const replacements = new Map<string, Replacement>()
 
+/**
+ * 이번 export 에서 이미 만든 조각. 키는 pieceKey — 같은 원본·사각형·목표·설정이면 다음 프레임도
+ * 그 해시를 꽂는다. 값은 문자열·숫자뿐이라 상한이 필요 없다. runExport 가 비운다.
+ */
+type Piece = { hash: string; bytes: number; mime: string }
+const pieces = new Map<string, Piece>()
+
 export function forgetReplacements(): void {
   replacements.clear()
+  pieces.clear()
 }
 
 function replacementKey(plan: ImagePlan, settings: Settings): string {
@@ -80,6 +97,8 @@ function replacementKey(plan: ImagePlan, settings: Settings): string {
 
 /** 리사이즈 요청을 UI 로 보내는 통로 — 메시지 모양은 types.ts 의 것 하나뿐이다 */
 export type ImageRequestSender = (payload: ResizeRequestPayload) => void
+/** 조각 여럿을 한 번에 — 없으면(옛 호출자·테스트) 잘라 넣기를 하지 않는다 */
+export type ImageManySender = (payload: ResizeManyRequestPayload) => void
 
 type FillsNode = SceneNode & { fills: readonly Paint[] | typeof figma.mixed }
 
@@ -111,22 +130,25 @@ function knownSizes(usages: readonly ImageUsage[]): Record<string, PixelSize> {
 }
 
 /**
- * 탐색용: 이 프로필로 처리한다면 각 이미지의 목표 크기가 얼마인지.
- * 실제 처리는 하지 않는다 — UI 가 바이트만 재보게 넘길 목록이다.
+ * 탐색용: 이 프로필로 처리한다면 이 프레임의 이미지들을 무엇으로 셀지 — export 와 같은
+ * 계획(frameImagePlan)에서 나온 쪽 단위 항목. 실제 처리는 하지 않는다.
  */
-export function planFor(
+export function probeItemsOf(
   root: SceneNode,
-  profile: { multiplier: number; maxEdge: number; minEdge: number }
-): ImagePlan[] {
+  profile: { multiplier: number; maxEdge: number; minEdge: number },
+  cropToVisible = true
+): ImageProbeItem[] {
   const usages = collectImageUsages(root)
-  return planImageTargets(
+  return probeItemsFrom(
     usages,
     {
       multiplier: profile.multiplier as Settings['multiplier'],
       maxEdge: profile.maxEdge as Settings['maxEdge'],
       minEdge: profile.minEdge as Settings['minEdge']
     },
-    knownSizes(usages)
+    knownSizes(usages),
+    seenImages,
+    cropToVisible
   )
 }
 
@@ -140,23 +162,27 @@ export function imageUsagesOf(node: SceneNode, clip: Rect | null = null): ImageU
   const usages: ImageUsage[] = []
   let scale: { x: number; y: number } | null = null
 
-  for (const paint of node.fills) {
+  for (let index = 0; index < node.fills.length; index += 1) {
+    const paint = node.fills[index]
     if (paint.type !== 'IMAGE' || paint.visible === false) continue
     if (paint.imageHash === null) continue
     // 부모가 확대·축소돼 있으면 node.width 는 화면 크기가 아니다 — 배율을 곱한다
     scale ??= transformScale(node.absoluteTransform)
+    const cropped = paint.scaleMode === 'CROP' && paint.imageTransform !== undefined
     usages.push({
       nodeId: node.id,
       imageHash: paint.imageHash,
       name: node.name,
       width: node.width * scale.x,
       height: node.height * scale.y,
+      localSize: { width: node.width, height: node.height },
       scaleMode: paint.scaleMode,
       // 잘라 쓰면 원본의 일부만 이 자리에 들어온다 — 목표를 셈하려면 그 비가 필요하다
-      crop:
-        paint.scaleMode === 'CROP' && paint.imageTransform !== undefined
-          ? cropFractions(paint.imageTransform)
-          : undefined,
+      crop: cropped ? cropFractions(paint.imageTransform as Transform) : undefined,
+      // 창만 잘라 넣으려면 비뿐 아니라 원점까지, 그리고 어느 fill 인지
+      fillIndex: index,
+      cropTransform: cropped ? (paint.imageTransform as Transform) : undefined,
+      paintRotation: paint.scaleMode === 'CROP' ? undefined : paint.rotation,
       visible: visibleIn(node, clip)
     })
   }
@@ -175,12 +201,17 @@ function visibleIn(node: SceneNode, clip: Rect | null): number {
   return visibleFraction(box, clip)
 }
 
-/** 프레임이 clipsContent 를 켜 두면 그 상자가 새 클립이다 — 조상들의 클립과 겹쳐 좁힌다 */
+/**
+ * 프레임이 clipsContent 를 켜 두면 그 상자가 새 클립이다 — 조상들의 클립과 겹쳐 좁힌다.
+ *
+ * 겹치는 데가 없으면 빈 클립이다. intersect 의 null 을 그대로 돌려주면 그 밑에서 "클립 없음"
+ * 이 돼, 부모 밖으로 통째로 나간 프레임 안의 그림이 visible 1 로 잡혔다(2026-09-10 재현).
+ */
 export function clipFor(node: SceneNode, parentClip: Rect | null): Rect | null {
   if (!('clipsContent' in node) || node.clipsContent !== true) return parentClip
   const box = node.absoluteBoundingBox
   if (box === null) return parentClip
-  return parentClip === null ? box : intersect(box, parentClip)
+  return parentClip === null ? box : (intersect(box, parentClip) ?? EMPTY_CLIP)
 }
 
 /** 클론 전체에서 이미지 fill 을 쓰는 자리를 모은다. 클립은 내려가면서 좁아진다. */
@@ -200,9 +231,18 @@ export function collectImageUsages(root: SceneNode): ImageUsage[] {
   return usages
 }
 
+/** 조각을 꽂을 자리 — 노드·fill 색인으로 집는다 */
+type FillSwap = { hash: string; transform: Transform }
+
+const fillKey = (nodeId: string, fillIndex: number): string => `${nodeId}|${fillIndex}`
+
 /**
  * 해시별로 한 번씩 처리하고 fill 을 교체한다.
  * 이미지 하나가 실패해도 원본을 유지하고 계속한다. (PRD §7.7)
+ *
+ * 잘라 넣기(sendMany 가 있을 때): 전체본 W₀ 를 만든 뒤, 조각 계획이 있는 해시는 조각도 인코딩해
+ * 바이트를 견준다. 조각 합이 W₀ 보다 작을 때만 자리마다 조각을 꽂고, 아니면 W₀ 다 — 품질은
+ * 계획 단계가 이미 기존 이상으로 못 박았으니 여기서 보는 것은 바이트뿐이다.
  */
 export async function shrinkImages(
   root: SceneNode,
@@ -210,11 +250,14 @@ export async function shrinkImages(
   send: ImageRequestSender,
   onProgress: (current: number, total: number) => void,
   isCancelled: () => boolean,
-  keepOriginal?: OriginalSink
+  keepOriginal?: OriginalSink,
+  sendMany?: ImageManySender
 ): Promise<ImageStats> {
   const usages = collectImageUsages(root)
   const stats: ImageStats = {
     processed: 0,
+    cropped: 0,
+    recovered: 0,
     bytesBefore: 0,
     bytesAfter: 0,
     bytesJpeg: 0,
@@ -222,13 +265,17 @@ export async function shrinkImages(
     warnings: [],
     seen: [...new Set(usages.map((usage) => usage.imageHash))]
   }
-  const plans = planImageTargets(usages, settings, knownSizes(usages))
-  if (plans.length === 0) return stats
-
   // 손댈지는 이미지마다 제 목표로 정한다(shouldShrink) — 프레임 예산으로 재면
   // 작은 자리에 놓인 큰 그림이 통째로 빠져나간다.
+  // 계획은 목표 용량 예측(probeItemsOf)과 같은 함수에서 나온다 — 예측과 결과가 같은 것을 본다.
+  // 조각 계획은 원본 크기를 아는 해시만, 통째로 보는 자리가 있으면 없다(기존 유지).
+  const { plans, crops } = frameImagePlan(usages, settings, knownSizes(usages))
+  if (plans.length === 0) return stats
 
-  const replacement = new Map<string, string>()
+  const byHash = new Map<string, string>()
+  const byFill = new Map<string, FillSwap>()
+  // 새로 꽂은 서로 다른 이미지 수 — 준비를 기다리는 시간은 장수에 비례한다
+  let applied = 0
 
   for (let index = 0; index < plans.length; index += 1) {
     if (isCancelled()) break
@@ -236,8 +283,46 @@ export async function shrinkImages(
 
     const plan = plans[index]
     try {
-      const newHash = await shrinkOne(plan, settings, send, stats, keepOriginal)
-      if (newHash !== null) replacement.set(plan.imageHash, newHash)
+      const whole = await shrinkOne(plan, settings, send, stats, keepOriginal)
+      if (whole === null) continue
+
+      const crop = crops.get(plan.imageHash)
+      let chosen: Piece[] | null = null
+      // 설정이 꺼져 있으면 통로가 있어도 묻지 않는다 — exporter 가 통로를 안 주지만 여기서도 막는다
+      if (crop !== undefined && sendMany !== undefined && settings.cropToVisible) {
+        try {
+          chosen = await cropOne(crop, whole, settings, sendMany)
+        } catch {
+          // 취소로 끊긴 것이면 복구할 것도 없다 — 바로 나간다
+          if (isCancelled()) break
+          // 조각 생성·되읽기·브리지 예외는 W₀ 로 합류한다. 원본으로 돌아가면 이미 만든
+          // 축소본과 바이트 통계가 사라지고 기존보다 큰 PDF 가 나간다. 출력은 정상이니 안내로만
+          stats.recovered += 1
+        }
+      }
+
+      stats.processed += 1
+      if (chosen === null || crop === undefined) {
+        byHash.set(plan.imageHash, whole.hash)
+        applied += 1
+        stats.bytesAfter += whole.bytes
+        if (whole.mime === 'image/jpeg') stats.bytesJpeg += whole.bytes
+        continue
+      }
+
+      stats.cropped += 1
+      for (let at = 0; at < crop.pieces.length; at += 1) {
+        const piece = chosen[at]
+        applied += 1
+        stats.bytesAfter += piece.bytes
+        if (piece.mime === 'image/jpeg') stats.bytesJpeg += piece.bytes
+        for (const fill of crop.pieces[at].fills) {
+          byFill.set(fillKey(fill.nodeId, fill.fillIndex), {
+            hash: piece.hash,
+            transform: fill.imageTransform
+          })
+        }
+      }
     } catch (error) {
       stats.warnings.push({
         code: 'image.warn',
@@ -249,22 +334,98 @@ export async function shrinkImages(
     }
   }
 
-  if (replacement.size > 0) {
-    applyReplacements(root, replacement)
+  if (byHash.size > 0 || byFill.size > 0) {
+    applyReplacements(root, byHash, byFill)
     // 여기서 안 기다리면 방금 꽂은 이미지가 export 에서 통째로 빠진다 (settleDelayMs 참고)
-    await new Promise((resolve) => setTimeout(resolve, settleDelayMs(replacement.size)))
+    await new Promise((resolve) => setTimeout(resolve, settleDelayMs(applied)))
   }
   void persistEdgeCache() // 선택 때 못 읽은 크기를 여기서 새로 읽었을 수 있다
   return stats
 }
 
+/** shrinkOne 이 만든(또는 캐시에서 찾은) 전체본 W₀. original 은 캐시에서 왔으면 없다 */
+type Whole = {
+  hash: string
+  bytes: number
+  mime: string
+  original: Uint8Array | null
+  image: Image
+}
+
+/**
+ * 조각을 인코딩해 W₀ 와 견준다. 이기면 조각마다 createImage 해서 돌려주고, 아니면 null.
+ * 캐시에 있는 조각은 다시 만들지 않는다. 어느 단계든 실패하면 null — W₀ 로 물러선다.
+ */
+async function cropOne(
+  crop: CropPlan,
+  whole: Whole,
+  settings: Settings,
+  sendMany: ImageManySender
+): Promise<Piece[] | null> {
+  const keys = crop.pieces.map((piece) => pieceKey(crop.imageHash, piece, settings))
+  const encoded: Array<Piece | { bytes: Uint8Array; mime: string } | null> = keys.map(
+    (key) => pieces.get(key) ?? null
+  )
+
+  const missing = crop.pieces
+    .map((piece, at) => ({ piece, at }))
+    .filter(({ at }) => encoded[at] === null)
+  if (missing.length > 0) {
+    const original = whole.original ?? (await bytesOf(whole.image, crop.imageHash))
+    const reqId = nextRequestId('imgs')
+    const promise = awaitResponse<ResizeManyResultPayload>(reqId)
+    sendMany({
+      reqId,
+      bytes: original,
+      quality: settings.quality,
+      reencodeOpaquePng: settings.reencodeOpaquePng,
+      jobs: missing.map(({ piece }) => ({ targetLongEdge: piece.targetLongEdge, crop: piece.rect }))
+    })
+    const result = await promise
+    if (!result.ok || result.results.length !== missing.length) return null
+    missing.forEach(({ at }, order) => {
+      encoded[at] = { bytes: result.results[order].bytes, mime: result.results[order].mime }
+    })
+  }
+
+  // 바이트를 먼저 견준다 — createImage 는 이긴 뒤에만. 품질은 계획이 이미 기존 이상으로 못 박았고,
+  // 채택은 목표 용량 예측과 같은 함수(chooseCrop)가 정한다
+  let total = 0
+  for (const item of encoded) {
+    if (item === null) return null
+    total += item.bytes instanceof Uint8Array ? item.bytes.length : item.bytes
+  }
+  if (!chooseCrop(whole.bytes, total, crop.densityGain).crop) return null
+
+  const out: Piece[] = []
+  for (let at = 0; at < encoded.length; at += 1) {
+    const item = encoded[at] as Piece | { bytes: Uint8Array; mime: string }
+    if (!(item.bytes instanceof Uint8Array)) {
+      out.push(item as Piece)
+      continue
+    }
+    // createImage 는 형식·크기 제한에 걸리면 throw 한다 — 조각 하나가 안 되면 통째로 W₀ 다
+    const created = figma.createImage(item.bytes)
+    await withTimeout(created.getBytesAsync(), READY_TIMEOUT_MS, crop.imageHash.slice(0, 8))
+    const piece: Piece = { hash: created.hash, bytes: item.bytes.length, mime: item.mime }
+    pieces.set(keys[at], piece)
+    out.push(piece)
+  }
+  return out
+}
+
+/**
+ * 전체본 W₀ 하나를 만든다(또는 캐시에서 찾는다). 손대지 않기로 했거나 실패하면 null — 그 사유의
+ * 통계(bytesUntouched·경고·원본 유지 바이트)는 여기서 적고, 처리한 결과의 통계는 부르는 쪽이
+ * 조각과 견준 뒤에 적는다.
+ */
 async function shrinkOne(
   plan: ImagePlan,
   settings: Settings,
   send: ImageRequestSender,
   stats: ImageStats,
   keepOriginal?: OriginalSink
-): Promise<string | null> {
+): Promise<Whole | null> {
   const image = figma.getImageByHash(plan.imageHash)
   if (image === null) {
     stats.warnings.push({ code: 'image.missing', params: { hash: plan.imageHash.slice(0, 8) } })
@@ -293,11 +454,11 @@ async function shrinkOne(
   if (known !== undefined && !belowFloor) {
     seenImages.set(plan.imageHash, { longEdge, bytes: known.originalBytes })
     stats.bytesBefore += known.originalBytes
-    stats.bytesAfter += known.bytes
-    if (known.hash === null) return null
-    if (known.mime === 'image/jpeg') stats.bytesJpeg += known.bytes
-    stats.processed += 1
-    return known.hash
+    if (known.hash === null) {
+      stats.bytesAfter += known.bytes
+      return null
+    }
+    return { hash: known.hash, bytes: known.bytes, mime: known.mime, original: null, image }
   }
 
   original ??= await bytesOf(image, plan.imageHash)
@@ -362,16 +523,13 @@ async function shrinkOne(
     // 실제 바이트를 되읽어야 "그릴 수 있는 상태" 임이 보장된다.
     await withTimeout(created.getBytesAsync(), READY_TIMEOUT_MS, plan.imageHash.slice(0, 8))
 
-    stats.bytesAfter += result.bytes.length
-    if (result.mime === 'image/jpeg') stats.bytesJpeg += result.bytes.length
-    stats.processed += 1
     replacements.set(key, {
       hash: created.hash,
       bytes: result.bytes.length,
       mime: result.mime,
       originalBytes: original.length
     })
-    return created.hash
+    return { hash: created.hash, bytes: result.bytes.length, mime: result.mime, original, image }
   } catch (error) {
     // createImage 는 형식·크기 제한(4096)에 걸리면 throw 한다 (C4)
     stats.bytesAfter += original.length
@@ -386,13 +544,42 @@ async function shrinkOne(
   }
 }
 
-function applyReplacements(root: SceneNode, replacement: Map<string, string>): void {
+/** Figma 에 넘길 변환 — 우리 것은 읽기 전용 튜플이라 복사한다 */
+function toFigmaTransform(
+  transform: Transform
+): [[number, number, number], [number, number, number]] {
+  return [
+    [transform[0][0], transform[0][1], transform[0][2]],
+    [transform[1][0], transform[1][1], transform[1][2]]
+  ]
+}
+
+function applyReplacements(
+  root: SceneNode,
+  byHash: Map<string, string>,
+  byFill: Map<string, FillSwap>
+): void {
   const visit = (node: SceneNode): void => {
     if (hasFills(node) && Array.isArray(node.fills)) {
       let touched = false
-      const next = node.fills.map((paint) => {
+      const next = node.fills.map((paint, index): Paint => {
         if (paint.type !== 'IMAGE' || paint.imageHash === null) return paint
-        const swap = replacement.get(paint.imageHash)
+        // 조각은 그 자리만 — 같은 원본을 통째로 쓰는 다른 자리는 해시 교체로 간다
+        const piece = byFill.get(fillKey(node.id, index))
+        if (piece !== undefined) {
+          touched = true
+          const swapped: ImagePaint = {
+            type: 'IMAGE',
+            scaleMode: 'CROP',
+            imageHash: piece.hash,
+            imageTransform: toFigmaTransform(piece.transform),
+            visible: paint.visible,
+            opacity: paint.opacity,
+            blendMode: paint.blendMode
+          }
+          return paint.filters === undefined ? swapped : { ...swapped, filters: paint.filters }
+        }
+        const swap = byHash.get(paint.imageHash)
         if (swap === undefined) return paint
         touched = true
         return { ...paint, imageHash: swap }

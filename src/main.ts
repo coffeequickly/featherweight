@@ -19,17 +19,10 @@ import {
   sharperVariants
 } from './lib/fitToSize'
 import { PixelSize } from './lib/imageDensity'
-import { shouldShrink } from './lib/imageTarget'
 import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
 import { exportFrame, removeLeftoverClones } from './main/exporter'
-import {
-  forgetReplacements,
-  forgetSeenImages,
-  OriginalSink,
-  planFor,
-  seenImageInfo
-} from './main/images'
+import { forgetReplacements, forgetSeenImages, OriginalSink, probeItemsOf } from './main/images'
 import { loadEdgeCache } from './main/imageSize'
 import {
   clearFonts,
@@ -59,8 +52,12 @@ import {
   FontBytesHandler,
   FontBytesResultHandler,
   ImageResizeHandler,
+  ImageResizeManyHandler,
+  ImageResizeManyResultHandler,
   ImageResizeResultHandler,
   NoticeHandler,
+  ResizeManyRequestPayload,
+  ResizeManyResultPayload,
   ResizeRequestPayload,
   ResizeResultPayload,
   PdfPartHandler,
@@ -136,6 +133,12 @@ export default async function main(): Promise<void> {
   on<ImageResizeResultHandler>('image:resize:result', (payload: ResizeResultPayload) => {
     settleResponse(payload.reqId, payload)
   })
+  on<ImageResizeManyResultHandler>(
+    'image:resizeMany:result',
+    (payload: ResizeManyResultPayload) => {
+      settleResponse(payload.reqId, payload)
+    }
+  )
 
   // 목표 용량 탐색: UI 가 머지해 잰 실제 PDF 크기
   on<ImageProbeResultHandler>('image:probe:result', (payload) => {
@@ -337,6 +340,9 @@ async function runPass(
       sendResizeRequest: (payload: ResizeRequestPayload) => {
         emit<ImageResizeHandler>('image:resize', payload)
       },
+      sendResizeManyRequest: (payload: ResizeManyRequestPayload) => {
+        emit<ImageResizeManyHandler>('image:resizeMany', payload)
+      },
       keepOriginal,
       // 이미지 진행은 그 페이지 몫(1/총쪽수) 안에서만 움직인다
       onImageProgress: (current, total) => {
@@ -403,7 +409,14 @@ async function runFitExport(order: string[], settings: Settings, outName: string
   const baselineBytes: ImageBytes = { total: measured.imageBytes, jpeg: measured.imageJpegBytes }
   const ratio = calibrationRatio(measured.pdfImageBytes, baselineBytes)
 
-  const probes = await runProbes(order, fixed, targetBytes, baselineBytes, ratio)
+  const probes = await runProbes(
+    order,
+    fixed,
+    targetBytes,
+    baselineBytes,
+    ratio,
+    settings.cropToVisible
+  )
   const outcome = chooseProfile(probes, fixed, targetBytes, baselineBytes, ratio)
   const fit: FitReport = {
     targetBytes,
@@ -442,7 +455,8 @@ async function runProbes(
   fixed: number,
   targetBytes: number,
   baselineBytes: ImageBytes,
-  ratio: number
+  ratio: number,
+  cropToVisible: boolean
 ): Promise<Probe[]> {
   const probes: Probe[] = []
   const baselineFits = predictSize(fixed, baselineBytes, ratio) <= targetBytes
@@ -456,7 +470,7 @@ async function runProbes(
   const probe = async (profile: CompressionProfile): Promise<boolean | null> => {
     step += 1
     reportProgress(t('progress.probe', { current: step, total }), step / total, FIT_PROBE)
-    const items = await probeItemsFor(order, profile)
+    const items = await probeItemsFor(order, profile, cropToVisible)
     if (items.length === 0) return null // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
 
     const reqId = nextRequestId('probe')
@@ -502,47 +516,22 @@ async function runProbes(
  * 하한은 프로필이 들고 있다 — 예전에는 사용자의 `settings.minEdge` 를 넘겼는데,
  * 그러면 최소를 올려 둔 사용자에게만 목표 용량이 덜 줄어든다. 화질을 알아서 정해 달라고
  * 맡긴 모드에서 사용자 설정이 탐색의 바닥을 막으면 안 된다.
+ *
+ * 항목은 **쪽마다** 만든다 — PDF 에는 쪽마다 한 벌씩 실리고, 같은 원본도 쪽마다 창·목표가
+ * 다를 수 있다. 같은 결과는 UI 가 인코딩 캐시로 재사용한다(imageCache.probeImageBytes).
  */
 async function probeItemsFor(
   order: string[],
-  profile: CompressionProfile
+  profile: CompressionProfile,
+  cropToVisible: boolean
 ): Promise<ImageProbeItem[]> {
-  const seen = seenImageInfo()
-  const byHash = new Map<string, ImageProbeItem>()
-
+  const items: ImageProbeItem[] = []
   for (const id of order) {
     const node = await figma.getNodeByIdAsync(id)
     if (node === null || node.removed || !('absoluteTransform' in node)) continue
-
-    const frame = node as SceneNode
-
-    for (const plan of planFor(frame, profile)) {
-      const info = seen.get(plan.imageHash)
-      if (info === undefined) continue // 기준 패스에서 못 본 이미지 — 셀 근거가 없다
-
-      // 탐색도 실제 export 와 같은 기준을 써야 예측이 맞는다
-      const skip = !shouldShrink(info.longEdge, plan.targetLongEdge)
-      const found = byHash.get(plan.imageHash)
-      if (found === undefined) {
-        byHash.set(plan.imageHash, {
-          imageHash: plan.imageHash,
-          targetLongEdge: plan.targetLongEdge,
-          skip,
-          originalBytes: info.bytes,
-          uses: 1
-        })
-        continue
-      }
-      // 같은 이미지를 여러 프레임이 쓰면 가장 크게 쓰는 쪽에 맞춘다. 인코딩은 한 번이지만
-      // PDF 에는 쪽마다 한 벌씩 실리므로 쓰는 쪽 수를 센다 — 31장에 깔린 배경을 한 번으로
-      // 세면 기준(쪽별 합)보다 30벌이 빠져 후보가 전부 "맞는다" 고 나온다
-      found.targetLongEdge = Math.max(found.targetLongEdge, plan.targetLongEdge)
-      found.skip = found.skip && skip
-      found.uses += 1
-    }
+    items.push(...probeItemsOf(node as SceneNode, profile, cropToVisible))
   }
-
-  return [...byHash.values()]
+  return items
 }
 
 /**

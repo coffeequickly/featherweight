@@ -34,6 +34,7 @@ type Props = {
   disabled: boolean
   onChange: (next: Settings) => void
   onFocus: (nodeIds: string[]) => void
+  onGoOptions: () => void
 }
 
 export function SizeBounds({
@@ -43,7 +44,8 @@ export function SizeBounds({
   rows,
   disabled,
   onChange,
-  onFocus
+  onFocus,
+  onGoOptions
 }: Props): JSX.Element {
   const frame = Math.max(1, Math.round(frameLongEdge))
 
@@ -109,7 +111,13 @@ export function SizeBounds({
       {/* 이미지가 없으면 할 말이 없다 — "이미지 0장이 이미 이 범위 안에 있습니다" 는
           답이 아니라 빈칸을 채운 문장이다. 목록 쪽이 이미 없다고 말한다 */}
       {rows.length === 0 ? null : (
-        <Cut rows={rows} frame={frame} mixedFrames={mixedFrames} multiplier={settings.multiplier} />
+        <Cut
+          rows={rows}
+          frame={frame}
+          mixedFrames={mixedFrames}
+          settings={settings}
+          onGoOptions={onGoOptions}
+        />
       )}
     </Fragment>
   )
@@ -177,8 +185,10 @@ function BoundSlider<T extends number>({
 }
 
 /**
- * 이 설정이 무엇을 하는지 한 줄로. 예전에는 확대율·DPI·기준 프레임·절감률을 각각 한 줄씩
- * 네 줄로 늘어놓아 벽이 됐다 — 읽히는 것은 결국 "몇 장이 얼마나 줄어드나" 다.
+ * 이 설정이 무엇을 하는지 — 줄어드는 장수, 선명도, 잘라 넣기 상태, 상한 경고. 한 덩어리로
+ * 같은 간격에 둔다(따로 흩어 두니 문단마다 빈 줄이 낀 것처럼 보였다는 제보, 2026-09-11).
+ * 예전에는 확대율·DPI·기준 프레임·절감률을 각각 한 줄씩 늘어놓아 벽이 됐다 — 읽히는 것은
+ * 결국 "몇 장이 얼마나 줄어드나" 다.
  *
  * 픽셀이지 바이트가 아니다. 바이트는 그림 내용에 따라 갈려서 내보내기 전에는 못 말한다.
  */
@@ -186,23 +196,38 @@ function Cut({
   rows,
   frame,
   mixedFrames,
-  multiplier
+  settings,
+  onGoOptions
 }: {
   rows: ImageRow[]
   frame: number
   mixedFrames: boolean
-  multiplier: number
+  settings: Settings
+  onGoOptions: () => void
 }): JSX.Element {
+  const { multiplier, cropToVisible } = settings
   const sized = rows.filter((row) => row.original !== null)
   let before = 0
   let after = 0
   for (const row of sized) {
     const original = row.original as number
-    const final = row.kept ? original : Math.min(original, row.target)
-    before += original * original
-    after += final * final
+    // 크기를 알면 진짜 픽셀 수(잘라 넣는 것은 조각)로, 모르면 긴 변의 제곱으로 어림한다
+    const source = row.pixels ?? original * original
+    const stored = row.storedPixels ?? (row.kept ? source : Math.min(original, row.target) ** 2)
+    before += source
+    after += stored
   }
   const shrink = sized.filter((row) => !row.kept).length
+  // 잘라 넣기 상태와 해당 장수 — 켜져 있으면 조각 계획이 선 것, 꺼져 있으면 켰을 때 해당될 것
+  const partial = cropToVisible
+    ? sized.filter((row) => row.crop !== null).length
+    : sized.filter((row) => !row.kept && row.partial).length
+  const cropLine =
+    partial === 0
+      ? t(cropToVisible ? 'images.cropOnNone' : 'images.cropOffNone')
+      : t(cropToVisible ? 'images.cropOn' : 'images.cropOff', { count: partial })
+  // 상한이 배율을 이겼다 — 고른 값이 그대로 안 나간다는 사실은 조용히 두면 안 된다
+  const capped = sized.filter((row) => row.capped).length
   const percent = before === 0 ? 0 : Math.max(0, Math.round((1 - after / before) * 100))
 
   return (
@@ -225,6 +250,22 @@ function Cut({
           </Muted>
         </Text>
       </p>
+      {/* 잘라 넣기 켜짐/꺼짐 — 줄 전체가 옵션 탭으로 가는 버튼이다. 상태만 보여 주고 바꾸러
+          갈 길을 안 주면 옵션 탭을 뒤지게 된다. 크기를 읽는 중에는 장수를 못 세니 안 보인다 */}
+      {sized.length === 0 ? null : (
+        <p class="chartWhy">
+          <button type="button" class="linkLine" onClick={onGoOptions}>
+            <Text>
+              <Muted>{cropLine}</Muted> <span class="linkWord">{t('images.cropGo')}</span>
+            </Text>
+          </button>
+        </p>
+      )}
+      {capped === 0 ? null : (
+        <p class="chartWhy chartWarn">
+          <Text>{t('images.cappedSays', { count: capped, maxEdge: settings.maxEdge })}</Text>
+        </p>
+      )}
     </div>
   )
 }

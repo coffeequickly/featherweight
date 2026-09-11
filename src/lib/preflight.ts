@@ -5,7 +5,10 @@
 // 규칙이 갈라지면 예고와 결과가 어긋나고, 그 순간 예고는 믿을 수 없는 것이 된다.
 
 import { missingFonts } from './fontStatus'
-import { planImageTargets, shouldShrink } from './imageTarget'
+import { isWhole, paintCoverage } from './cropWindow'
+import { frameImagePlan, windowOf } from './imageCrop'
+import { PixelSize } from './imageDensity'
+import { planImageTargets, scaledSize, shouldShrink } from './imageTarget'
 import { FontUsage, FrameItem, Preflight, Reason, Settings, StoredFont, TextReject } from './types'
 
 export type ImageForecast = {
@@ -51,6 +54,16 @@ export function forecastImages(preflight: Preflight, settings: Settings): ImageF
   return { total: all.size, shrink: shrink.size, tiny, unsized }
 }
 
+export type ImageCropRow = {
+  /** 조각의 저장 긴 변(px) — 화면의 "저장" 열은 통째 대신 이것을 보인다 */
+  target: number
+  /** 원본 넓이 가운데 잘라 버리는 비(0~1). 감싸는 사각형 기준이라 돌린 창은 창보다 조금 덜 버린다 */
+  cut: number
+  /** 조각의 저장 크기(px) — 그림(SizeDiagram)이 조각 모양대로 그린다 */
+  width: number
+  height: number
+}
+
 export type ImageRow = {
   imageHash: string
   /** 이 이미지를 가장 크게 쓰는 레이어의 이름 — 목록에서 어느 그림인지 가리키는 단서 */
@@ -73,6 +86,25 @@ export type ImageRow = {
   visible: number
   /** 이 그림을 쓰는 레이어들 — 목록에서 누르면 캔버스에서 그것들을 보여 준다 */
   nodeIds: string[]
+  /**
+   * 모든 자리가 원본의 일부만 쓰는가(자르기 모드, 비율이 어긋난 FILL). 통째로 쓰는 자리가 하나라도
+   * 있으면 false. 잘라 넣기가 꺼졌을 때 "그래도 통째로 간다" 를 세는 데 쓴다. 크기를 모르면 false
+   */
+  partial: boolean
+  /**
+   * 지면에 보이는 원본 넓이의 비(0~1) — 가장 크게 놓인 자리의 창 × 프레임 안에 남는 비.
+   * 원본 크기를 몰라 창을 못 셈하면 null. 화면의 "쓰는 영역" 열이다
+   */
+  used: number | null
+  /** 원본 픽셀 수(가로×세로). 크기를 모르면 null */
+  pixels: number | null
+  /** 지금 계획대로면 PDF 에 실릴 픽셀 수 — 그대로면 원본, 잘라 넣으면 조각. 크기를 모르면 null */
+  storedPixels: number | null
+  /**
+   * 가장 크게 놓인 자리의 잘라 넣기 계획. null 이면 통째로 간다 — 통째로 쓰는 자리가 있거나,
+   * 옵션이 꺼졌거나, 손대지 않는 그림. 채택은 export 가 바이트를 재 보고 정한다(docs/IMAGE-CROP.md)
+   */
+  crop: ImageCropRow | null
   /** 짧은 변 ÷ 긴 변(0~1). 그림을 진짜 비로 그리는 데 쓴다. 모르면 1 */
   aspect: number
   /** 이 그림이 캔버스에 놓인 긴 변(pt). 최대 바가 도달 px 를 셈하는 기준이다 */
@@ -92,25 +124,99 @@ export type ImageRow = {
  * 볼 이유가 있는 줄이 위에 있어야 한다.
  */
 export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[] {
-  /** 해시별로 가장 큰 목표와, 그 목표를 만든 자리의 이름·표시 크기·기준선 */
-  const best = new Map<
-    string,
-    { name: string; shown: number; target: number; visible: number; nodeIds: string[] }
-  >()
+  const sizes: Record<string, PixelSize> = preflight.imageSizes ?? {}
+
+  /** 해시별로 가장 큰 목표와, 가장 크게 놓인 자리의 이름·표시 크기·보이는 비·조각 계획 */
+  type Largest = {
+    name: string
+    shown: number
+    target: number
+    visible: number
+    nodeIds: string[]
+    used: number | null
+    crop: ImageCropRow | null
+  }
+  const best = new Map<string, Largest>()
+
+  /** 해시마다: 통째로 쓰는 자리가 있었나, 일부만 쓰는 자리가 있었나 */
+  const wholeOf = new Set<string>()
+  const partialOf = new Set<string>()
 
   for (const frame of preflight.frames) {
-    const nameOf = new Map<string, { name: string; edge: number; visible: number }>()
+    /** 이 프레임에서 가장 크게 놓인 자리 — 창 넓이 비(모르면 null)까지 */
+    type At = {
+      name: string
+      edge: number
+      visible: number
+      nodeId: string
+      fillIndex: number | undefined
+      window: number | null
+    }
+    const nameOf = new Map<string, At>()
     for (const usage of frame.images) {
       const edge = Math.max(usage.width, usage.height)
+      const size = sizes[usage.imageHash]
+      let window: number | null = null
+      if (size !== undefined) {
+        const paint = windowOf(usage, size)
+        if (paint === null || isWhole(paint.bbox)) {
+          wholeOf.add(usage.imageHash)
+          // 잘라 넣을 수 없어도 비는 말한다 — FIT 은 전체, 원본 밖까지 나간 CROP 창(이미지를 상자보다
+          // 작게 놓은 것)은 겹치는 만큼. TILE 은 셈할 것이 없다
+          window =
+            paint !== null || usage.scaleMode === 'FIT'
+              ? 1
+              : usage.cropTransform === undefined
+                ? null
+                : paintCoverage(usage.cropTransform)
+        } else {
+          partialOf.add(usage.imageHash)
+          // 창 넓이 비 = |det| — 돌린 창도 정확하다
+          const [[a, b], [c, d]] = paint.transform
+          window = Math.min(1, Math.abs(a * d - b * c))
+        }
+      }
+      // 목표를 정하는 것은 가장 크게 쓰는 자리다 — 보이는 비도 그 자리의 것을 쓴다
       const found = nameOf.get(usage.imageHash)
-      // 목표를 정하는 것은 가장 크게 쓰는 자리다 — 잘린 비도 그 자리의 것을 쓴다
       if (found === undefined || edge > found.edge) {
-        nameOf.set(usage.imageHash, { name: usage.name, edge, visible: usage.visible })
+        nameOf.set(usage.imageHash, {
+          name: usage.name,
+          edge,
+          visible: usage.visible,
+          nodeId: usage.nodeId,
+          fillIndex: usage.fillIndex,
+          window
+        })
       }
     }
 
-    for (const plan of planImageTargets(frame.images, settings, preflight.imageSizes)) {
+    // export 와 같은 계획(목표 + 조각) — 예고가 결과와 어긋나면 그 순간 예고는 믿을 수 없는 것이 된다
+    const { plans, crops } = frameImagePlan(frame.images, settings, sizes)
+    for (const plan of plans) {
       const at = nameOf.get(plan.imageHash)
+      const size = sizes[plan.imageHash]
+      const used = at === undefined || at.window === null ? null : at.window * at.visible
+      // 이 자리의 조각 — 옵션이 켜져 있고 이 쪽에 계획이 있을 때. 채택은 export 가 바이트로 정한다
+      let crop: ImageCropRow | null = null
+      if (settings.cropToVisible && at !== undefined && size !== undefined) {
+        const piece = crops
+          .get(plan.imageHash)
+          ?.pieces.find((candidate) =>
+            candidate.fills.some(
+              (fill) => fill.nodeId === at.nodeId && fill.fillIndex === at.fillIndex
+            )
+          )
+        if (piece !== undefined) {
+          const stored = scaledSize(piece.rect.w, piece.rect.h, piece.targetLongEdge)
+          crop = {
+            target: Math.max(stored.width, stored.height),
+            cut: 1 - (piece.rect.w * piece.rect.h) / (size.width * size.height),
+            width: stored.width,
+            height: stored.height
+          }
+        }
+      }
+
       const found = best.get(plan.imageHash)
       // 자리는 여러 프레임에 흩어져 있다 — 목표는 가장 큰 것을 따르되 레이어는 다 모은다
       const nodeIds = [...new Set([...(found?.nodeIds ?? []), ...plan.nodeIds])]
@@ -120,13 +226,15 @@ export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[
           shown: at?.edge ?? 0,
           target: plan.targetLongEdge,
           visible: at?.visible ?? 1,
-          nodeIds
+          nodeIds,
+          used,
+          crop
         })
         continue
       }
       found.nodeIds = nodeIds
       found.target = Math.max(found.target, plan.targetLongEdge)
-      // 이름·표시 크기·잘린 비는 **가장 크게 놓인 자리**의 것이다. 예전에는 목표가 가장 큰
+      // 이름·표시 크기·보이는 비·조각은 **가장 크게 놓인 자리**의 것이다. 예전에는 목표가 가장 큰
       // 자리를 골랐는데, 목표는 설정을 타므로 상한을 올리면 승자가 바뀌어 같은 그림의
       // 이름이 갈아치워졌다(실기: 최대를 3840→5120 으로 올리자 대표 그림 이름이 바뀜).
       // 놓인 크기는 설정과 무관하니 여기서만은 그걸 기준으로 삼는다.
@@ -134,15 +242,17 @@ export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[
         found.name = at?.name ?? found.name
         found.shown = at?.edge ?? found.shown
         found.visible = at?.visible ?? found.visible
+        found.used = used
+        found.crop = crop
       }
     }
   }
 
   const rows: ImageRow[] = []
-  for (const [imageHash, { name, shown, target, visible, nodeIds }] of best) {
+  for (const [imageHash, { name, shown, target, visible, nodeIds, used, crop }] of best) {
     const edge = preflight.imageEdges[imageHash]
     const original = edge === undefined ? null : edge
-    const size = preflight.imageSizes?.[imageHash]
+    const size = sizes[imageHash]
     const aspect =
       size === undefined || size.width <= 0 || size.height <= 0
         ? 1
@@ -150,6 +260,16 @@ export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[
     // 제 목표보다 크고 절대 하한도 넘을 때만 손댄다 — 로고·아이콘은 어떤 문서에서도 그대로
     const kept = original === null ? false : !shouldShrink(original, target)
     const wanted = Math.max(Math.ceil(shown * settings.multiplier), settings.minEdge)
+    const pixels = size === undefined ? null : size.width * size.height
+    let storedPixels: number | null = null
+    if (size !== undefined) {
+      if (kept) storedPixels = pixels
+      else if (crop !== null) storedPixels = crop.width * crop.height
+      else {
+        const stored = scaledSize(size.width, size.height, target)
+        storedPixels = stored.width * stored.height
+      }
+    }
     rows.push({
       imageHash,
       name,
@@ -159,6 +279,11 @@ export function imageRoster(preflight: Preflight, settings: Settings): ImageRow[
       capped: settings.maxEdge < wanted,
       visible,
       nodeIds,
+      partial: partialOf.has(imageHash) && !wholeOf.has(imageHash),
+      used,
+      pixels,
+      storedPixels,
+      crop: kept ? null : crop,
       aspect,
       shown
     })

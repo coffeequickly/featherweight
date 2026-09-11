@@ -288,6 +288,16 @@ const MESSAGES = {
     en: 'Only those characters are replaced, from Inter first, then Pretendard. When off, the whole layer is outlined instead.',
     ko: '그 글자만 Inter, 그다음 Pretendard 순으로 대체합니다. 끄면 그 텍스트 전체를 아웃라인으로 내보냅니다.'
   },
+  'settings.sectionImages': { en: 'Images', ko: '이미지' },
+  /** 보이는 창만 잘라 넣기 — 기본 켬. 끄면 예전처럼 통째로 줄인다 (docs/IMAGE-CROP.md) */
+  'settings.cropToVisible': {
+    en: 'Trim pictures to the visible area',
+    ko: '보이는 부분만 잘라 넣기'
+  },
+  'settings.cropToVisibleSays': {
+    en: 'Pictures that show only part of the original are trimmed to that part — only when every placement stays as sharp as before and the PDF gets smaller. When off, the whole picture is downscaled as before.',
+    ko: '원본의 일부만 보이는 그림은 그 부분만 실습니다 — 자리마다 지금만큼 선명하고 PDF가 작아질 때만. 끄면 예전처럼 그림을 통째로 줄입니다.'
+  },
   'settings.outlineAllSays': {
     en: 'Converts all text to outlines. Search and copy may be limited, and text may not be recognized by an ATS.',
     ko: '모든 텍스트를 아웃라인으로 변환합니다. 검색·복사가 제한되거나 채용 시스템(ATS)에서 텍스트를 인식하지 못할 수 있습니다.'
@@ -301,9 +311,9 @@ const MESSAGES = {
   // 셋(배율·확대율·DPI)은 한 값에서 나온다 — 따로 넘기면 서로 어긋날 수 있다
   'images.zoomSays': {
     en: (p) =>
-      `Stays sharp when zoomed to ${Number(p.multiplier) * 100}%. That is ${Math.round(Number(p.multiplier) * 72)} DPI in print.`,
+      `Stays sharp zoomed to ${Number(p.multiplier) * 100}%, or ${Math.round(Number(p.multiplier) * 72)} DPI in print.`,
     ko: (p) =>
-      `${Number(p.multiplier) * 100}%까지 확대해도 선명합니다. 인쇄 기준으로 ${Math.round(Number(p.multiplier) * 72)} DPI입니다.`
+      `${Number(p.multiplier) * 100}%까지 확대해도 선명하고, 인쇄로는 ${Math.round(Number(p.multiplier) * 72)} DPI입니다.`
   },
   'images.largestSays': {
     en: 'The largest placed image becomes {target}px. Smaller ones keep only what they show.',
@@ -316,7 +326,7 @@ const MESSAGES = {
   'images.cappedSays': {
     en: (p) =>
       `${n(Number(p.count), 'image hits', 'images hit')} the ${p.maxEdge}px maximum and are exported smaller than the chosen scale. Raise Largest to give them room.`,
-    ko: '이미지 {count}장은 최대 {maxEdge}px에 걸려, 고른 배율보다 작게 나갑니다. 더 키우려면 최대를 올리세요.'
+    ko: '이미지 {count}장은 최대 {maxEdge}px에 걸려 고른 배율보다 작게 저장됩니다. 더 키우려면 최대값을 올리세요.'
   },
   'images.boundLargest': { en: 'Largest', ko: '최대' },
   'images.boundSmallest': { en: 'Smallest', ko: '최소' },
@@ -337,17 +347,41 @@ const MESSAGES = {
   'images.repKept': { en: '{original}px, unchanged', ko: '{original}px 그대로' },
   'images.mixedFrames': {
     en: 'Frames vary in size; the largest is {size}pt.',
-    ko: '프레임 크기는 여러 가지이고 가장 큰 것이 {size}pt입니다.'
+    ko: '프레임 크기가 여러 가지라 가장 큰 {size}pt를 기준으로 셉니다.'
   },
   /** 바이트가 아니라 픽셀이다 — 바이트는 그림 내용에 따라 갈려서 내보내기 전에 못 말한다 */
+  /** 용량은 그림 내용에 달렸다는 말은 뺐다 — 세 문장이 벽이 됐다. 픽셀 비율이면 뜻은 전달된다 */
   'images.cutSays': {
     en: (p) =>
-      `${p.shrink} of ${n(Number(p.total), 'image', 'images')} will be downscaled, cutting ${p.percent}% of the pixels. Bytes depend on what the pictures contain.`,
-    ko: '이미지 {total}장 중 {shrink}장이 줄어듭니다. 픽셀로는 {percent}% 줄어듭니다. 실제 용량은 그림 내용에 따라 달라집니다.'
+      `${p.shrink} of ${n(Number(p.total), 'image', 'images')} will be downscaled — ${p.percent}% fewer pixels.`,
+    ko: '이미지 {total}장 중 {shrink}장을 줄입니다. 픽셀은 {percent}% 줄어듭니다.'
   },
+  /**
+   * 잘라 넣기 상태 한 줄 — 이미지 크기 섹션에서 켜짐/꺼짐과 해당 장수를 말하고, 누르면 옵션 탭.
+   * 켜져 있을 때의 장수는 조각 계획이 선 그림이다. 채택은 export 가 바이트로 정한다
+   */
+  'images.cropOn': {
+    en: (p) =>
+      `Trim to visible area is on — applies to ${n(Number(p.count), 'partly used picture', 'partly used pictures')}.`,
+    ko: '보이는 부분만 잘라 넣기 켜짐 — 일부만 쓰는 {count}장에 적용됩니다.'
+  },
+  'images.cropOff': {
+    en: (p) =>
+      `Trim to visible area is off — ${n(Number(p.count), 'partly used picture is', 'partly used pictures are')} embedded whole.`,
+    ko: '보이는 부분만 잘라 넣기 꺼짐 — 일부만 쓰는 {count}장도 통째로 싣습니다.'
+  },
+  'images.cropOnNone': {
+    en: 'Trim to visible area is on — no picture here is partly used.',
+    ko: '보이는 부분만 잘라 넣기 켜짐 — 일부만 쓰는 그림은 없습니다.'
+  },
+  'images.cropOffNone': {
+    en: 'Trim to visible area is off — no picture here is partly used.',
+    ko: '보이는 부분만 잘라 넣기 꺼짐 — 일부만 쓰는 그림은 없습니다.'
+  },
+  'images.cropGo': { en: 'Options ›', ko: '옵션 ›' },
   'images.cutNone': {
     en: (p) => `${n(Number(p.total), 'image is', 'images are')} already within this range.`,
-    ko: '이미지 {total}장이 이미 이 범위 안에 있습니다.'
+    ko: '이미지 {total}장 모두 이 범위 안이라 줄일 것이 없습니다.'
   },
   /** 원본 크기는 비동기로 들어온다 — 그동안 "0장" 이라고 말하면 안 된다 */
   'images.cutMeasuring': {
@@ -364,23 +398,33 @@ const MESSAGES = {
     en: 'Show this layer on the canvas',
     ko: '이 레이어를 캔버스에서 보여 줍니다'
   },
-  /** 프레임 밖으로 넘쳐 잘리는 그림 — 목록 행에 붙는 짧은 표시 */
-  'images.listClipped': { en: '{percent}% shown', ko: '{percent}%만 보임' },
   /**
-   * 자르지 않고 통째로 줄이기 때문에 안 보이는 픽셀도 실린다. 고칠 곳은 Figma 쪽이다 —
-   * 우리가 잘라 넣는 것은 노드 기하까지 바꾸는 일이라 아직 하지 않는다(개선 계획 37).
+   * 목록의 열 이름. 숫자만 두면 무슨 비인지 모른다 — "42%만 씀" 이 뭔 소리냐는 제보(2026-09-11).
+   * 쓰는 영역 = 지면에 보이는 원본 넓이의 비, 잘라냄 = 잘라 넣으며 버리는 원본 넓이의 비
+   */
+  'images.headUsed': { en: 'Area used', ko: '쓰는 영역' },
+  'images.headFrom': { en: 'Original', ko: '원본' },
+  'images.headTo': { en: 'Stored', ko: '저장' },
+  'images.headCut': { en: 'Trimmed', ko: '잘라냄' },
+  /** 잘라 넣는 줄 — 버리는 비 */
+  'images.listCut': { en: '{percent}%', ko: '{percent}%' },
+  /** 일부만 보이는데 통째로 가는 줄 — 프레임 밖으로 넘침, 통째로 쓰는 자리가 있음, 옵션 꺼짐 */
+  'images.listWhole': { en: 'whole', ko: '통째로' },
+  /**
+   * 프레임 밖으로 넘친 부분은 잘라 넣지 않는다 — 노드 기하까지 바꾸는 일이라 아직(개선 계획 37).
+   * 상자 안에서 잘라 쓴 부분(CROP·비율 어긋난 FILL)은 잘라 넣으므로 그쪽 얘기와 섞이지 않게 쓴다.
    */
   'images.clippedSays': {
     en: (p) =>
       (Number(p.count) === 1
         ? `One image extends past the frame and is cut off. Only ${p.percent}% of it is shown.`
         : `${p.count} images extend past the frame and are cut off. As little as ${p.percent}% of one is shown.`) +
-      ' The hidden part still takes up pixels in the PDF, because the whole image is scaled rather than cropped. Cropping it in Figma makes both files smaller.',
+      ' The part outside the frame is not trimmed — the whole image is scaled — so it still takes up pixels in the PDF. Cropping it in Figma makes both files smaller.',
     ko: (p) =>
       (Number(p.count) === 1
         ? `이미지 1장이 프레임 밖으로 넘쳐 잘립니다. ${p.percent}%만 보입니다.`
         : `이미지 ${p.count}장이 프레임 밖으로 넘쳐 잘립니다. 적게는 ${p.percent}%만 보입니다.`) +
-      ' 이미지를 자르지 않고 통째로 줄이기 때문에 안 보이는 부분도 PDF에 그대로 실립니다. Figma에서 잘라 두면 원본 파일도 함께 가벼워집니다.'
+      ' 프레임 밖으로 넘친 부분은 잘라 넣지 않고 통째로 줄이므로 PDF에 그대로 실립니다. Figma에서 잘라 두면 원본 파일도 함께 가벼워집니다.'
   },
   'images.listUnsized': { en: 'reading size', ko: '크기 읽는 중' },
   'images.listMore': {
@@ -721,6 +765,16 @@ const MESSAGES = {
   'result.imagesKept': {
     en: (p) => `${n(Number(p.count), 'image', 'images')} exported unchanged`,
     ko: '{count}장은 그대로 내보냈습니다'
+  },
+  /** 보이는 창만 잘라 넣은 원본 — 품질은 기존 그대로, 바이트만 줄었을 때. "화질 개선" 이라 적지 않는다 */
+  'result.imagesCropped': {
+    en: (p) => `${n(Number(p.count), 'image', 'images')} trimmed to the visible area only`,
+    ko: '{count}장은 보이는 부분만 실었습니다'
+  },
+  /** 조각을 만들다 실패해 기존 방식으로 물러선 원본 — 출력은 정상. 처리 실패(경고)와 구분한다 */
+  'result.imagesRecovered': {
+    en: (p) => `${n(Number(p.count), 'image was', 'images were')} optimized the usual way instead`,
+    ko: '{count}장은 기존 방식으로 최적화했습니다'
   },
   /** 파일 안에서 이미지가 차지하는 몫 — 더 줄일 값어치가 있는지 판단할 근거다 */
   'result.imageShare': {

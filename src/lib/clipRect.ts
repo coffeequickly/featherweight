@@ -10,6 +10,15 @@
 
 export type Rect = { x: number; y: number; width: number; height: number }
 
+/**
+ * 아무것도 안 보이는 클립. `null`("클립 없음 — 다 보인다")의 반대다.
+ *
+ * 클립끼리 겹치는 데가 없으면 intersect 가 null 을 주는데, 그 null 을 다음 단계가 "클립 없음"
+ * 으로 읽어 부모 밖으로 통째로 나간 프레임 안의 그림이 다 보이는 것으로 잡혔다. 넓이가 0 이라
+ * 무엇과 겹쳐도 null 이고, visibleFraction 은 그걸 0 으로 센다.
+ */
+export const EMPTY_CLIP: Rect = { x: 0, y: 0, width: 0, height: 0 }
+
 /** 겹치는 부분. 안 겹치면 null (맞닿기만 한 것도 겹친 것으로 치지 않는다) */
 export function intersect(a: Rect, b: Rect): Rect | null {
   const x = Math.max(a.x, b.x)
@@ -23,7 +32,8 @@ export function intersect(a: Rect, b: Rect): Rect | null {
 /**
  * 노드에서 클립 안에 남는 넓이의 비. 1 이면 온전히 보이고, 0.47 이면 절반 넘게 잘린다.
  *
- * 클립이 없으면(프레임이 clipsContent 를 끈 경우) 잘리지 않으므로 1 이다.
+ * 클립이 없으면(null — 프레임이 clipsContent 를 끈 경우) 잘리지 않으므로 1 이고,
+ * 클립이 비었으면(EMPTY_CLIP) 0 이다.
  * 넓이가 0 인 노드도 1 로 둔다 — 잴 것이 없는데 "다 잘렸다" 고 말하면 거짓말이 된다.
  */
 export function visibleFraction(node: Rect, clip: Rect | null): number {

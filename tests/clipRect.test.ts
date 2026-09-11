@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { intersect, visibleFraction } from '../src/lib/clipRect'
+import { EMPTY_CLIP, intersect, visibleFraction } from '../src/lib/clipRect'
 
 const frame = { x: 0, y: 0, width: 1920, height: 1080 }
 
@@ -35,6 +35,11 @@ describe('visibleFraction', () => {
 
   it('클립이 없으면 잘리지 않는다', () => {
     expect(visibleFraction({ x: -5000, y: 0, width: 100, height: 100 }, null)).toBe(1)
+  })
+
+  it('클립이 비었으면 아무것도 안 보인다 — 클립 없음(null)과 반대다', () => {
+    expect(visibleFraction({ x: -5000, y: 0, width: 100, height: 100 }, EMPTY_CLIP)).toBe(0)
+    expect(visibleFraction({ x: 0, y: 0, width: 100, height: 100 }, EMPTY_CLIP)).toBe(0)
   })
 
   it('완전히 밖이면 0', () => {
