@@ -285,3 +285,21 @@ export function probeOrder(
 export function describeProfile(profile: CompressionProfile): string {
   return `${profile.multiplier}x max${profile.maxEdge} min${profile.minEdge} q${Math.round(profile.quality * 100)}${profile.reencodeOpaquePng ? '' : ' keep-png'}`
 }
+
+/** 실제 크기가 목표를 넘었을 때 다시 뽑아 보는 횟수의 상한 — 한 번이 곧 문서 전체 내보내기다 */
+export const MAX_FIT_RETRIES = 2
+
+/**
+ * 최종 PDF 의 실제 바이트가 목표를 넘었을 때 다음에 뽑아 볼 후보 — 선명도(픽셀)를 지키려고 같은
+ * 해상도에서 품질만 내린 것부터, 그다음 사다리의 아래 칸. 판단은 예측이 아니라 실제 바이트로 한다
+ * (실측: 예측이 낮게 나와 5.7·5.9 MB 목표를 각각 +0.5%·+0.7% 넘긴 실행이 있었다, 2026-09-11).
+ * 품질이 이미 바닥(MIN_QUALITY)이고 아래 칸도 없으면 빈 배열 — 그때는 못 맞췄다고 말한다.
+ */
+export function retryCandidates(chosen: CompressionProfile): CompressionProfile[] {
+  const out: CompressionProfile[] = []
+  const lower = Math.max(MIN_QUALITY, Math.round((chosen.quality - 0.04) * 100) / 100)
+  if (lower < chosen.quality - 0.005) out.push({ ...chosen, quality: lower })
+  const below = PROFILE_LADDER.find((rung) => sharpnessOrder(rung, chosen) > 0)
+  if (below !== undefined) out.push(below)
+  return out.slice(0, MAX_FIT_RETRIES)
+}

@@ -713,6 +713,11 @@ const MESSAGES = {
     en: 'Looking for the best quality that fits ({current}/{total})',
     ko: '목표 용량에 맞는 최적 화질을 찾는 중 ({current}/{total})'
   },
+  /** 최종 PDF 의 실제 크기가 목표를 넘어 다음 후보로 다시 뽑는 중 */
+  'progress.retry': {
+    en: 'The file came out over the target — re-exporting with the next candidate ({current}/{total})',
+    ko: '실제 크기가 목표를 넘어 다음 후보로 다시 내보내는 중 ({current}/{total})'
+  },
   'progress.refine': {
     en: 'Re-exporting at the chosen quality',
     ko: '선택한 화질로 다시 내보내는 중'
@@ -855,6 +860,17 @@ const MESSAGES = {
   'report.fitCandidates': {
     en: 'Candidates (predicted bytes): {list}',
     ko: '후보별 예측 바이트: {list}'
+  },
+  /** 한도 안에서 다시 뽑았지만 실제 크기가 목표를 넘었다 — 저장은 됐다, 사실만 말한다 */
+  'report.fitMissed': {
+    en: (p) =>
+      `Could not meet ${p.target} this time — re-exported ${n(Number(p.count), 'more time', 'more times')}, the file is ${p.actual}. Try a lower target or the Smallest preset.`,
+    ko: '이번 시도에서는 {target}을 맞추지 못했습니다 — {count}번 다시 뽑았지만 실제 {actual}입니다. 목표를 낮추거나 최소 용량 프리셋으로 다시 내보내세요.'
+  },
+  /** 시도마다 실제 바이트 — "배율×최대·품질 실제바이트", 목표 안이면 ✓ */
+  'report.fitAttempts': {
+    en: 'Actual size per attempt: {list}',
+    ko: '시도별 실제 바이트: {list}'
   },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",

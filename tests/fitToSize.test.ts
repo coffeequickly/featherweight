@@ -9,6 +9,8 @@ import {
   describeProfile,
   fixedBytes,
   probeOrder,
+  retryCandidates,
+  MAX_FIT_RETRIES,
   MAX_QUALITY,
   MIN_MIN_EDGE,
   MAX_TARGET_MB,
@@ -313,5 +315,24 @@ describe('describeProfile — 콘솔에 적는 자동 선택 설정(화면 문�
   it('배율·최대·최소·품질을 한 줄로, PNG 를 그대로 두는 맨 위 칸만 표시가 붙는다', () => {
     expect(describeProfile({ ...PROFILE_LADDER[6], quality: 0.74 })).toBe('1.1x max1280 min640 q74')
     expect(describeProfile(PROFILE_LADDER[0])).toBe('2x max4096 min1024 q92 keep-png')
+  })
+})
+
+describe('retryCandidates — 실제 크기가 목표를 넘었을 때 다음 후보', () => {
+  it('같은 해상도에서 품질 −0.04 가 먼저, 그다음 사다리 아래 칸 — 상한 두 개', () => {
+    const rung5 = PROFILE_LADDER[5]
+    const next = retryCandidates(rung5)
+    expect(next).toHaveLength(Math.min(2, MAX_FIT_RETRIES))
+    expect(next[0]).toEqual({ ...rung5, quality: 0.68 })
+    expect(next[1]).toEqual(PROFILE_LADDER[6])
+  })
+
+  it('품질만 올린 변형이 뽑혔으면 같은 해상도의 한 단계 아래 품질부터', () => {
+    const variant = { ...PROFILE_LADDER[5], quality: 0.76 }
+    expect(retryCandidates(variant)[0]).toEqual({ ...PROFILE_LADDER[5], quality: 0.72 })
+  })
+
+  it('맨 아래 칸(품질 바닥)이면 뽑아 볼 것이 없다', () => {
+    expect(retryCandidates(PROFILE_LADDER[PROFILE_LADDER.length - 1])).toEqual([])
   })
 })

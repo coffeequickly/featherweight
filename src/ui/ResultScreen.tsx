@@ -60,7 +60,10 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
 
   const fit = report.fit
   const missedTarget =
-    fit !== null && (fit.outcome === 'unreachable' || report.byteLength > fit.targetBytes)
+    fit !== null &&
+    (fit.outcome === 'unreachable' ||
+      fit.outcome === 'missed' ||
+      report.byteLength > fit.targetBytes)
   const outlined = report.fallbacks.length
   const embedded = report.textDrawn
   const total = embedded + outlined
@@ -131,8 +134,26 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
                     png: fit.profile.reencodeOpaquePng ? 'no' : 'yes',
                     count: fit.candidates ?? 0,
                     predicted: Math.round(fit.predictedBytes).toLocaleString(),
-                    actual: report.byteLength.toLocaleString(),
-                    error: errorPercent(fit.predictedBytes, report.byteLength)
+                    actual: (fit.attempts?.[0]?.actual ?? report.byteLength).toLocaleString(),
+                    error: errorPercent(
+                      fit.predictedBytes,
+                      fit.attempts?.[0]?.actual ?? report.byteLength
+                    )
+                  })}
+                </Muted>
+              </Text>
+            )}
+            {/* 다시 뽑았으면 시도마다 실제 바이트 — 마지막이 저장된 것 */}
+            {fit.attempts === undefined || fit.attempts.length < 2 ? null : (
+              <Text>
+                <Muted>
+                  {t('report.fitAttempts', {
+                    list: fit.attempts
+                      .map(
+                        (a) =>
+                          `${a.multiplier}×${a.maxEdge}·${Math.round(a.quality * 100)}% ${a.actual.toLocaleString()}${a.actual <= fit.targetBytes ? '✓' : ''}`
+                      )
+                      .join(' → ')
                   })}
                 </Muted>
               </Text>
@@ -397,6 +418,13 @@ function errorPercent(predicted: number, actual: number): string {
 
 function fitLine(fit: NonNullable<ExportReport['fit']>, actualBytes: number): string {
   const target = formatBytes(fit.targetBytes)
+  if (fit.outcome === 'missed') {
+    return t('report.fitMissed', {
+      target,
+      count: Math.max(0, (fit.attempts?.length ?? 1) - 1),
+      actual: formatBytes(actualBytes)
+    })
+  }
   if (fit.outcome === 'unreachable') {
     return t('report.fitUnreachable', {
       target,

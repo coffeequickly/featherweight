@@ -5,7 +5,9 @@ import {
   applyProfile,
   BASELINE_INDEX,
   calibrationRatio,
+  MAX_FIT_RETRIES,
   probeOrder,
+  retryCandidates,
   chooseProfile,
   describeProfile,
   clampTargetMb,
@@ -467,10 +469,50 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     return
   }
 
-  reportProgress(t('progress.refine'), 0, FIT_FINAL)
-  const chosen = applyProfile(settings, outcome.profile)
-  const second = await runPass(order, chosen, FIT_FINAL)
-  emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: second.skipped, fit })
+  // 최종 패스 — 그리고 다운로드 전에 완성된 PDF 의 실제 바이트를 잰다. 예측이 낮게 나와 목표를
+  // 살짝 넘긴 실행이 실제로 있었다(5.7·5.9 MB 목표, +0.5%·+0.7%). 넘으면 같은 해상도의 품질 조정
+  // 후보부터 한도 안에서 다시 뽑고, 판단은 실제 바이트로만 한다. 측정한 병합본은 UI 가 보관하므로
+  // 맞은 결과는 그대로 저장된다 — 다시 병합하지 않는다
+  let profile = outcome.profile
+  const queue = retryCandidates(profile)
+  const attempts: NonNullable<FitReport['attempts']> = []
+  let skipped: DoneReport['skipped'] = []
+  for (let attempt = 0; ; attempt += 1) {
+    reportProgress(
+      attempt === 0
+        ? t('progress.refine')
+        : t('progress.retry', { current: attempt, total: MAX_FIT_RETRIES }),
+      0,
+      FIT_FINAL
+    )
+    const pass = await runPass(order, applyProfile(settings, profile), FIT_FINAL)
+    skipped = pass.skipped
+    if (cancelled) break
+    reportProgress(t('progress.measure'), 1, FIT_FINAL)
+    const check = await requestMeasurement(outName)
+    // 크기를 못 쟀으면(머지 실패) 판단할 근거가 없다 — 이 패스의 결과로 마무리한다
+    if (check.pdfBytes <= 0) break
+    attempts.push({ ...profile, actual: check.pdfBytes })
+    console.log(
+      '[fit] attempt',
+      attempt,
+      describeProfile(profile),
+      'actual',
+      check.pdfBytes,
+      'target',
+      targetBytes
+    )
+    if (check.pdfBytes <= targetBytes) break
+    const next = queue.shift()
+    if (next === undefined) {
+      fit.outcome = 'missed'
+      break
+    }
+    profile = next
+  }
+  fit.profile = { ...profile }
+  fit.attempts = attempts
+  emit<DoneHandler>('done', { fileName: outName, cancelled, skipped, fit })
 }
 
 /**

@@ -424,7 +424,8 @@ export interface FitMeasuredHandler extends EventHandler {
 /** Fit to Size 결과 — 리포트에 그대로 보여준다 */
 export type FitReport = {
   targetBytes: number
-  outcome: 'fits' | 'already-small' | 'unreachable'
+  /** missed = 최종 PDF 의 실제 바이트가 목표를 넘어 한도 안에서 다시 뽑아 봤지만 못 맞췄다 */
+  outcome: 'fits' | 'already-small' | 'unreachable' | 'missed'
   /** 예측 크기 — unreachable 이면 이 문서에서 가능한 가장 작은 크기(하한) */
   predictedBytes: number
   /**
@@ -440,6 +441,15 @@ export type FitReport = {
   }
   /** 재본 후보 수 — 기준 패스는 빼고 */
   candidates?: number
+  /** 최종 패스마다(첫 시도 + 재시도) 뽑은 설정과 실제 PDF 바이트 — 마지막이 저장된 것 */
+  attempts?: Array<{
+    multiplier: number
+    maxEdge: number
+    minEdge: number
+    quality: number
+    reencodeOpaquePng: boolean
+    actual: number
+  }>
   /** 재본 후보마다 예측 바이트 — 탈락한 후보의 예측이 맞았는지 실제로 내보내 견주려면 이게 있어야 한다 */
   probes?: Array<{
     multiplier: number
