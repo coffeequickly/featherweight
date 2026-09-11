@@ -309,11 +309,9 @@ describe('probeOrder — 잘라 넣기가 켜져 있으면 기준이 목표를 �
   })
 })
 
-describe('describeProfile — 결과 탭에 적는 자동 선택 설정', () => {
+describe('describeProfile — 콘솔에 적는 자동 선택 설정(화면 문구는 i18n 이 조립)', () => {
   it('배율·최대·최소·품질을 한 줄로, PNG 를 그대로 두는 맨 위 칸만 표시가 붙는다', () => {
-    expect(describeProfile({ ...PROFILE_LADDER[6], quality: 0.74 })).toBe(
-      '1.1× · 1280px · 640px · 74%'
-    )
-    expect(describeProfile(PROFILE_LADDER[0])).toBe('2× · 4096px · 1024px · 92% · PNG 유지')
+    expect(describeProfile({ ...PROFILE_LADDER[6], quality: 0.74 })).toBe('1.1x max1280 min640 q74')
+    expect(describeProfile(PROFILE_LADDER[0])).toBe('2x max4096 min1024 q92 keep-png')
   })
 })

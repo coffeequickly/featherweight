@@ -25,7 +25,6 @@ import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
 import { groupReasons, unifyMissingGlyphs } from '../lib/preflight'
 import { NodesFocusHandler } from '../lib/types'
-import { describeProfile } from '../lib/fitToSize'
 import { Fold } from './Fold'
 import { useThumbUrl } from './FrameList'
 import { Section } from './Section'
@@ -125,8 +124,14 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
               <Text>
                 <Muted>
                   {t('report.fitProfile', {
-                    profile: describeProfile(fit.profile),
-                    count: fit.candidates ?? 0
+                    scale: fit.profile.multiplier,
+                    max: fit.profile.maxEdge,
+                    min: fit.profile.minEdge,
+                    quality: Math.round(fit.profile.quality * 100),
+                    png: fit.profile.reencodeOpaquePng ? 'no' : 'yes',
+                    count: fit.candidates ?? 0,
+                    predicted: formatBytes(fit.predictedBytes),
+                    actual: formatBytes(report.byteLength)
                   })}
                 </Muted>
               </Text>

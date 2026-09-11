@@ -840,10 +840,16 @@ const MESSAGES = {
     en: 'The exported file is {actual}, above the {target} target. Try a lower target or the Smallest preset.',
     ko: '내보낸 파일은 {actual}로 목표 용량 {target}을 초과했습니다. 목표 용량을 조정하거나 최소 용량 프리셋으로 다시 내보내세요.'
   },
-  /** 자동으로 고른 최종 설정 — 배율 · 최대 · 최소 · 품질. 칸 이름만으론 알 수 없어 적는다 */
+  /**
+   * 자동으로 고른 최종 설정 — 배율 · 최대 · 최소 · JPEG 품질. 칸 이름만으론 알 수 없어 적는다.
+   * png 가 'yes' 면 맨 위 칸(PNG 를 그대로 둠). 예측과 실제 바이트를 같이 적는다 — 예측식이 과하면
+   * 필요 이상으로 압축하는 셈이라, 그 차이가 보여야 한다
+   */
   'report.fitProfile': {
-    en: 'Chosen automatically: {profile} · {count} candidates measured',
-    ko: '자동 선택 {profile} · 후보 {count}개 재봄'
+    en: (p) =>
+      `Chosen automatically: scale ${p.scale}× · max ${p.max}px · min ${p.min}px · JPEG quality ${p.quality}%${p.png === 'yes' ? ' · PNG kept' : ''} · ${n(Number(p.count), 'candidate', 'candidates')} measured · predicted ${p.predicted}, actual ${p.actual}`,
+    ko: (p) =>
+      `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · 최소 ${p.min}px · JPEG 품질 ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''} · 후보 ${p.count}개 재봄 · 예측 ${p.predicted}, 실제 ${p.actual}`
   },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",

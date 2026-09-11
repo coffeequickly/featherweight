@@ -277,5 +277,5 @@ export function probeOrder(
  * 내보낼 때 이미지를 다시 인코딩한다 — 2026-09-11 실측, 네 PDF 의 JPEG 69장이 같은 양자화표). 그래서 적어 둔다.
  */
 export function describeProfile(profile: CompressionProfile): string {
-  return `${profile.multiplier}× · ${profile.maxEdge}px · ${profile.minEdge}px · ${Math.round(profile.quality * 100)}%${profile.reencodeOpaquePng ? '' : ' · PNG 유지'}`
+  return `${profile.multiplier}x max${profile.maxEdge} min${profile.minEdge} q${Math.round(profile.quality * 100)}${profile.reencodeOpaquePng ? '' : ' keep-png'}`
 }

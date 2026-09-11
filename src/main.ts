@@ -436,8 +436,14 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     fixed,
     'ratio',
     ratio.toFixed(3),
-    'baseline',
-    predictSize(fixed, baselineBytes, ratio),
+    'baseline measured',
+    measured.pdfBytes,
+    'baseline images(ours/pdf)',
+    `${measured.imageBytes}/${measured.pdfImageBytes}`,
+    'chosen',
+    describeProfile(chosenProfile),
+    'predicted',
+    outcome.predicted,
     probes.map(
       (probe) => `${describeProfile(probe.profile)} → ${predictSize(fixed, probe.bytes, ratio)}`
     )
