@@ -13,6 +13,7 @@ import {
   MAX_FIT_RETRIES,
   decideFit,
   fitAttemptPlan,
+  resolveSave,
   savedSource,
   MAX_QUALITY,
   MIN_MIN_EDGE,
@@ -432,5 +433,38 @@ describe('decideFit — 저장할 PDF 와 결과 상태는 실제 바이트로 �
     expect(savedSource(false, true, true)).toBe('best')
     expect(savedSource(false, false, true)).toBe('stash')
     expect(savedSource(false, true, false)).toBe('stash')
+  })
+})
+
+describe('resolveSave — 마지막 패스의 병합·측정이 실패했을 때', () => {
+  const target = 5_242_880
+  const baseline = PROFILE_LADDER[3]
+  const sharper = PROFILE_LADDER[2]
+
+  it('첫 최종 후보의 측정이 실패해도 기준본이 목표 안이면 보관본을 저장하고 기준 설정으로 적는다', () => {
+    const decision = decideFit(target, { profile: baseline, actual: 4_900_000 }, [], true, 'fits')
+    expect(resolveSave(decision, true, true, sharper)).toEqual({
+      saveBest: true,
+      profile: baseline
+    })
+  })
+
+  it('보관본이 없으면 저장되는 것은 실패한 후보의 재병합본 — 설정도 그것으로', () => {
+    const decision = decideFit(target, { profile: baseline, actual: 6_000_000 }, [], true, 'fits')
+    expect(resolveSave(decision, true, false, sharper)).toEqual({
+      saveBest: false,
+      profile: sharper
+    })
+  })
+
+  it('측정이 실패하지 않았으면 decideFit 그대로', () => {
+    const decision = decideFit(
+      target,
+      { profile: baseline, actual: 4_900_000 },
+      [{ profile: sharper, actual: 6_300_000 }],
+      true,
+      'fits'
+    )
+    expect(resolveSave(decision, false, true, null)).toEqual({ saveBest: true, profile: baseline })
   })
 })

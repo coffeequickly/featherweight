@@ -8,6 +8,7 @@ import {
   decideFit,
   FitAttempt,
   fitAttemptPlan,
+  resolveSave,
   MAX_FIT_RETRIES,
   probeOrder,
   retryCandidates,
@@ -495,6 +496,8 @@ async function runFitExport(order: string[], settings: Settings, outName: string
   const attempts: FitAttempt[] = []
   let skipped: DoneReport['skipped'] = []
   let measureFailed = false
+  /** 병합·측정이 실패한 패스의 설정 — 저장되는 것이 그 재병합본이면 설정도 그것으로 적는다 */
+  let failedProfile: CompressionProfile | null = null
   for (let index = 0; index < plan.length; index += 1) {
     const profile = plan[index]
     reportProgress(
@@ -512,6 +515,7 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     // 크기를 못 쟀으면(머지 실패) 판단할 근거가 없다 — 이 패스의 결과로 마무리한다
     if (check.pdfBytes <= 0) {
       measureFailed = true
+      failedProfile = profile
       break
     }
     attempts.push({ profile, actual: check.pdfBytes })
@@ -538,17 +542,22 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     retryCandidates(outcome.profile).length > 0,
     outcome.kind
   )
-  fit.outcome = measureFailed && attempts.length === 0 ? fit.outcome : decision.outcome
-  fit.profile = { ...decision.profile }
+  // 측정이 실패한 패스가 있으면 저장할 것과 적을 설정을 다시 정한다 — 목표 안 보관본이 있으면 그것
+  const keptFits =
+    baselineActual.actual <= targetBytes ||
+    attempts.some((attempt) => attempt.actual <= targetBytes)
+  const save = resolveSave(decision, measureFailed, keptFits, failedProfile)
+  fit.outcome = decision.outcome
+  fit.profile = { ...save.profile }
   fit.attempts = attempts.map((attempt) => ({ ...attempt.profile, actual: attempt.actual }))
-  console.log('[fit] decision', decision.save, describeProfile(decision.profile), decision.outcome)
-  emit<DoneHandler>('done', {
-    fileName: outName,
-    cancelled,
-    skipped,
-    fit,
-    saveBest: decision.save === 'best'
-  })
+  console.log(
+    '[fit] decision',
+    save.saveBest ? 'best' : 'last',
+    describeProfile(save.profile),
+    decision.outcome,
+    measureFailed ? '(measure failed)' : ''
+  )
+  emit<DoneHandler>('done', { fileName: outName, cancelled, skipped, fit, saveBest: save.saveBest })
 }
 
 /**

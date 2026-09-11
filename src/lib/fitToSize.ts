@@ -387,3 +387,20 @@ export function savedSource(
   if (hasArrived) return 'arrived'
   return saveBest && hasBest ? 'best' : 'stash'
 }
+
+/**
+ * 어느 병합본을 저장하고 어떤 설정으로 적을지 — 마지막 패스의 병합·측정이 실패한 경우까지.
+ * 측정이 실패하면 UI 의 마지막 측정 슬롯에는 그 실패한 패스의 조각이 남는다. 그때 목표 안 보관본이
+ * 있으면 그것을 저장하고(saveBest), 없으면 저장되는 것은 실패한 패스의 재병합본이니 설정도 그것으로
+ * 적는다 — 판정은 기준본으로 하면서 저장은 실패한 후보를 하던 불일치(검토).
+ */
+export function resolveSave(
+  decision: FitDecision,
+  measureFailed: boolean,
+  keptFits: boolean,
+  failedProfile: CompressionProfile | null
+): { saveBest: boolean; profile: CompressionProfile } {
+  if (measureFailed && keptFits) return { saveBest: true, profile: decision.profile }
+  if (measureFailed && failedProfile !== null) return { saveBest: false, profile: failedProfile }
+  return { saveBest: decision.save === 'best', profile: decision.profile }
+}
