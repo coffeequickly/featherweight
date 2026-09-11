@@ -858,8 +858,8 @@ const MESSAGES = {
   },
   /** 예측식의 재료 — 고정분 · 보정비 · 기준 측정 / PDF 안 이미지 · 기준 PDF */
   'report.fitCalibration': {
-    en: 'Calibration: fixed {fixed} B · ratio {ratio} · baseline measured {measured} B vs {pdfImages} B in PDF (PDF {pdf} B)',
-    ko: '예측 재료: 고정분 {fixed} B · 보정비 {ratio} · 기준 측정 {measured} B vs PDF 안 이미지 {pdfImages} B (기준 PDF {pdf} B)'
+    en: 'Calibration: fixed {fixed} B · ratio {ratio} · baseline measured {measured} B vs {own} B of ours in PDF (all images {pdfImages} B, PDF {pdf} B)',
+    ko: '예측 재료: 고정분 {fixed} B · 보정비 {ratio} · 기준 측정 {measured} B vs PDF 안 우리 이미지 {own} B (이미지 전체 {pdfImages} B, 기준 PDF {pdf} B)'
   },
   /** 재본 후보와 예측 바이트 — "배율×최대·품질 예측바이트", 목표 안이면 ✓ */
   'report.fitCandidates': {

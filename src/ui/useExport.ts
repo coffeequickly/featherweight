@@ -22,7 +22,7 @@ import {
 } from '../lib/types'
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
-import { forgetOriginals } from './imageCache'
+import { forgetOriginals, ownImageSizes } from './imageCache'
 import { savedSource } from '../lib/fitToSize'
 import { downloadPdf, ImageWeight, MergeOutput, mergePdfs, OutlineCost } from './pdf'
 import { drawTextLayer, FontCache } from './textLayer'
@@ -177,6 +177,7 @@ export function useExport(
       return await mergePdfs(collected, {
         title: fileName.replace(/\.pdf$/i, ''),
         createdAt: new Date(),
+        ownImageSizes: ownImageSizes(),
         drawText: wantsText.current
           ? async (document, page, index) => {
               const part = collected.find((candidate) => candidate.index === index)
@@ -210,7 +211,8 @@ export function useExport(
           pdfBytes: merged.bytes.length,
           imageBytes: imageBytesOf(collected),
           imageJpegBytes: imageJpegBytesOf(collected),
-          pdfImageBytes: merged.images.bytes
+          pdfImageBytes: merged.images.bytes,
+          pdfOwnImageBytes: merged.images.own
         })
       } catch {
         if (mine !== run.current) return
@@ -220,7 +222,8 @@ export function useExport(
           pdfBytes: 0,
           imageBytes: 0,
           imageJpegBytes: 0,
-          pdfImageBytes: 0
+          pdfImageBytes: 0,
+          pdfOwnImageBytes: 0
         })
       }
     }
@@ -285,7 +288,7 @@ export function useExport(
             substitutions: [],
             fit: done.fit ?? null,
             outlines: { fonts: 0, vectorBytes: 0 },
-            images: { count: 0, bytes: 0 },
+            images: { count: 0, bytes: 0, own: 0 },
             extractable: []
           })
           return
@@ -350,7 +353,11 @@ export function useExport(
           textEmbedded: wantsText.current,
           fit: logFit(done.fit ?? null, bytes.length),
           outlines: merged.outlines,
-          images: { count: distinctImages.size, bytes: merged.images.bytes },
+          images: {
+            count: distinctImages.size,
+            bytes: merged.images.bytes,
+            own: merged.images.own
+          },
           extractable: extractableText(collected)
         })
         setError(null)

@@ -166,6 +166,7 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
                     ratio: fit.calibration.ratio.toFixed(3),
                     measured: fit.calibration.baselineMeasured.toLocaleString(),
                     pdfImages: fit.calibration.pdfImageBytes.toLocaleString(),
+                    own: fit.calibration.pdfOwnImageBytes.toLocaleString(),
                     pdf: fit.calibration.pdfBytes.toLocaleString()
                   })}
                 </Muted>

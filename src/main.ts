@@ -411,9 +411,9 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     return
   }
 
-  // 고정분은 PDF 안에 실제로 든 이미지를 뺀 나머지. 우리가 센 바이트는 Figma 가 다시
-  // 압축해 넣는 몫만큼 부풀어 있어서 그 비율로 후보 예측을 보정한다 (fitToSize.predictSize)
-  const fixed = fixedBytes(measured.pdfBytes, measured.pdfImageBytes)
+  // 고정분은 PDF 에서 우리가 넣은 이미지를 뺀 나머지 — Figma 가 그림자·마스크를 스스로 래스터화한
+  // 이미지는 우리 설정으로 안 움직이니 고정분에 남긴다. 보정비도 우리 몫끼리 (fitToSize.predictSize)
+  const fixed = fixedBytes(measured.pdfBytes, measured.pdfOwnImageBytes)
   // 기준 패스도 후보와 같은 잣대(Figma 품질로 다시 인코딩한 크기)로 재서 보정비를 잡는다. 못 재면
   // (잴 이미지가 없다) 기준 패스가 실제로 넣은 바이트로 — 그때는 후보도 없다
   const baselineProbe = await probeBytes(
@@ -425,7 +425,7 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     total: measured.imageBytes,
     jpeg: measured.imageJpegBytes
   }
-  const ratio = calibrationRatio(measured.pdfImageBytes, baselineBytes)
+  const ratio = calibrationRatio(measured.pdfOwnImageBytes, baselineBytes)
 
   const probes = await runProbes(
     order,
@@ -449,6 +449,7 @@ async function runFitExport(order: string[], settings: Settings, outName: string
       ratio,
       baselineMeasured: baselineBytes.total,
       pdfImageBytes: measured.pdfImageBytes,
+      pdfOwnImageBytes: measured.pdfOwnImageBytes,
       pdfBytes: measured.pdfBytes
     },
     probes: probes.map((probe) => ({
@@ -466,8 +467,8 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     ratio.toFixed(3),
     'baseline measured',
     measured.pdfBytes,
-    'baseline images(export raw/pdf)',
-    `${measured.imageBytes}/${measured.pdfImageBytes}`,
+    'baseline images(export raw/pdf/pdf own)',
+    `${measured.imageBytes}/${measured.pdfImageBytes}/${measured.pdfOwnImageBytes}`,
     'chosen',
     describeProfile(chosenProfile),
     'predicted',
@@ -691,6 +692,7 @@ type Measured = {
   imageBytes: number
   imageJpegBytes: number
   pdfImageBytes: number
+  pdfOwnImageBytes: number
 }
 
 async function requestMeasurement(outName: string, keepUnder?: number): Promise<Measured> {

@@ -418,6 +418,8 @@ export interface FitMeasuredHandler extends EventHandler {
     /** imageBytes 중 우리가 만든 JPEG 몫 */
     imageJpegBytes: number
     pdfImageBytes: number
+    /** pdfImageBytes 중 우리가 넣은 이미지(치수 일치) 몫 — 나머지는 Figma 가 그림자·마스크를 래스터화한 것 */
+    pdfOwnImageBytes: number
   }) => void
 }
 
@@ -447,6 +449,8 @@ export type FitReport = {
     ratio: number
     baselineMeasured: number
     pdfImageBytes: number
+    /** pdfImageBytes 중 우리가 넣은 이미지 몫 — 보정비는 이걸로 잡는다 */
+    pdfOwnImageBytes: number
     pdfBytes: number
   }
   /** 최종 패스마다(첫 시도 + 재시도) 뽑은 설정과 실제 PDF 바이트 — 마지막이 저장된 것 */

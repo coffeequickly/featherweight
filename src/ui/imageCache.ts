@@ -8,6 +8,7 @@
 // 오래 안 쓴 것부터 버린다. export 가 끝나면 즉시 비운다.
 
 import { Encoded, ProbeTally, tallyProbe } from '../lib/imageProbe'
+import { imageDimensions } from '../lib/imageHeader'
 import { KEEP_BYTES_FLOOR, keepsOriginal } from '../lib/imageTarget'
 import { CropRect, ImageProbeItem } from '../lib/types'
 import { cloneBitmap, decodeImage, encodePiece, figmaSizeOf, isPng, resizeDecoded } from './resize'
@@ -19,9 +20,23 @@ const originals = new Map<string, Uint8Array>()
 // 원본을 그대로 넣을 때 PDF 안에서 차지할 크기 — 한 번 재면 실행 내내 같다
 const sizedOriginals = new Map<string, number>()
 let cachedBytes = 0
+// 이 실행에서 Figma 에 넣은(넣을 수 있는) 이미지의 치수 "WxH" — 머지된 PDF 안에서 우리 것을 알아보는 열쇠.
+// 줄인 출력은 그 치수로, 원본 그대로 가는 것은 원본 치수(EXIF 방향 반영)로 들어간다
+const ownSizes = new Set<string>()
+
+export function rememberOwnSize(width: number, height: number): void {
+  ownSizes.add(`${width}x${height}`)
+}
+
+export function ownImageSizes(): ReadonlySet<string> {
+  return ownSizes
+}
 
 export function rememberOriginal(imageHash: string, bytes: Uint8Array): void {
   if (originals.has(imageHash)) return
+  // 원본 그대로 들어가더라도 PDF 안에서 알아봐야 한다 — 치수부터 적는다
+  const size = imageDimensions(bytes)
+  if (size !== null) rememberOwnSize(size.width, size.height)
   // 혼자서 상한을 넘는 원본은 들고 있어 봐야 다른 것을 다 밀어낸다 — 재보지 않고 원본 크기로 센다
   if (bytes.length > MAX_CACHE_BYTES) return
 
@@ -42,6 +57,7 @@ export function rememberOriginal(imageHash: string, bytes: Uint8Array): void {
 export function forgetOriginals(): void {
   originals.clear()
   sizedOriginals.clear()
+  ownSizes.clear()
   cachedBytes = 0
 }
 

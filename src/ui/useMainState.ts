@@ -44,7 +44,7 @@ import {
 import { settleResponse } from './bridge'
 import { backfillFontFacts } from './fontFacts'
 import { resetFontCache } from './fontSource'
-import { forgetOriginals, probeImageBytes, rememberOriginal } from './imageCache'
+import { forgetOriginals, probeImageBytes, rememberOriginal, rememberOwnSize } from './imageCache'
 import { resizeImage, resizeMany } from './resize'
 import { ValidationOutcome, validateSources } from './validateText'
 
@@ -153,6 +153,7 @@ export function useMainState(): MainState {
       // 목표 용량 탐색이 같은 원본을 여러 설정으로 다시 재봐야 해서 들고 있는다
       if (payload.imageHash !== undefined) rememberOriginal(payload.imageHash, payload.bytes)
       void resizeImage(payload).then((result) => {
+        if (result.ok) rememberOwnSize(result.width, result.height)
         emit<ImageResizeResultHandler>('image:resize:result', { reqId: payload.reqId, ...result })
       })
     })
@@ -160,6 +161,8 @@ export function useMainState(): MainState {
     // 조각 여럿 — 원본을 한 번만 디코드한다 (resize.ts resizeMany)
     const offResizeMany = on<ImageResizeManyHandler>('image:resizeMany', (payload) => {
       void resizeMany(payload).then((result) => {
+        if (result.ok)
+          for (const piece of result.results) rememberOwnSize(piece.width, piece.height)
         emit<ImageResizeManyResultHandler>('image:resizeMany:result', {
           reqId: payload.reqId,
           ...result

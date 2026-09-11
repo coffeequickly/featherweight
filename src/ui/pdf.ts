@@ -2,7 +2,16 @@
 
 import { t } from '../lib/i18n'
 import { Reason } from '../lib/types'
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFPage, PDFRawStream, PDFStream } from 'pdf-lib'
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFNumber,
+  PDFPage,
+  PDFRawStream,
+  PDFStream
+} from 'pdf-lib'
 
 import { DrawResult, DrawSubstitution } from './textLayer'
 
@@ -13,6 +22,8 @@ export type MergeMeta = {
   createdAt: Date
   /** Phase 2: 페이지를 붙인 직후 그 위에 진짜 폰트로 텍스트를 얹는다 */
   drawText?: (document: PDFDocument, page: PDFPage, partIndex: number) => Promise<DrawResult>
+  /** 우리가 Figma 에 넣은 이미지의 치수("WxH") — PDF 안에서 우리 것과 Figma 가 스스로 래스터화한 것을 가른다 */
+  ownImageSizes?: ReadonlySet<string>
 }
 
 export type MergeOutput = PdfContents & {
@@ -53,6 +64,11 @@ export type ImageWeight = {
   /** 알파 마스크(smask)는 빼고 센 장수 */
   count: number
   bytes: number
+  /**
+   * bytes 중 우리가 넣은 이미지(치수가 일치)와 그 알파 마스크의 몫. 나머지는 Figma 가 그림자·마스크
+   * 같은 것을 스스로 래스터화한 것이라 우리 이미지 설정으로는 안 움직인다. 치수를 안 주면 bytes 와 같다
+   */
+  own: number
 }
 
 export type OutlineCost = {
@@ -109,7 +125,7 @@ export async function mergePdfs(
   out.setCreationDate(meta.createdAt)
   out.setModificationDate(meta.createdAt)
 
-  const contents = measurePdf(out)
+  const contents = measurePdf(out, meta.ownImageSizes)
 
   // save() 는 메타데이터를 건드리지 않는다. 덮어쓰는 쪽은 PDFDocument.load/create 이므로
   // 결과를 다시 읽어 확인할 때는 load(bytes, { updateMetadata: false }) 로 열어야 한다.
@@ -126,37 +142,54 @@ export async function mergePdfs(
  * 아웃라인의 무게를 잰다 — Type 3 폰트 개수와 페이지 벡터 콘텐츠의 바이트.
  * 둘 다 압축된 실제 크기로 센다 (파일에서 차지하는 몫).
  */
-function measurePdf(document: PDFDocument): PdfContents {
+function measurePdf(document: PDFDocument, ownImageSizes?: ReadonlySet<string>): PdfContents {
   return {
     pageCount: document.getPageCount(),
     outlines: measureOutlines(document),
-    images: measureImages(document)
+    images: measureImages(document, ownImageSizes)
   }
 }
 
-/** 이미지 XObject 의 장수와 압축된 바이트. smask 는 본체에 딸린 것이라 세지 않는다. */
-function measureImages(document: PDFDocument): ImageWeight {
+/**
+ * 이미지 XObject 의 장수와 압축된 바이트. smask 는 본체에 딸린 것이라 장수에 세지 않는다.
+ * ownSizes(우리가 넣은 이미지의 "WxH")를 주면 치수가 일치하는 이미지와 그 smask 의 바이트를 own 으로 따로
+ * 센다 — 실측(2026-09-12): 그림자 효과가 있는 프레임을 Figma 가 3204×5538 JPEG+알파로 통째 래스터화해
+ * 쪽마다 15 MB 를 넣었다. 그건 우리 이미지 설정과 무관하니 목표 용량 예측에서는 고정분이다.
+ */
+export function measureImages(document: PDFDocument, ownSizes?: ReadonlySet<string>): ImageWeight {
   // 알파 채널(smask)도 /Subtype /Image 이고 ColorSpace 도 갖는다 — 본체가 /SMask 로
-  // 가리키는 대상을 먼저 모아 두고 빼야 장수가 두 배로 세어지지 않는다.
-  const masks = new Set<string>()
+  // 가리키는 대상을 먼저 모아 두고 빼야 장수가 두 배로 세어지지 않는다. 본체가 우리 것이면 마스크도 우리 것
+  const masks = new Map<string, boolean>()
   for (const [, object] of document.context.enumerateIndirectObjects()) {
     if (!(object instanceof PDFStream)) continue
     const mask = object.dict.get(PDFName.of('SMask'))
-    if (mask !== undefined) masks.add(String(mask))
+    if (mask !== undefined) masks.set(String(mask), isOwnImage(object, ownSizes))
   }
 
   let count = 0
   let bytes = 0
+  let own = 0
   for (const [ref, object] of document.context.enumerateIndirectObjects()) {
     if (!(object instanceof PDFStream)) continue
     const subtype = object.dict.get(PDFName.of('Subtype'))
     if (!(subtype instanceof PDFName) || subtype.asString() !== '/Image') continue
 
-    bytes += object instanceof PDFRawStream ? object.contents.length : object.sizeInBytes()
-    if (!masks.has(String(ref))) count += 1
+    const size = object instanceof PDFRawStream ? object.contents.length : object.sizeInBytes()
+    bytes += size
+    const maskOfOwn = masks.get(String(ref))
+    if (maskOfOwn === undefined) count += 1
+    if (maskOfOwn ?? isOwnImage(object, ownSizes)) own += size
   }
 
-  return { count, bytes }
+  return { count, bytes, own }
+}
+
+function isOwnImage(object: PDFStream, ownSizes: ReadonlySet<string> | undefined): boolean {
+  if (ownSizes === undefined) return true
+  const width = object.dict.get(PDFName.of('Width'))
+  const height = object.dict.get(PDFName.of('Height'))
+  if (!(width instanceof PDFNumber) || !(height instanceof PDFNumber)) return false
+  return ownSizes.has(`${width.asNumber()}x${height.asNumber()}`)
 }
 
 function measureOutlines(document: PDFDocument): OutlineCost {

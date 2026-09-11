@@ -2,7 +2,7 @@ import { t } from '../src/lib/i18n'
 import { PDFDocument } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
 
-import { MergeMeta, MergePart, mergePdfs, PRODUCER } from '../src/ui/pdf'
+import { measureImages, MergeMeta, MergePart, mergePdfs, PRODUCER } from '../src/ui/pdf'
 
 /** mergePdfs 는 통계도 같이 돌려준다. 여기 테스트는 바이트만 본다. */
 async function mergeBytes(parts: MergePart[], meta: MergeMeta): Promise<Uint8Array> {
@@ -93,5 +93,41 @@ describe('mergePdfs', () => {
     await expect(mergePdfs([], { title: 't', createdAt: CREATED_AT })).rejects.toThrow(
       t('pdf.noParts')
     )
+  })
+})
+
+describe('measureImages — 우리가 넣은 이미지와 Figma 가 래스터화한 것을 가른다', () => {
+  it('치수가 일치하는 이미지(와 그 알파 마스크)만 own, 치수를 안 주면 전부 own', async () => {
+    const doc = await PDFDocument.create()
+    const image = (
+      width: number,
+      height: number,
+      size: number,
+      extra: Record<string, unknown> = {}
+    ) =>
+      doc.context.register(
+        doc.context.stream(new Uint8Array(size), {
+          Type: 'XObject',
+          Subtype: 'Image',
+          Width: width,
+          Height: height,
+          ColorSpace: 'DeviceRGB',
+          BitsPerComponent: 8,
+          ...extra
+        })
+      )
+    const shadowMask = image(3204, 5538, 300) // Figma 가 그림자를 래스터화한 것의 알파
+    image(3204, 5538, 1000, { SMask: shadowMask })
+    image(1280, 960, 500) // 우리가 줄여 넣은 사진
+    const ownMask = image(640, 480, 50) // 우리가 넣은 알파 PNG 의 알파
+    image(640, 480, 200, { SMask: ownMask })
+
+    expect(measureImages(doc, new Set(['1280x960', '640x480']))).toEqual({
+      count: 3,
+      bytes: 2050,
+      own: 750
+    })
+    expect(measureImages(doc)).toEqual({ count: 3, bytes: 2050, own: 2050 })
+    expect(measureImages(doc, new Set())).toEqual({ count: 3, bytes: 2050, own: 0 })
   })
 })

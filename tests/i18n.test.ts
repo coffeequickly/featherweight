@@ -95,6 +95,7 @@ describe('사전 무결성', () => {
     png: 'yes',
     ratio: '0.912',
     fixed: '1,000,000',
+    own: '1,000,000',
     measured: '7,000,000',
     pdfImages: '6,500,000',
     pdf: '8,000,000',
