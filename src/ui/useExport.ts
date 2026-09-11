@@ -326,7 +326,7 @@ export function useExport(
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
           imageWarnings: stats.imageWarnings,
           textEmbedded: wantsText.current,
-          fit: done.fit ?? null,
+          fit: logFit(done.fit ?? null, bytes.length),
           outlines: merged.outlines,
           images: { count: distinctImages.size, bytes: merged.images.bytes },
           extractable: extractableText(collected)
@@ -399,4 +399,31 @@ export function useExport(
   }, [])
 
   return { busy, progress, report, error, start, retry, cancel, dismiss }
+}
+
+/**
+ * 목표 용량의 예측 대 실제를 콘솔에 남긴다 — 반올림 전 바이트와 오차율, 후보별 예측까지.
+ * "예측 4.7MB·실제 4.7MB" 로는 정확한지 알 수 없다(검토). 결과는 그대로 돌려준다
+ */
+function logFit(fit: FitReport | null, actualBytes: number): FitReport | null {
+  if (fit === null) return fit
+  const error =
+    fit.predictedBytes > 0 ? ((actualBytes - fit.predictedBytes) / fit.predictedBytes) * 100 : 0
+  console.log(
+    '[fit] final predicted',
+    fit.predictedBytes,
+    'actual',
+    actualBytes,
+    `error ${error.toFixed(2)}%`,
+    'target',
+    fit.targetBytes,
+    'chosen',
+    fit.profile,
+    'candidates',
+    (fit.probes ?? []).map(
+      (probe) =>
+        `${probe.multiplier}x${probe.maxEdge} q${Math.round(probe.quality * 100)} → ${probe.predicted}`
+    )
+  )
+  return fit
 }

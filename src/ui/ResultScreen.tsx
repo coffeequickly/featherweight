@@ -130,8 +130,24 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
                     quality: Math.round(fit.profile.quality * 100),
                     png: fit.profile.reencodeOpaquePng ? 'no' : 'yes',
                     count: fit.candidates ?? 0,
-                    predicted: formatBytes(fit.predictedBytes),
-                    actual: formatBytes(report.byteLength)
+                    predicted: fit.predictedBytes.toLocaleString(),
+                    actual: report.byteLength.toLocaleString(),
+                    error: errorPercent(fit.predictedBytes, report.byteLength)
+                  })}
+                </Muted>
+              </Text>
+            )}
+            {/* 후보별 예측 — 탈락한 후보의 예측이 맞았는지는 그 설정으로 실제 내보내 견줘야 안다 */}
+            {fit.probes === undefined || fit.probes.length === 0 ? null : (
+              <Text>
+                <Muted>
+                  {t('report.fitCandidates', {
+                    list: fit.probes
+                      .map(
+                        (probe) =>
+                          `${probe.multiplier}×${probe.maxEdge}·${Math.round(probe.quality * 100)}% ${probe.predicted.toLocaleString()}${probe.predicted <= fit.targetBytes ? '✓' : ''}`
+                      )
+                      .join(' · ')
                   })}
                 </Muted>
               </Text>
@@ -372,6 +388,13 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
  * 목표 용량 결과 한 줄. 못 맞췄을 때는 "왜 안 됐는지" 보다 "그럼 얼마가 최선인지" 가
  * 쓸모 있다 — 목표를 다시 잡을 근거가 되는 건 그 숫자다.
  */
+/** 예측 대비 실제의 오차(%) — 부호 붙여서. 예측이 크면 음수(필요 이상으로 압축한 쪽) */
+function errorPercent(predicted: number, actual: number): string {
+  if (predicted <= 0) return '—'
+  const percent = ((actual - predicted) / predicted) * 100
+  return `${percent >= 0 ? '+' : ''}${percent.toFixed(1)}`
+}
+
 function fitLine(fit: NonNullable<ExportReport['fit']>, actualBytes: number): string {
   const target = formatBytes(fit.targetBytes)
   if (fit.outcome === 'unreachable') {

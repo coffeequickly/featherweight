@@ -440,6 +440,15 @@ export type FitReport = {
   }
   /** 재본 후보 수 — 기준 패스는 빼고 */
   candidates?: number
+  /** 재본 후보마다 예측 바이트 — 탈락한 후보의 예측이 맞았는지 실제로 내보내 견주려면 이게 있어야 한다 */
+  probes?: Array<{
+    multiplier: number
+    maxEdge: number
+    minEdge: number
+    quality: number
+    reencodeOpaquePng: boolean
+    predicted: number
+  }>
 }
 
 export type DoneReport = {

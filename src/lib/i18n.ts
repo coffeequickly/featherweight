@@ -847,9 +847,14 @@ const MESSAGES = {
    */
   'report.fitProfile': {
     en: (p) =>
-      `Chosen automatically: scale ${p.scale}× · max ${p.max}px · min ${p.min}px · JPEG quality ${p.quality}%${p.png === 'yes' ? ' · PNG kept' : ''} · ${n(Number(p.count), 'candidate', 'candidates')} measured · predicted ${p.predicted}, actual ${p.actual}`,
+      `Chosen automatically: scale ${p.scale}× · max ${p.max}px · min ${p.min}px · JPEG quality ${p.quality}%${p.png === 'yes' ? ' · PNG kept' : ''} · ${n(Number(p.count), 'candidate', 'candidates')} measured · predicted ${p.predicted} B, actual ${p.actual} B (${p.error}%)`,
     ko: (p) =>
-      `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · 최소 ${p.min}px · JPEG 품질 ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''} · 후보 ${p.count}개 재봄 · 예측 ${p.predicted}, 실제 ${p.actual}`
+      `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · 최소 ${p.min}px · JPEG 품질 ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''} · 후보 ${p.count}개 재봄 · 예측 ${p.predicted} B, 실제 ${p.actual} B (오차 ${p.error}%)`
+  },
+  /** 재본 후보와 예측 바이트 — "배율×최대·품질 예측바이트", 목표 안이면 ✓ */
+  'report.fitCandidates': {
+    en: 'Candidates (predicted bytes): {list}',
+    ko: '후보별 예측 바이트: {list}'
   },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",
