@@ -58,9 +58,12 @@ export async function resizeImage(request: ResizeRequest): Promise<ResizeResult>
   }
 }
 
-/** 원본 바이트를 비트맵으로. 실패는 throw — 부르는 쪽이 원본으로 물러선다 */
+/**
+ * 원본 바이트를 비트맵으로. 실패는 throw — 부르는 쪽이 원본으로 물러선다.
+ * EXIF 방향은 적용한 채로 — Figma 가 보여 주는 방향이고, 조각 사각형도 그 좌표계(imageHeader)다
+ */
 export function decodeImage(bytes: Uint8Array): Promise<ImageBitmap> {
-  return createImageBitmap(new Blob([bytes as BlobPart]))
+  return createImageBitmap(new Blob([bytes as BlobPart]), { imageOrientation: 'from-image' })
 }
 
 /** 같은 원본을 여러 번 줄일 때 — 인코딩은 비트맵을 닫으므로 한 벌 복사해 준다 */

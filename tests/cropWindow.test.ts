@@ -289,3 +289,29 @@ describe('paintCoverage — 창이 원본과 겹치는 넓이의 비', () => {
     ).toBeNull()
   })
 })
+
+describe('가장자리 허용 오차 — 자르기 도구가 남기는 작은 넘침은 받는다', () => {
+  it('실측(5.6e-5 · 3.4e-4)과 2e-3 안쪽은 창으로 받고, 그보다 크게 넘치면 거절한다', () => {
+    for (const over of [5.6e-5, 3.4e-4, 1e-3]) {
+      const window = cropWindow([
+        [0.54, 0, 0.3],
+        [0, 1, -over]
+      ])
+      expect(window).not.toBeNull()
+      expect(window?.bbox.y).toBe(0) // 넘친 만큼은 원본 안으로 잘린다
+      expect(window?.bbox.height).toBeCloseTo(1 - over, 6)
+    }
+    expect(
+      cropWindow([
+        [0.54, 0, 0.3],
+        [0, 1, -5e-3]
+      ])
+    ).toBeNull()
+    expect(
+      cropWindow([
+        [0.5, 0, 0.51],
+        [0, 0.5, 0.3]
+      ])
+    ).toBeNull() // 오른쪽으로 1% 넘침
+  })
+})

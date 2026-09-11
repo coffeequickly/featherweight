@@ -10,9 +10,12 @@ import { withTimeout } from '../lib/withTimeout'
 import { imageDimensions } from '../lib/imageHeader'
 
 const edgeCache = new Map<string, PixelSize>()
-/** 양변을 담는 새 키. 옛 'imageEdges'(긴 변만)는 열 때 지운다 — 다시 읽는 편이 싸다 */
-const EDGE_CACHE_KEY = 'imageSizes'
-const LEGACY_EDGE_KEY = 'imageEdges'
+/**
+ * 양변을 담는 키. 옛 키들은 열 때 지운다 — 다시 읽는 편이 싸다.
+ * 'imageEdges' 는 긴 변만, 'imageSizes' 는 EXIF 방향을 안 본 크기(세로 사진의 가로세로가 뒤집힘)
+ */
+const EDGE_CACHE_KEY = 'imageSizes2'
+const LEGACY_EDGE_KEYS = ['imageEdges', 'imageSizes']
 /** 저장해 두는 크기 수. 넘으면 오래된 것부터 버린다 — 덱 수십 개 분량이면 넉넉하다 */
 const EDGE_CACHE_CAP = 3000
 let dirty = false
@@ -20,7 +23,8 @@ let dirty = false
 /** 플러그인이 뜰 때 한 번 — 지난번에 읽은 덱은 크기를 다시 안 읽는다 */
 export async function loadEdgeCache(): Promise<void> {
   try {
-    void figma.clientStorage.deleteAsync(LEGACY_EDGE_KEY).catch(() => undefined)
+    for (const key of LEGACY_EDGE_KEYS)
+      void figma.clientStorage.deleteAsync(key).catch(() => undefined)
     const stored = (await figma.clientStorage.getAsync(EDGE_CACHE_KEY)) as
       Record<string, [number, number]> | undefined
     if (stored === undefined) return

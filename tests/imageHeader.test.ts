@@ -158,3 +158,93 @@ describe('imageDimensions', () => {
     ).toBeNull()
   })
 })
+
+describe('JPEG EXIF 방향 — 세로로 찍어 태그로 돌린 사진은 보이는 크기로', () => {
+  /** SOF0: 원시 4032×3024(가로) */
+  const sof0 = [
+    0xff,
+    0xc0,
+    ...be16(17),
+    8,
+    ...be16(3024),
+    ...be16(4032),
+    3,
+    1,
+    0x22,
+    0,
+    2,
+    0x11,
+    1,
+    3,
+    0x11,
+    1
+  ]
+  /** APP1 Exif · TIFF 머리 · IFD0 에 방향 태그 하나 */
+  function app1(orientation: number, little = false): number[] {
+    const u16 = little ? le16 : be16
+    const u32 = little ? le32 : be32
+    const tiff = [
+      ...(little ? 'II' : 'MM').split('').map((c) => c.charCodeAt(0)),
+      ...u16(42),
+      ...u32(8),
+      ...u16(1),
+      ...u16(0x0112),
+      ...u16(3),
+      ...u32(1),
+      ...u16(orientation),
+      0,
+      0,
+      ...u32(0)
+    ]
+    return [
+      0xff,
+      0xe1,
+      ...be16(2 + 6 + tiff.length),
+      ...'Exif\0\0'.split('').map((c) => c.charCodeAt(0)),
+      ...tiff
+    ]
+  }
+
+  it('방향 6(시계 90°)·8(반시계 90°)은 가로세로를 바꾼다 — 빅엔디안·리틀엔디안 모두', () => {
+    expect(imageDimensions(bytes([0xff, 0xd8], app1(6), sof0))).toEqual({
+      width: 3024,
+      height: 4032
+    })
+    expect(imageDimensions(bytes([0xff, 0xd8], app1(8, true), sof0))).toEqual({
+      width: 3024,
+      height: 4032
+    })
+    for (const orientation of [5, 7]) {
+      expect(imageDimensions(bytes([0xff, 0xd8], app1(orientation), sof0))).toEqual({
+        width: 3024,
+        height: 4032
+      })
+    }
+  })
+
+  it('방향 1·3(뒤집기만)은 그대로, 태그가 없거나 깨져도 원시 크기', () => {
+    expect(imageDimensions(bytes([0xff, 0xd8], app1(1), sof0))).toEqual({
+      width: 4032,
+      height: 3024
+    })
+    expect(imageDimensions(bytes([0xff, 0xd8], app1(3), sof0))).toEqual({
+      width: 4032,
+      height: 3024
+    })
+    expect(imageDimensions(bytes([0xff, 0xd8], sof0))).toEqual({ width: 4032, height: 3024 })
+    // XMP 같은 다른 APP1 은 건너뛴다
+    const xmp = [0xff, 0xe1, ...be16(2 + 5), ...'http:'.split('').map((c) => c.charCodeAt(0))]
+    expect(imageDimensions(bytes([0xff, 0xd8], xmp, sof0))).toEqual({ width: 4032, height: 3024 })
+    // TIFF 머리가 잘린 Exif — 방향을 모르니 원시 크기
+    const broken = [
+      0xff,
+      0xe1,
+      ...be16(2 + 6 + 4),
+      ...'Exif\0\0MM\0\x2a'.split('').map((c) => c.charCodeAt(0))
+    ]
+    expect(imageDimensions(bytes([0xff, 0xd8], broken, sof0))).toEqual({
+      width: 4032,
+      height: 3024
+    })
+  })
+})
