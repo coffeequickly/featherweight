@@ -130,7 +130,7 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
                     quality: Math.round(fit.profile.quality * 100),
                     png: fit.profile.reencodeOpaquePng ? 'no' : 'yes',
                     count: fit.candidates ?? 0,
-                    predicted: fit.predictedBytes.toLocaleString(),
+                    predicted: Math.round(fit.predictedBytes).toLocaleString(),
                     actual: report.byteLength.toLocaleString(),
                     error: errorPercent(fit.predictedBytes, report.byteLength)
                   })}

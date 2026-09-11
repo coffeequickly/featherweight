@@ -429,7 +429,7 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     candidates: probes.length,
     probes: probes.map((probe) => ({
       ...probe.profile,
-      predicted: predictSize(fixed, probe.bytes, ratio)
+      predicted: Math.round(predictSize(fixed, probe.bytes, ratio))
     }))
   }
   // 후보별 예측치 — 어느 칸이 왜 떨어졌는지는 여기서만 볼 수 있다(플러그인 콘솔)
