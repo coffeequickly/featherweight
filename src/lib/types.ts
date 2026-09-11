@@ -427,6 +427,19 @@ export type FitReport = {
   outcome: 'fits' | 'already-small' | 'unreachable'
   /** 예측 크기 — unreachable 이면 이 문서에서 가능한 가장 작은 크기(하한) */
   predictedBytes: number
+  /**
+   * 자동으로 고른 최종 설정. 칸 이름만으로는 알 수 없고(마지막 단계가 품질만 올린 변형을 재본다)
+   * PDF 에서도 못 읽는다(Figma 가 내보낼 때 다시 인코딩) — 결과 탭에 적어야 검증이 된다
+   */
+  profile?: {
+    multiplier: number
+    maxEdge: number
+    minEdge: number
+    quality: number
+    reencodeOpaquePng: boolean
+  }
+  /** 재본 후보 수 — 기준 패스는 빼고 */
+  candidates?: number
 }
 
 export type DoneReport = {

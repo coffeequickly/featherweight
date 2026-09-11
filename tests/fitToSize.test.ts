@@ -6,6 +6,7 @@ import {
   candidateIndices,
   chooseProfile,
   clampTargetMb,
+  describeProfile,
   fixedBytes,
   probeOrder,
   MAX_QUALITY,
@@ -305,5 +306,14 @@ describe('probeOrder — 잘라 넣기가 켜져 있으면 기준이 목표를 �
     const outcome = chooseProfile(probes, 0, 990 * KB, { total: 1000 * KB, jpeg: 1000 * KB })
     expect(outcome.kind).toBe('fits')
     if (outcome.kind === 'fits') expect(sharpnessOrder(outcome.profile, PROFILE_LADDER[2])).toBe(0)
+  })
+})
+
+describe('describeProfile — 결과 탭에 적는 자동 선택 설정', () => {
+  it('배율·최대·최소·품질을 한 줄로, PNG 를 그대로 두는 맨 위 칸만 표시가 붙는다', () => {
+    expect(describeProfile({ ...PROFILE_LADDER[6], quality: 0.74 })).toBe(
+      '1.1× · 1280px · 640px · 74%'
+    )
+    expect(describeProfile(PROFILE_LADDER[0])).toBe('2× · 4096px · 1024px · 92% · PNG 유지')
   })
 })

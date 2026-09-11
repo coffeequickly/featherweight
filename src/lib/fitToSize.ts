@@ -270,3 +270,12 @@ export function probeOrder(
   const smaller = candidateIndices(baselineIndex, 'smaller')
   return cropToVisible ? [...candidateIndices(baselineIndex, 'sharper'), ...smaller] : smaller
 }
+
+/**
+ * 결과 탭에 적을 자동 선택 설정 — "1.1× · 최대 1280px · 최소 640px · 품질 74%". 마지막 단계가
+ * 품질만 올린 변형을 재보므로 칸 이름만으로는 최종 설정을 알 수 없고, PDF 에서도 못 읽는다(Figma 가
+ * 내보낼 때 이미지를 다시 인코딩한다 — 2026-09-11 실측, 네 PDF 의 JPEG 69장이 같은 양자화표). 그래서 적어 둔다.
+ */
+export function describeProfile(profile: CompressionProfile): string {
+  return `${profile.multiplier}× · ${profile.maxEdge}px · ${profile.minEdge}px · ${Math.round(profile.quality * 100)}%${profile.reencodeOpaquePng ? '' : ' · PNG 유지'}`
+}
