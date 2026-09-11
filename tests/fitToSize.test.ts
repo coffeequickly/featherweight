@@ -11,6 +11,9 @@ import {
   probeOrder,
   retryCandidates,
   MAX_FIT_RETRIES,
+  decideFit,
+  fitAttemptPlan,
+  savedSource,
   MAX_QUALITY,
   MIN_MIN_EDGE,
   MAX_TARGET_MB,
@@ -327,12 +330,107 @@ describe('retryCandidates — 실제 크기가 목표를 넘었을 때 다음 �
     expect(next[1]).toEqual(PROFILE_LADDER[6])
   })
 
-  it('품질만 올린 변형이 뽑혔으면 같은 해상도의 한 단계 아래 품질부터', () => {
+  it('품질만 올린 변형이 뽑혔으면 같은 해상도의 한 단계 아래 품질부터, 그다음은 그보다 덜 선명한 칸 — 같은 설정 두 번 없음', () => {
     const variant = { ...PROFILE_LADDER[5], quality: 0.76 }
-    expect(retryCandidates(variant)[0]).toEqual({ ...PROFILE_LADDER[5], quality: 0.72 })
+    expect(retryCandidates(variant)).toEqual([
+      { ...PROFILE_LADDER[5], quality: 0.72 },
+      PROFILE_LADDER[6]
+    ])
+    const plan = fitAttemptPlan(variant)
+    expect(plan).toHaveLength(1 + MAX_FIT_RETRIES)
+    for (let i = 0; i < plan.length; i += 1)
+      for (let j = i + 1; j < plan.length; j += 1)
+        expect(sharpnessOrder(plan[i], plan[j])).toBeLessThan(0)
   })
 
   it('맨 아래 칸(품질 바닥)이면 뽑아 볼 것이 없다', () => {
     expect(retryCandidates(PROFILE_LADDER[PROFILE_LADDER.length - 1])).toEqual([])
+  })
+})
+
+describe('decideFit — 저장할 PDF 와 결과 상태는 실제 바이트로 정한다', () => {
+  const target = 5_242_880
+  const baseline = PROFILE_LADDER[3]
+  const sharper = PROFILE_LADDER[2]
+
+  it('기준이 목표 안인데 더 선명한 후보와 재시도가 전부 넘치면 기준본을 복구해 저장한다 — already-small', () => {
+    const plan = fitAttemptPlan(sharper)
+    const actuals = [6_300_000, 6_200_000, 6_000_000] // 대역 실측 — 전부 초과
+    const attempts = plan.map((profile, i) => ({ profile, actual: actuals[i] }))
+    const decision = decideFit(
+      target,
+      { profile: baseline, actual: 4_900_000 },
+      attempts,
+      true,
+      'fits'
+    )
+    expect(decision).toEqual({ save: 'best', profile: baseline, outcome: 'already-small' })
+  })
+
+  it('마지막 시도가 목표 안이면 그것 — fits', () => {
+    const attempts = [
+      { profile: sharper, actual: 6_300_000 },
+      { profile: { ...sharper, quality: 0.8 }, actual: 5_100_000 }
+    ]
+    const decision = decideFit(
+      target,
+      { profile: baseline, actual: 4_900_000 },
+      attempts,
+      true,
+      'fits'
+    )
+    expect(decision).toEqual({ save: 'last', profile: attempts[1].profile, outcome: 'fits' })
+  })
+
+  it('예측은 unreachable 이어도 최종 실측이 목표 안이면 fits — 결과 화면은 실물을 따른다', () => {
+    const smallest = PROFILE_LADDER[PROFILE_LADDER.length - 1]
+    const decision = decideFit(
+      target,
+      { profile: baseline, actual: 6_000_000 },
+      [{ profile: smallest, actual: 5_000_000 }],
+      false,
+      'unreachable'
+    )
+    expect(decision.outcome).toBe('fits')
+    expect(decision.save).toBe('last')
+  })
+
+  it('아무것도 못 들면 — 재시도가 있었으면 missed, 사다리 바닥이라 없었으면 unreachable', () => {
+    const smallest = PROFILE_LADDER[PROFILE_LADDER.length - 1]
+    expect(
+      decideFit(
+        target,
+        { profile: baseline, actual: 6_000_000 },
+        [{ profile: smallest, actual: 5_500_000 }],
+        false,
+        'unreachable'
+      ).outcome
+    ).toBe('unreachable')
+    expect(
+      decideFit(
+        target,
+        { profile: baseline, actual: 6_000_000 },
+        [
+          { profile: PROFILE_LADDER[5], actual: 5_500_000 },
+          { profile: PROFILE_LADDER[6], actual: 5_300_000 }
+        ],
+        true,
+        'fits'
+      ).outcome
+    ).toBe('missed')
+  })
+
+  it('최종 패스가 없으면 기준 실측으로 — 기준이 목표 안이면 already-small', () => {
+    expect(
+      decideFit(target, { profile: baseline, actual: 4_900_000 }, [], false, 'already-small')
+        .outcome
+    ).toBe('already-small')
+  })
+
+  it('UI 가 저장할 슬롯 — 새 조각이 오면 그것, 아니면 메인이 고른 보관본 또는 마지막 측정본', () => {
+    expect(savedSource(true, true, true)).toBe('arrived')
+    expect(savedSource(false, true, true)).toBe('best')
+    expect(savedSource(false, false, true)).toBe('stash')
+    expect(savedSource(false, true, false)).toBe('stash')
   })
 })

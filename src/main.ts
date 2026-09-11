@@ -5,6 +5,9 @@ import {
   applyProfile,
   BASELINE_INDEX,
   calibrationRatio,
+  decideFit,
+  FitAttempt,
+  fitAttemptPlan,
   MAX_FIT_RETRIES,
   probeOrder,
   retryCandidates,
@@ -398,7 +401,8 @@ async function runFitExport(order: string[], settings: Settings, outName: string
   }
 
   reportProgress(t('progress.measure'), 1, FIT_BASELINE)
-  const measured = await requestMeasurement(outName)
+  // 목표 안이면 이 병합본을 보관본에도 둔다 — 더 선명한 후보와 재시도가 전부 넘치면 이걸로 돌아온다
+  const measured = await requestMeasurement(outName, targetBytes)
 
   // 크기를 못 쟀으면(머지 실패) 예측할 근거가 없다 — 기준 결과로 조용히 마무리한다
   if (measured.pdfBytes <= 0) {
@@ -465,6 +469,16 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     sameProfile(outcome.profile, PROFILE_LADDER[BASELINE_INDEX]) ||
     cancelled
   if (keepBaseline) {
+    if (!cancelled) {
+      const decision = decideFit(
+        targetBytes,
+        { profile: PROFILE_LADDER[BASELINE_INDEX], actual: measured.pdfBytes },
+        [],
+        false,
+        outcome.kind
+      )
+      fit.outcome = decision.outcome
+    }
     emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: first.skipped, fit })
     return
   }
@@ -473,15 +487,20 @@ async function runFitExport(order: string[], settings: Settings, outName: string
   // 살짝 넘긴 실행이 실제로 있었다(5.7·5.9 MB 목표, +0.5%·+0.7%). 넘으면 같은 해상도의 품질 조정
   // 후보부터 한도 안에서 다시 뽑고, 판단은 실제 바이트로만 한다. 측정한 병합본은 UI 가 보관하므로
   // 맞은 결과는 그대로 저장된다 — 다시 병합하지 않는다
-  let profile = outcome.profile
-  const queue = retryCandidates(profile)
-  const attempts: NonNullable<FitReport['attempts']> = []
+  const baselineActual: FitAttempt = {
+    profile: PROFILE_LADDER[BASELINE_INDEX],
+    actual: measured.pdfBytes
+  }
+  const plan = fitAttemptPlan(outcome.profile)
+  const attempts: FitAttempt[] = []
   let skipped: DoneReport['skipped'] = []
-  for (let attempt = 0; ; attempt += 1) {
+  let measureFailed = false
+  for (let index = 0; index < plan.length; index += 1) {
+    const profile = plan[index]
     reportProgress(
-      attempt === 0
+      index === 0
         ? t('progress.refine')
-        : t('progress.retry', { current: attempt, total: MAX_FIT_RETRIES }),
+        : t('progress.retry', { current: index, total: MAX_FIT_RETRIES }),
       0,
       FIT_FINAL
     )
@@ -489,13 +508,16 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     skipped = pass.skipped
     if (cancelled) break
     reportProgress(t('progress.measure'), 1, FIT_FINAL)
-    const check = await requestMeasurement(outName)
+    const check = await requestMeasurement(outName, targetBytes)
     // 크기를 못 쟀으면(머지 실패) 판단할 근거가 없다 — 이 패스의 결과로 마무리한다
-    if (check.pdfBytes <= 0) break
-    attempts.push({ ...profile, actual: check.pdfBytes })
+    if (check.pdfBytes <= 0) {
+      measureFailed = true
+      break
+    }
+    attempts.push({ profile, actual: check.pdfBytes })
     console.log(
       '[fit] attempt',
-      attempt,
+      index,
       describeProfile(profile),
       'actual',
       check.pdfBytes,
@@ -503,16 +525,30 @@ async function runFitExport(order: string[], settings: Settings, outName: string
       targetBytes
     )
     if (check.pdfBytes <= targetBytes) break
-    const next = queue.shift()
-    if (next === undefined) {
-      fit.outcome = 'missed'
-      break
-    }
-    profile = next
   }
-  fit.profile = { ...profile }
-  fit.attempts = attempts
-  emit<DoneHandler>('done', { fileName: outName, cancelled, skipped, fit })
+  if (cancelled) {
+    emit<DoneHandler>('done', { fileName: outName, cancelled, skipped, fit })
+    return
+  }
+  // 저장할 것과 결과 상태는 실제 바이트로 정한다 — 예측은 탐색 정보일 뿐
+  const decision = decideFit(
+    targetBytes,
+    baselineActual,
+    attempts,
+    retryCandidates(outcome.profile).length > 0,
+    outcome.kind
+  )
+  fit.outcome = measureFailed && attempts.length === 0 ? fit.outcome : decision.outcome
+  fit.profile = { ...decision.profile }
+  fit.attempts = attempts.map((attempt) => ({ ...attempt.profile, actual: attempt.actual }))
+  console.log('[fit] decision', decision.save, describeProfile(decision.profile), decision.outcome)
+  emit<DoneHandler>('done', {
+    fileName: outName,
+    cancelled,
+    skipped,
+    fit,
+    saveBest: decision.save === 'best'
+  })
 }
 
 /**
@@ -619,12 +655,13 @@ type Measured = {
   pdfImageBytes: number
 }
 
-async function requestMeasurement(outName: string): Promise<Measured> {
+async function requestMeasurement(outName: string, keepUnder?: number): Promise<Measured> {
   const reqId = nextRequestId('fit')
   const promise = awaitResponse<Measured>(reqId, MEASURE_TIMEOUT_MS)
   emit<DoneHandler>('done', {
     reqId,
     measureOnly: true,
+    keepUnder,
     fileName: outName,
     cancelled: false,
     skipped: []

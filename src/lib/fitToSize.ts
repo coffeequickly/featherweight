@@ -299,7 +299,91 @@ export function retryCandidates(chosen: CompressionProfile): CompressionProfile[
   const out: CompressionProfile[] = []
   const lower = Math.max(MIN_QUALITY, Math.round((chosen.quality - 0.04) * 100) / 100)
   if (lower < chosen.quality - 0.005) out.push({ ...chosen, quality: lower })
-  const below = PROFILE_LADDER.find((rung) => sharpnessOrder(rung, chosen) > 0)
-  if (below !== undefined) out.push(below)
+  // 아래 칸은 품질을 내린 변형보다도 덜 선명한 첫 칸 — 변형 76% 의 −0.04 가 5번 칸(72%) 그 자체라
+  // 같은 설정을 두 번 뽑던 것을 막는다(검토 재현)
+  const floor = out[out.length - 1] ?? chosen
+  const below = PROFILE_LADDER.find((rung) => sharpnessOrder(rung, floor) > 0)
+  if (below !== undefined && !out.some((candidate) => sameProfile(candidate, below)))
+    out.push(below)
   return out.slice(0, MAX_FIT_RETRIES)
+}
+
+/** 최종 패스로 뽑을 설정의 순서 — 고른 것부터, 넘치면 재시도 후보. 같은 설정은 한 번만 */
+export function fitAttemptPlan(chosen: CompressionProfile): CompressionProfile[] {
+  return [chosen, ...retryCandidates(chosen).filter((c) => !sameProfile(c, chosen))]
+}
+
+export type FitAttempt = { profile: CompressionProfile; actual: number }
+
+export type FitDecision = {
+  /** last = 마지막으로 잰 병합본을 저장, best = 목표 안에 든 것 가운데 가장 선명한 보관본을 저장 */
+  save: 'last' | 'best'
+  /** 저장되는 것의 설정 */
+  profile: CompressionProfile
+  outcome: 'fits' | 'already-small' | 'unreachable' | 'missed'
+}
+
+/**
+ * 저장할 PDF 와 결과 상태를 **실제 바이트**로 정한다 — 예측(chooseProfile)은 탐색 정보일 뿐이다.
+ *
+ * - 마지막 시도가 목표 안이면 그것(가장 선명한 쪽부터 시도했으니 그게 답).
+ * - 아니면 목표 안에 든 것(앞선 시도, 기준 패스) 가운데 가장 선명한 것을 보관본에서 복구한다 —
+ *   기준이 이미 목표 안인데 더 선명한 후보와 재시도가 전부 넘친 경우 마지막 초과본을 저장하던 결함(검토).
+ * - 아무것도 못 들면: 재시도 후보가 있었으면 missed, 사다리 바닥이라 없었으면 unreachable.
+ * - 최종 패스가 없으면(기준 그대로) 기준 패스의 실측으로 판정한다. 예측이 unreachable 이어도
+ *   실측이 목표 안이면 fits — 결과 화면이 실물과 다른 말을 하면 안 된다.
+ */
+export function decideFit(
+  targetBytes: number,
+  baseline: FitAttempt,
+  attempts: readonly FitAttempt[],
+  retriesAvailable: boolean,
+  predicted: 'fits' | 'already-small' | 'unreachable'
+): FitDecision {
+  const last = attempts[attempts.length - 1]
+  if (last === undefined) {
+    const fits = baseline.actual <= targetBytes
+    return {
+      save: 'last',
+      profile: baseline.profile,
+      outcome: fits
+        ? predicted === 'fits'
+          ? 'fits'
+          : 'already-small'
+        : predicted === 'unreachable'
+          ? 'unreachable'
+          : 'missed'
+    }
+  }
+  if (last.actual <= targetBytes) return { save: 'last', profile: last.profile, outcome: 'fits' }
+  const fitting = [
+    ...attempts.filter((attempt) => attempt.actual <= targetBytes),
+    ...(baseline.actual <= targetBytes ? [baseline] : [])
+  ].sort((a, b) => sharpnessOrder(a.profile, b.profile))
+  const best = fitting[0]
+  if (best !== undefined) {
+    return {
+      save: 'best',
+      profile: best.profile,
+      outcome: sameProfile(best.profile, baseline.profile) ? 'already-small' : 'fits'
+    }
+  }
+  return {
+    save: 'last',
+    profile: last.profile,
+    outcome: retriesAvailable ? 'missed' : 'unreachable'
+  }
+}
+
+/**
+ * UI 가 저장할 병합본 — 새 조각이 왔으면 그것(보통 내보내기), 아니면 메인이 고른 슬롯:
+ * saveBest 면 목표 안 보관본, 없으면 마지막 측정본
+ */
+export function savedSource(
+  hasArrived: boolean,
+  hasBest: boolean,
+  saveBest: boolean
+): 'arrived' | 'best' | 'stash' {
+  if (hasArrived) return 'arrived'
+  return saveBest && hasBest ? 'best' : 'stash'
 }

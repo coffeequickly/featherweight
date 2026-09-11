@@ -23,6 +23,7 @@ import {
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
 import { forgetOriginals } from './imageCache'
+import { savedSource } from '../lib/fitToSize'
 import { downloadPdf, ImageWeight, MergeOutput, mergePdfs, OutlineCost } from './pdf'
 import { drawTextLayer, FontCache } from './textLayer'
 import { loadFontBytes } from './fontSource'
@@ -126,6 +127,8 @@ export function useExport(
   const parts = useRef<PdfPart[]>([])
   // 목표 용량 탐색 1회차 결과. 2회차가 없으면(이미 목표 이하) 이걸 그대로 저장한다.
   const measured = useRef<{ parts: PdfPart[]; merged: MergeOutput | null } | null>(null)
+  /** 목표 안에 든 병합본 — 더 선명한 후보와 재시도가 전부 넘치면 이걸 저장한다 (fitToSize.decideFit) */
+  const best = useRef<{ parts: PdfPart[]; merged: MergeOutput } | null>(null)
   const startedAt = useRef(0)
   // 실행 번호. 늦게 끝난 옛 실행의 머지·측정이 새 실행에 섞이지 않게 완료 시점에 대조한다
   const run = useRef(0)
@@ -159,6 +162,7 @@ export function useExport(
       // 실패로 끝난 실행의 조각을 남기면 다음 실행에 섞여 들어간다
       parts.current = []
       measured.current = null
+      best.current = null
       forgetOriginals()
       setError(payload.message)
       setBusy(false)
@@ -198,6 +202,9 @@ export function useExport(
         const merged = await mergeCollected(collected, done.fileName)
         if (mine !== run.current) return // 늦게 끝난 옛 실행 — 새 실행의 측정을 덮어쓰지 않는다
         measured.current = { parts: collected, merged }
+        if (done.keepUnder !== undefined && merged.bytes.length <= done.keepUnder) {
+          best.current = { parts: collected, merged }
+        }
         emit<FitMeasuredHandler>('fit:measured', {
           reqId: done.reqId ?? '',
           pdfBytes: merged.bytes.length,
@@ -227,6 +234,7 @@ export function useExport(
       // 취소 버튼이 이미 화면을 정리했으므로 여기서는 남은 것만 버린다
       if (done.cancelled || !active.current) {
         measured.current = null
+        best.current = null
         forgetOriginals()
         return
       }
@@ -237,12 +245,26 @@ export function useExport(
       }
 
       const stash = measured.current
+      const kept = best.current
       measured.current = null
+      best.current = null
       forgetOriginals()
 
-      // 2회차가 아무것도 안 보냈으면 1회차 결과를 그대로 쓴다 (이미 목표 이하였던 경우)
-      const collected = arrived.length > 0 ? arrived : (stash?.parts ?? [])
-      const premerged = arrived.length > 0 ? null : (stash?.merged ?? null)
+      // 새 조각이 없으면 메인이 고른 슬롯을 쓴다 — 목표 안 보관본이거나 마지막 측정본.
+      // 측정한 병합본을 그대로 저장하므로 잰 바이트와 저장 바이트가 같다
+      const source = savedSource(arrived.length > 0, kept !== null, done.saveBest === true)
+      const collected =
+        source === 'arrived'
+          ? arrived
+          : source === 'best'
+            ? (kept?.parts ?? [])
+            : (stash?.parts ?? [])
+      const premerged =
+        source === 'arrived'
+          ? null
+          : source === 'best'
+            ? (kept?.merged ?? null)
+            : (stash?.merged ?? null)
 
       try {
         if (collected.length === 0) {
@@ -361,6 +383,7 @@ export function useExport(
     active.current = true
     parts.current = []
     measured.current = null
+    best.current = null
     startedAt.current = Date.now()
     setBusy(true)
     setError(null)
@@ -384,6 +407,7 @@ export function useExport(
     active.current = false
     parts.current = []
     measured.current = null
+    best.current = null
     forgetOriginals()
     emit<CancelHandler>('cancel')
     setBusy(false)

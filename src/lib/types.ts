@@ -466,6 +466,10 @@ export type DoneReport = {
   reqId?: string
   /** true 면 UI 는 머지해서 크기만 재고 저장하지 않는다 (목표 용량 탐색 1회차) */
   measureOnly?: boolean
+  /** measureOnly 일 때: 잰 바이트가 이 값 이하면 그 병합본을 "목표 안 보관본" 에도 둔다 */
+  keepUnder?: number
+  /** 마지막 done 에서: true 면 마지막 측정본 대신 목표 안 보관본을 저장한다 (fitToSize.decideFit) */
+  saveBest?: boolean
   fit?: FitReport
   fileName: string
   cancelled: boolean
