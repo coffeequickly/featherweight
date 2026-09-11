@@ -10,7 +10,7 @@
 import { Encoded, ProbeTally, tallyProbe } from '../lib/imageProbe'
 import { KEEP_BYTES_FLOOR } from '../lib/imageTarget'
 import { CropRect, ImageProbeItem } from '../lib/types'
-import { cloneBitmap, decodeImage, encodePiece, isPng, resizeDecoded } from './resize'
+import { cloneBitmap, decodeImage, encodePiece, figmaSizeOf, isPng, resizeDecoded } from './resize'
 
 /** 캐시 총량 상한. 넘으면 오래된 것부터 버린다. */
 const MAX_CACHE_BYTES = 200 * 1024 * 1024
@@ -54,6 +54,8 @@ const pieceKeyOf = (crop: CropRect, targetLongEdge: number): string =>
  * 합계에는 쪽마다 더해진다 — PDF 에는 쪽마다 한 벌씩 실린다. 창·목표가 다르면 따로 인코딩한다.
  * 원본은 한 번만 디코드해 W₀ 와 조각을 전부 만든다(resize.ts encodePiece).
  *
+ * 재는 값은 우리 인코딩 바이트가 아니라 그것을 Figma 품질로 다시 인코딩한 크기(figmaSizeOf)다 — Figma 가
+ * PDF 에 넣을 때 하는 일이라, 후보 품질에 따른 편향이 없다.
  * 채택(W₀ 인가 조각인가)은 export 와 같은 규칙으로 tallyProbe 가 정한다. 캐시에 없는 이미지는
  * 재볼 수 없으므로 원본 크기로 세고 failed 로 알린다 — 예측이 실제보다 크게 나오는 쪽이라,
  * 결과가 목표를 넘기는 것보다는 안전하다. 조각 인코딩이 빠지면 W₀ 로 센다(export 의 복구와 같다).
@@ -106,7 +108,8 @@ export async function probeImageBytes(
             reencodeOpaquePng,
             quality
           )
-          pieces.set(`${imageHash}|${key}`, { bytes: out.bytes.length, mime: out.mime })
+          // 재는 값은 우리 바이트가 아니라 Figma 가 다시 인코딩한 뒤의 크기
+          pieces.set(`${imageHash}|${key}`, { bytes: await figmaSizeOf(out.bytes), mime: out.mime })
         } catch {
           pieces.set(`${imageHash}|${key}`, null)
         }
@@ -127,8 +130,8 @@ export async function probeImageBytes(
             reencodeOpaquePng
           )
           if (!result.ok) wholes.set(key, null)
-          else if (!result.changed) wholes.set(key, 'original')
-          else wholes.set(key, { bytes: result.bytes.length, mime: result.mime })
+          // 손대지 않은 원본도 Figma 는 다시 인코딩한다 — 원본 파일 크기가 아니라 그 크기로 센다
+          else wholes.set(key, { bytes: await figmaSizeOf(result.bytes), mime: result.mime })
         } catch {
           wholes.set(key, null)
         }

@@ -12,6 +12,7 @@ import {
   retryCandidates,
   MAX_FIT_RETRIES,
   decideFit,
+  FIGMA_JPEG_QUALITY,
   fitAttemptPlan,
   resolveSave,
   savedSource,
@@ -240,10 +241,12 @@ describe('chooseProfile — 칸 사이 변형', () => {
   })
 })
 
-describe('보정 — Figma 가 다시 넣는 몫만', () => {
-  it('비율 = (PDF 안 실제 − 우리 JPEG) / (우리 셈 − 우리 JPEG). 못 재면 1, 터무니없으면 잘라 낸다', () => {
+describe('보정 — 기준 패스를 Figma 품질로 잰 값 대비 PDF 안 실제', () => {
+  it('비율 = PDF 안 실제 / 기준 패스 측정값. 못 재면 1, 터무니없으면 잘라 낸다', () => {
     expect(calibrationRatio(9 * MB, 18 * MB)).toBeCloseTo(0.5)
-    expect(calibrationRatio(10 * MB, { total: 18 * MB, jpeg: 6 * MB })).toBeCloseTo(1 / 3)
+    expect(calibrationRatio(10 * MB, { total: 18 * MB, jpeg: 6 * MB })).toBeCloseTo(10 / 18)
+    // 예측 = 고정분 + 보정비 × 전체 — JPEG 몫을 따로 더하지 않는다(Figma 가 다시 인코딩한다)
+    expect(predictSize(1 * MB, { total: 2 * MB, jpeg: 1 * MB }, 0.5)).toBe(2 * MB)
     expect(calibrationRatio(0, 18 * MB)).toBe(1)
     expect(calibrationRatio(9 * MB, 0)).toBe(1)
     expect(calibrationRatio(9 * MB, { total: 9 * MB, jpeg: 9 * MB })).toBe(1)
@@ -251,23 +254,24 @@ describe('보정 — Figma 가 다시 넣는 몫만', () => {
     expect(calibrationRatio(100 * MB, 1 * MB)).toBe(2)
   })
 
-  it('우리 JPEG 는 그대로 더하고 나머지에만 비율을 곱한다', () => {
+  it('보정비는 전체에 고르게 곱한다 — 재는 값이 이미 Figma 품질이라 JPEG 몫을 따로 두지 않는다', () => {
     expect(predictSize(1 * MB, 20 * MB, 0.5)).toBe(11 * MB)
-    expect(predictSize(1 * MB, { total: 20 * MB, jpeg: 5 * MB }, 0.5)).toBe(13.5 * MB)
+    expect(predictSize(1 * MB, { total: 20 * MB, jpeg: 5 * MB }, 0.5)).toBe(11 * MB)
     // 우리 셈 18MB 가 PDF 안에서는 9MB — 보정 없이는 넘치고, 보정하면 10MB 안에 든다
     const outcome = chooseProfile([probe(4, 18 * MB)], 1 * MB, 10 * MB, 30 * MB, 0.5)
     expect(outcome).toEqual({ kind: 'fits', profile: PROFILE_LADDER[4], predicted: 10 * MB })
     expect(chooseProfile([probe(4, 18 * MB)], 1 * MB, 10 * MB, 30 * MB).kind).toBe('unreachable')
   })
 
-  it('JPEG 가 많은 후보는 비율 덕을 못 본다 — 실측 5.8 예측이 8.0 으로 나온 그 경우', () => {
+  it('옛 사고(예측 5.8MB → 실제 8.0MB)의 원인이던 JPEG 분리는 없다 — 그 전제(우리 JPEG 는 그대로 실린다)가 틀렸다', () => {
+    // 그때는 우리 품질의 JPEG 바이트를 그대로 더해 품질 높은 후보를 과하게, 낮은 후보를 적게 예측했다.
+    // 지금은 후보 출력을 Figma 품질(76)로 다시 인코딩한 크기를 재므로 한 비율로 충분하다(실측 근거는 fitToSize.ts)
     const heavyJpeg: Probe = {
       profile: PROFILE_LADDER[4],
       bytes: { total: 18 * MB, jpeg: 12 * MB }
     }
-    expect(predictSize(1 * MB, heavyJpeg.bytes, 0.2)).toBeCloseTo(14.2 * MB)
-    // 기준 60MB × 0.2 = 13MB 라 목표를 넘고, 유일한 후보도 14.2MB 라 못 맞춘다
-    expect(chooseProfile([heavyJpeg], 1 * MB, 10 * MB, 60 * MB, 0.2).kind).toBe('unreachable')
+    expect(predictSize(1 * MB, heavyJpeg.bytes, 0.2)).toBeCloseTo(4.6 * MB)
+    expect(FIGMA_JPEG_QUALITY).toBe(0.76)
   })
 })
 

@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   cloneBitmap: vi.fn(),
   resizeDecoded: vi.fn(),
   encodePiece: vi.fn(),
+  // Figma 크기 어림은 캔버스가 필요하다 — 입력 길이를 그대로 돌려준다
+  figmaSizeOf: vi.fn(async (bytes: Uint8Array) => bytes.length),
   isPng: vi.fn(() => false)
 }))
 vi.mock('../src/ui/resize', () => mocks)

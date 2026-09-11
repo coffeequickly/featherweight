@@ -77,9 +77,8 @@ export function applyProfile(settings: Settings, profile: CompressionProfile): S
 }
 
 /**
- * 이미지 바이트를 두 갈래로 센다. 우리가 만든 JPEG 는 PDF 에 그대로(DCT) 실리고,
- * 나머지(손대지 않은 원본, PNG 로 남긴 출력)는 Figma 가 다시 인코딩해 넣어서 크기가 달라진다.
- * 숫자 하나만 주면 전부 "나머지" 로 본다.
+ * 이미지 바이트 합계. jpeg 는 그중 JPEG 로 낸 몫 — 예전 예측식이 갈라 썼고 지금은 참고용으로만 남긴다.
+ * 숫자 하나만 주면 전부 total 로 본다.
  */
 export type ImageBytes = { total: number; jpeg: number }
 
@@ -140,35 +139,36 @@ export function fixedBytes(baselinePdfBytes: number, baselineImageBytes: number)
 }
 
 /**
- * 예측 = 고정분 + 우리 JPEG + 보정비 × 나머지.
+ * Figma 가 PDF 로 내보낼 때 이미지를 다시 인코딩하는 JPEG 품질(IJG 척도). 실측(2026-09-11): 같은 사진을
+ * 품질 60/80/95 로 넣어도 PDF 안의 JPEG 는 전부 같은 양자화표였고, 그 표는 IJG 표준 휘도표의 0.455~0.5 배
+ * = scale 48 = 품질 76. 우리 캔버스 인코더(Chrome, IJG 표)의 0.76 이 같은 표를 만든다 — 그래서 후보의
+ * 용량은 "후보 품질로 인코딩한 결과를 다시 이 품질로 인코딩한 크기" 로 잰다(resize.figmaSizeOf).
+ */
+export const FIGMA_JPEG_QUALITY = 0.76
+
+/**
+ * 예측 = 고정분 + 보정비 × 이미지 바이트.
  *
- * Figma 는 PDF 를 만들 때 손대지 않은 원본을 자기 방식으로 다시 인코딩해 넣는다 — 31장 덱
- * 실측: 우리 셈 48MB 가 PDF 안에서는 8.9MB. 그대로 더하면 고정분이 0 으로 잘리고 압축을
- * 세게 한 후보가 기준보다 크게 예측된다. 그래서 JPEG 는 그대로 더하고 나머지에만 기준 패스에서
- * 잰 비율을 곱한다. 비율 하나를 전부에 곱하면 우리 JPEG 가 많은 후보일수록 작게 예측돼 목표를
- * 넘긴다(실측: 예측 5.8MB → 실제 8.0MB).
- *
- * 단, "우리 JPEG 는 그대로(DCT) 실린다" 는 전제는 틀렸다(2026-09-11 실측). 같은 600×403 사진을
- * 품질 60/80/95 로 넣었더니 PDF 안에서는 28,260/41,653/88,112 B → 31,390/39,972/37,144 B 로 바뀌고
- * 셋 다 Figma 의 고정 양자화표를 갖는다 — 우리 JPEG 도 다시 인코딩되며, 품질 95 가 80 보다 작아지기도
- * 한다. 그러니 이 식은 JPEG 몫을 대체로 크게 잡고(품질을 올린 변형일수록), 품질 변형은 실제 용량을
- * 거의 못 움직인다. 결과는 목표 안에 들지만 필요 이상으로 압축할 수 있다. 고치려면 JPEG 몫에도
- * 해상도 기준의 보정이 필요하고, 그 전에 기준·최종의 예측 대 실제 오차를 결과 탭·콘솔로 모은다.
+ * 이미지 바이트는 후보의 출력을 Figma 품질(FIGMA_JPEG_QUALITY)로 다시 인코딩한 크기의 합이다 — Figma 가
+ * PDF 를 만들 때 하는 일을 미리 해 보는 셈. 예전에는 "우리 JPEG 는 그대로 실린다" 고 보고 우리 품질의
+ * 바이트를 그대로 더했는데, 실측으로 틀렸다: Figma 는 우리 JPEG 도 품질 76 으로 다시 인코딩하므로 품질을
+ * 올린 후보는 과하게(선명한 결과를 놓침), 내린 후보는 적게(목표를 넘김) 예측됐다(+0.5%·+2.1%·+3.6% 가
+ * 품질 순). 같은 잣대로 잰 기준 패스와 PDF 안 실제 이미지 바이트의 비(calibrationRatio)가 인코더 차이를
+ * 흡수한다. 31장 덱 실측: 우리 셈 48MB 가 PDF 안에서 8.9MB — 그대로 더하면 고정분이 0 으로 잘린다.
  */
 export function predictSize(fixed: number, imageBytes: number | ImageBytes, ratio = 1): number {
   const bytes = asImageBytes(imageBytes)
-  return fixed + bytes.jpeg + Math.max(0, bytes.total - bytes.jpeg) * ratio
+  return fixed + Math.max(0, bytes.total) * ratio
 }
 
 /**
- * 나머지 몫의 보정비 = (PDF 안의 실제 이미지 바이트 − 우리 JPEG) / (우리 셈 − 우리 JPEG).
- * 잴 수 없으면 1, 터무니없으면 잘라 낸다.
+ * 보정비 = PDF 안의 실제 이미지 바이트 / 기준 패스를 Figma 품질로 잰 바이트.
+ * 잴 수 없으면 1, 터무니없으면 잘라 낸다. 기준 패스도 후보와 같은 잣대(figmaSizeOf)로 재야 비가 맞다.
  */
 export function calibrationRatio(pdfImageBytes: number, baseline: number | ImageBytes): number {
   const bytes = asImageBytes(baseline)
-  const rest = bytes.total - bytes.jpeg
-  if (rest <= 0 || pdfImageBytes <= 0) return 1
-  return Math.min(2, Math.max(0.05, (pdfImageBytes - bytes.jpeg) / rest))
+  if (bytes.total <= 0 || pdfImageBytes <= 0) return 1
+  return Math.min(2, Math.max(0.05, pdfImageBytes / bytes.total))
 }
 
 /**

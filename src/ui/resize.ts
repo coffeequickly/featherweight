@@ -1,5 +1,6 @@
 // 이미지 다운스케일·재인코딩. Canvas 가 있는 UI 스레드에서만 된다. (PRD C3, §7.6)
 
+import { FIGMA_JPEG_QUALITY } from '../lib/fitToSize'
 import { t } from '../lib/i18n'
 import { keepsOriginal, scaledSize } from '../lib/imageTarget'
 import { CropRect } from '../lib/types'
@@ -269,4 +270,28 @@ export function hasAlphaPixels(data: Uint8ClampedArray | Uint8Array): boolean {
     if (data[index] < 255) return true
   }
   return false
+}
+
+/**
+ * 이 이미지가 Figma 의 PDF 안에서 차지할 바이트의 어림 — Figma 가 하듯 다시 디코드해 품질 76 JPEG 로
+ * 인코딩한 크기. 알파는 버린다(Figma 는 SMask 를 따로 얹지만 그 몫은 작다, 실측 257 B).
+ * 실패하면 입력 크기를 그대로 돌려준다 — 예측이 커지는 쪽이라 목표를 넘기지는 않는다.
+ */
+export async function figmaSizeOf(bytes: Uint8Array): Promise<number> {
+  let bitmap: ImageBitmap | undefined
+  try {
+    bitmap = await createImageBitmap(new Blob([bytes as BlobPart]), {
+      imageOrientation: 'from-image'
+    })
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+    const context = canvas.getContext('2d')
+    if (context === null) return bytes.length
+    context.drawImage(bitmap, 0, 0)
+    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: FIGMA_JPEG_QUALITY })
+    return blob.size
+  } catch {
+    return bytes.length
+  } finally {
+    bitmap?.close()
+  }
 }

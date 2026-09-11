@@ -414,7 +414,17 @@ async function runFitExport(order: string[], settings: Settings, outName: string
   // 고정분은 PDF 안에 실제로 든 이미지를 뺀 나머지. 우리가 센 바이트는 Figma 가 다시
   // 압축해 넣는 몫만큼 부풀어 있어서 그 비율로 후보 예측을 보정한다 (fitToSize.predictSize)
   const fixed = fixedBytes(measured.pdfBytes, measured.pdfImageBytes)
-  const baselineBytes: ImageBytes = { total: measured.imageBytes, jpeg: measured.imageJpegBytes }
+  // 기준 패스도 후보와 같은 잣대(Figma 품질로 다시 인코딩한 크기)로 재서 보정비를 잡는다. 못 재면
+  // (잴 이미지가 없다) 기준 패스가 실제로 넣은 바이트로 — 그때는 후보도 없다
+  const baselineProbe = await probeBytes(
+    order,
+    PROFILE_LADDER[BASELINE_INDEX],
+    settings.cropToVisible
+  )
+  const baselineBytes: ImageBytes = baselineProbe ?? {
+    total: measured.imageBytes,
+    jpeg: measured.imageJpegBytes
+  }
   const ratio = calibrationRatio(measured.pdfImageBytes, baselineBytes)
 
   const probes = await runProbes(
@@ -588,22 +598,8 @@ async function runProbes(
   const probe = async (profile: CompressionProfile): Promise<boolean | null> => {
     step += 1
     reportProgress(t('progress.probe', { current: step, total }), step / total, FIT_PROBE)
-    const items = await probeItemsFor(order, profile, cropToVisible)
-    if (items.length === 0) return null // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
-
-    const reqId = nextRequestId('probe')
-    const promise = awaitResponse<{ totalBytes: number; jpegBytes: number; failed: number }>(
-      reqId,
-      PROBE_TIMEOUT_MS
-    )
-    emit<ImageProbeHandler>('image:probe', {
-      reqId,
-      items,
-      quality: profile.quality,
-      reencodeOpaquePng: profile.reencodeOpaquePng
-    })
-    const result = await promise
-    const bytes: ImageBytes = { total: result.totalBytes, jpeg: result.jpegBytes }
+    const bytes = await probeBytes(order, profile, cropToVisible)
+    if (bytes === null) return null // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
     probes.push({ profile, bytes })
     return predictSize(fixed, bytes, ratio) <= targetBytes
   }
@@ -639,6 +635,32 @@ async function runProbes(
  * 항목은 **쪽마다** 만든다 — PDF 에는 쪽마다 한 벌씩 실리고, 같은 원본도 쪽마다 창·목표가
  * 다를 수 있다. 같은 결과는 UI 가 인코딩 캐시로 재사용한다(imageCache.probeImageBytes).
  */
+/**
+ * 이 프로필로 문서의 이미지를 인코딩했을 때 PDF 안에서 차지할 바이트(UI 가 Figma 품질로 다시 인코딩해 잰다).
+ * 잴 이미지가 없으면 null.
+ */
+async function probeBytes(
+  order: string[],
+  profile: CompressionProfile,
+  cropToVisible: boolean
+): Promise<ImageBytes | null> {
+  const items = await probeItemsFor(order, profile, cropToVisible)
+  if (items.length === 0) return null
+  const reqId = nextRequestId('probe')
+  const promise = awaitResponse<{ totalBytes: number; jpegBytes: number; failed: number }>(
+    reqId,
+    PROBE_TIMEOUT_MS
+  )
+  emit<ImageProbeHandler>('image:probe', {
+    reqId,
+    items,
+    quality: profile.quality,
+    reencodeOpaquePng: profile.reencodeOpaquePng
+  })
+  const result = await promise
+  return { total: result.totalBytes, jpeg: result.jpegBytes }
+}
+
 async function probeItemsFor(
   order: string[],
   profile: CompressionProfile,
