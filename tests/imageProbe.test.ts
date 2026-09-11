@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 
 import { CROP_RULES } from '../src/lib/imageCrop'
 import { Encoded, EncodedLookup, probeItemsFrom, tallyProbe } from '../src/lib/imageProbe'
+import { applyProfile, PROFILE_LADDER } from '../src/lib/fitToSize'
 import { KEEP_BYTES_FLOOR } from '../src/lib/imageTarget'
+import { DEFAULT_SETTINGS } from '../src/lib/types'
 import { CropRect, ImageProbeItem, ImageUsage } from '../src/lib/types'
 
 const SETTINGS = { multiplier: 1.5 as const, maxEdge: 1920 as const, minEdge: 640 as const }
@@ -222,5 +224,25 @@ describe('잘라 넣기 끄기', () => {
     const [item] = probeItemsFrom([A], SETTINGS, sizes, seen, false)
     expect(item.pieces).toBeUndefined()
     expect(item.densityGain).toBeUndefined()
+  })
+})
+
+describe('조각 관문은 사다리 칸마다 다르다 — 목표 용량 탐색이 더 선명한 칸을 걸러선 안 되는 이유', () => {
+  it('4096² 원본에 25% 창 여섯: 기준 칸(2048)은 픽셀 합 관문에 걸려 통째, 한 칸 위(2560)는 조각 계획', () => {
+    const square = { big: { width: 4096, height: 4096 } }
+    const seenBig = new Map([['big', { longEdge: 4096, bytes: 5_000_000 }]])
+    const usages: ImageUsage[] = []
+    for (const [i, x] of [0.05, 0.37, 0.69].entries()) {
+      for (const [j, y] of [0.05, 0.65].entries()) {
+        usages.push({ ...crop(`n${i}${j}`, 400, 0.25, 0.25, x, y), imageHash: 'big' })
+      }
+    }
+    const at = (index: number) =>
+      probeItemsFrom(usages, applyProfile(DEFAULT_SETTINGS, PROFILE_LADDER[index]), square, seenBig)
+    const baseline = at(3)
+    const sharper = at(2)
+    expect(baseline).toHaveLength(1)
+    expect(baseline[0].pieces).toBeUndefined()
+    expect(sharper[0].pieces).toHaveLength(6)
   })
 })

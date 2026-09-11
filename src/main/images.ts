@@ -291,7 +291,9 @@ export async function shrinkImages(
       // 설정이 꺼져 있으면 통로가 있어도 묻지 않는다 — exporter 가 통로를 안 주지만 여기서도 막는다
       if (crop !== undefined && sendMany !== undefined && settings.cropToVisible) {
         try {
-          chosen = await cropOne(crop, whole, settings, sendMany)
+          const attempt = await cropOne(crop, whole, settings, sendMany)
+          if (attempt.kind === 'pieces') chosen = attempt.pieces
+          else if (attempt.kind === 'failed') stats.recovered += 1
         } catch {
           // 취소로 끊긴 것이면 복구할 것도 없다 — 바로 나간다
           if (isCancelled()) break
@@ -361,7 +363,7 @@ async function cropOne(
   whole: Whole,
   settings: Settings,
   sendMany: ImageManySender
-): Promise<Piece[] | null> {
+): Promise<CropAttempt> {
   const keys = crop.pieces.map((piece) => pieceKey(crop.imageHash, piece, settings))
   const encoded: Array<Piece | { bytes: Uint8Array; mime: string } | null> = keys.map(
     (key) => pieces.get(key) ?? null
@@ -382,7 +384,8 @@ async function cropOne(
       jobs: missing.map(({ piece }) => ({ targetLongEdge: piece.targetLongEdge, crop: piece.rect }))
     })
     const result = await promise
-    if (!result.ok || result.results.length !== missing.length) return null
+    // UI 가 정상 회신으로 실패를 알린 것 — 예외와 같은 복구 경로다(검토: 예전엔 '절감 부족' 과 섞여 복구 0 으로 셌다)
+    if (!result.ok || result.results.length !== missing.length) return { kind: 'failed' }
     missing.forEach(({ at }, order) => {
       encoded[at] = { bytes: result.results[order].bytes, mime: result.results[order].mime }
     })
@@ -392,10 +395,10 @@ async function cropOne(
   // 채택은 목표 용량 예측과 같은 함수(chooseCrop)가 정한다
   let total = 0
   for (const item of encoded) {
-    if (item === null) return null
+    if (item === null) return { kind: 'failed' }
     total += item.bytes instanceof Uint8Array ? item.bytes.length : item.bytes
   }
-  if (!chooseCrop(whole.bytes, total, crop.densityGain).crop) return null
+  if (!chooseCrop(whole.bytes, total, crop.densityGain).crop) return { kind: 'declined' }
 
   const out: Piece[] = []
   for (let at = 0; at < encoded.length; at += 1) {
@@ -411,8 +414,11 @@ async function cropOne(
     pieces.set(keys[at], piece)
     out.push(piece)
   }
-  return out
+  return { kind: 'pieces', pieces: out }
 }
+
+/** 조각 시도의 결말 — 채택 / 절감 부족으로 W₀ / 인코딩 실패로 W₀(복구로 센다) */
+type CropAttempt = { kind: 'pieces'; pieces: Piece[] } | { kind: 'declined' } | { kind: 'failed' }
 
 /**
  * 전체본 W₀ 하나를 만든다(또는 캐시에서 찾는다). 손대지 않기로 했거나 실패하면 null — 그 사유의

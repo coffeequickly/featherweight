@@ -113,15 +113,22 @@ function compose(then: Transform, first: Transform): Transform {
 /**
  * 비율이 어긋난 FILL 이 보여 주는 창 — Figma 는 가운데를 잘라 쓴다
  * (실측: 이 가정으로 만든 조각이 Figma 의 FILL 렌더와 0.07pt 안에서 겹쳤다).
- * 회전(90° 단위)이 있으면 돌린 이미지 위에서 가운데를 잡고 원본 좌표로 되돌린다. 90 단위가
- * 아닌 회전은 FILL 에 없다 — 있으면 null.
+ * 회전(90° 단위)이 있으면 돌린 이미지 위에서 가운데를 잡고 원본 좌표로 되돌린다. 90 배수가
+ * 아닌 각도(90.4° 같은)는 반올림하지 않고 null — 임의 각도는 기존 경로(통째)다. 부동소수점
+ * 부스러기만 FILL_ANGLE_TOLERANCE 안에서 받는다.
  */
+export const FILL_ANGLE_TOLERANCE = 1e-3
+
 export function fillWindow(
   box: { width: number; height: number },
   source: PixelSize,
   rotation = 0
 ): PaintWindow | null {
-  const turn = ((Math.round(rotation) % 360) + 360) % 360
+  if (!Number.isFinite(rotation)) return null
+  const normalized = ((rotation % 360) + 360) % 360
+  const nearest = Math.round(normalized / 90) * 90
+  if (Math.abs(normalized - nearest) > FILL_ANGLE_TOLERANCE) return null
+  const turn = nearest % 360
   const rotate = FILL_ROTATIONS[turn]
   if (rotate === undefined) return null
   const sideways = turn === 90 || turn === 270

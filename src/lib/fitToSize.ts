@@ -221,6 +221,22 @@ export function chooseProfile(
  *
  * 두 경우 다 좋은 쪽부터 재고, 처음 목표 안에 드는 것에서 멈추면 된다.
  */
+/**
+ * 후보 프로필에 기준에는 없던 조각 계획이 붙었는가. 키는 "쪽|해시".
+ *
+ * 기준이 목표를 넘으면 더 선명한 칸은 볼 이유가 없다는 전제는 조각 계획이 같을 때만 참이다 —
+ * 조각 관문(픽셀 합 ≤ W₀ 픽셀, 목표 ≥ 원본이면 안 함)은 칸마다 달라서, 2048 에서는 관문에 걸려
+ * 통째였던 원본이 2560 에서는 조각으로 바뀌어 더 선명하면서 더 작을 수 있다(검토 재현: 4096²
+ * 원본에 25% 창 여섯). 그런 칸만 골라 재본다. 계획이 같은 칸은 픽셀도 품질도 기준 이상이라 크다.
+ */
+export function hasNewCrops(
+  candidate: ReadonlySet<string>,
+  baseline: ReadonlySet<string>
+): boolean {
+  for (const key of candidate) if (!baseline.has(key)) return true
+  return false
+}
+
 export function candidateIndices(
   baselineIndex: number,
   direction: 'sharper' | 'smaller'

@@ -323,13 +323,19 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
     expect(stats).toMatchObject({ processed: 1, cropped: 0 })
   })
 
-  it('조각 인코딩이 실패하면 W₀ 로 물러선다', async () => {
+  it('조각 인코딩이 실패하면 W₀ 로 물러서고 복구로 센다 — 절감 부족과 다르다', async () => {
     manyOk = false
     const root = frame(false)
     const stats = await run(root)
     expect(created).toEqual(['new-1'])
     expect(fillOf(root, 'B')).toMatchObject({ scaleMode: 'CROP', imageHash: 'new-1' })
-    expect(stats).toMatchObject({ processed: 1, cropped: 0, bytesAfter: 500_000, warnings: [] })
+    expect(stats).toMatchObject({
+      processed: 1,
+      cropped: 0,
+      recovered: 1,
+      bytesAfter: 500_000,
+      warnings: []
+    })
   })
 
   it('sendMany 가 없으면(옛 호출자) 오늘 그대로다', async () => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   cropWindow,
   enclosingRect,
+  FILL_ANGLE_TOLERANCE,
   fillWindow,
   isWhole,
   paintCoverage,
@@ -313,5 +314,24 @@ describe('가장자리 허용 오차 — 자르기 도구가 남기는 작은 �
         [0, 0.5, 0.3]
       ])
     ).toBeNull() // 오른쪽으로 1% 넘침
+  })
+})
+
+describe('FILL 각도 — 90° 배수만, 반올림하지 않는다', () => {
+  it('90.4° · −0.4° · 45° 는 기존 경로(null), 부스러기(89.9999°)와 360°·−270° 는 받는다', () => {
+    const box = { width: 300, height: 100 }
+    expect(fillWindow(box, source, 90.4)).toBeNull()
+    expect(fillWindow(box, source, -0.4)).toBeNull()
+    expect(fillWindow(box, source, 45)).toBeNull()
+    expect(fillWindow(box, source, 90 + FILL_ANGLE_TOLERANCE * 2)).toBeNull()
+    const exact = fillWindow(box, source, 90) as PaintWindow
+    const nearly = fillWindow(box, source, 90 - FILL_ANGLE_TOLERANCE / 2) as PaintWindow
+    expect(nearly).not.toBeNull()
+    expect(nearly.transform).toEqual(exact.transform)
+    expect((fillWindow(box, source, 360) as PaintWindow).transform).toEqual(
+      (fillWindow(box, source, 0) as PaintWindow).transform
+    )
+    expect((fillWindow(box, source, -270) as PaintWindow).transform).toEqual(exact.transform)
+    expect(fillWindow(box, source, Number.NaN)).toBeNull()
   })
 })

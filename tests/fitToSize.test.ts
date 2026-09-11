@@ -7,6 +7,7 @@ import {
   chooseProfile,
   clampTargetMb,
   fixedBytes,
+  hasNewCrops,
   MAX_QUALITY,
   MIN_MIN_EDGE,
   MAX_TARGET_MB,
@@ -283,5 +284,15 @@ describe('PROFILE_LADDER 의 하한', () => {
     for (const profile of PROFILE_LADDER) {
       expect(profile.minEdge).toBeLessThanOrEqual(profile.maxEdge)
     }
+  })
+})
+
+describe('hasNewCrops — 기준이 목표를 넘어도 재봐야 하는 더 선명한 칸', () => {
+  it('기준에 없던 "쪽|해시" 조각 계획이 하나라도 붙으면 참, 부분집합이면 거짓', () => {
+    const baseline = new Set(['p1|a', 'p2|b'])
+    expect(hasNewCrops(new Set(['p1|a', 'p2|b', 'p3|c']), baseline)).toBe(true)
+    expect(hasNewCrops(new Set(['p1|a']), baseline)).toBe(false)
+    expect(hasNewCrops(new Set(), baseline)).toBe(false)
+    expect(hasNewCrops(new Set(['p1|a']), new Set())).toBe(true)
   })
 })

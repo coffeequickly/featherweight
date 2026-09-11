@@ -6,6 +6,7 @@ import {
   BASELINE_INDEX,
   calibrationRatio,
   candidateIndices,
+  hasNewCrops,
   chooseProfile,
   clampTargetMb,
   CompressionProfile,
@@ -463,8 +464,20 @@ async function runProbes(
   const rungs = candidateIndices(BASELINE_INDEX, baselineFits ? 'sharper' : 'smaller').map(
     (index) => PROFILE_LADDER[index]
   )
+  // 기준이 목표를 넘어도 잘라 넣기가 켜져 있으면 더 선명한 칸이 더 작을 수 있다 — 조각 관문이
+  // 칸마다 달라 기준에는 없던 조각 계획이 붙는 칸이 있다. 그런 칸만 골라 먼저 재본다
+  // (fitToSize.hasNewCrops). 계획은 순수 계산이라 재보기 전에 걸러도 싸다
+  const ahead: CompressionProfile[] = []
+  if (!baselineFits && cropToVisible) {
+    const baselineCrops = await cropKeysFor(order, PROFILE_LADDER[BASELINE_INDEX])
+    for (const index of candidateIndices(BASELINE_INDEX, 'sharper')) {
+      if (hasNewCrops(await cropKeysFor(order, PROFILE_LADDER[index]), baselineCrops)) {
+        ahead.push(PROFILE_LADDER[index])
+      }
+    }
+  }
   // 진행 표시용 — 칸 사이 변형은 최대 둘
-  const total = rungs.length + 2
+  const total = ahead.length + rungs.length + 2
   let step = 0
 
   const probe = async (profile: CompressionProfile): Promise<boolean | null> => {
@@ -491,7 +504,8 @@ async function runProbes(
   }
 
   let fitted: CompressionProfile | undefined
-  for (const rung of rungs) {
+  // 선명한 것부터 — ahead 는 사다리 위쪽이라 앞에 서고, 그중 하나가 맞으면 아래 칸은 볼 이유가 없다
+  for (const rung of [...ahead, ...rungs]) {
     if (cancelled) return probes
     const fits = await probe(rung)
     if (fits === null) return probes
@@ -520,6 +534,19 @@ async function runProbes(
  * 항목은 **쪽마다** 만든다 — PDF 에는 쪽마다 한 벌씩 실리고, 같은 원본도 쪽마다 창·목표가
  * 다를 수 있다. 같은 결과는 UI 가 인코딩 캐시로 재사용한다(imageCache.probeImageBytes).
  */
+/** 이 프로필에서 조각 계획이 붙는 자리들 — "쪽|해시". 재보기 전에 칸을 거르는 데 쓴다 */
+async function cropKeysFor(order: string[], profile: CompressionProfile): Promise<Set<string>> {
+  const keys = new Set<string>()
+  for (const id of order) {
+    const node = await figma.getNodeByIdAsync(id)
+    if (node === null || node.removed || !('absoluteTransform' in node)) continue
+    for (const item of probeItemsOf(node as SceneNode, profile, true)) {
+      if (item.pieces !== undefined && item.pieces.length > 0) keys.add(`${id}|${item.imageHash}`)
+    }
+  }
+  return keys
+}
+
 async function probeItemsFor(
   order: string[],
   profile: CompressionProfile,
