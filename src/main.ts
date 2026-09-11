@@ -7,6 +7,7 @@ import {
   calibrationRatio,
   probeOrder,
   chooseProfile,
+  describeProfile,
   clampTargetMb,
   CompressionProfile,
   fixedBytes,
@@ -418,11 +419,29 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     settings.cropToVisible
   )
   const outcome = chooseProfile(probes, fixed, targetBytes, baselineBytes, ratio)
+  const chosenProfile =
+    outcome.kind === 'already-small' ? PROFILE_LADDER[BASELINE_INDEX] : outcome.profile
   const fit: FitReport = {
     targetBytes,
     outcome: outcome.kind,
-    predictedBytes: outcome.predicted
+    predictedBytes: outcome.predicted,
+    profile: { ...chosenProfile },
+    candidates: probes.length
   }
+  // 후보별 예측치 — 어느 칸이 왜 떨어졌는지는 여기서만 볼 수 있다(플러그인 콘솔)
+  console.log(
+    '[fit] target',
+    targetBytes,
+    'fixed',
+    fixed,
+    'ratio',
+    ratio.toFixed(3),
+    'baseline',
+    predictSize(fixed, baselineBytes, ratio),
+    probes.map(
+      (probe) => `${describeProfile(probe.profile)} → ${predictSize(fixed, probe.bytes, ratio)}`
+    )
+  )
 
   // 기준 그대로가 답이면 다시 뽑지 않는다 — 부분을 안 보내면 UI 가 방금 머지해 둔 것을
   // 그대로 저장한다. 세 경우가 여기로 온다:
