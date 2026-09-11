@@ -25,6 +25,7 @@ import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
 import { groupReasons, unifyMissingGlyphs } from '../lib/preflight'
 import { NodesFocusHandler } from '../lib/types'
+import { describeProfile } from '../lib/fitToSize'
 import { Fold } from './Fold'
 import { useThumbUrl } from './FrameList'
 import { Section } from './Section'
@@ -119,6 +120,17 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
         {fit === null ? null : (
           <div class={`fileCardFit${missedTarget ? ' fileCardFitWarn' : ''}`}>
             <Text>{fitLine(fit, report.byteLength)}</Text>
+            {/* 고른 설정은 여기에만 남는다 — PDF 로는 못 읽는다(Figma 가 다시 인코딩) */}
+            {fit.profile === undefined ? null : (
+              <Text>
+                <Muted>
+                  {t('report.fitProfile', {
+                    profile: describeProfile(fit.profile),
+                    count: fit.candidates ?? 0
+                  })}
+                </Muted>
+              </Text>
+            )}
           </div>
         )}
       </div>
