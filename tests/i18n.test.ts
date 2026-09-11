@@ -91,6 +91,7 @@ describe('사전 무결성', () => {
     min: 640,
     scale: 1.5,
     count: 2,
+    profile: '1.1× · 1280px · 640px · 74%',
     missing: 1,
     total: 3,
     done: 1,
