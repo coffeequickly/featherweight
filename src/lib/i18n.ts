@@ -856,6 +856,11 @@ const MESSAGES = {
     ko: (p) =>
       `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · 최소 ${p.min}px · JPEG 품질 ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''} · 후보 ${p.count}개 재봄 · 예측 ${p.predicted} B, 실제 ${p.actual} B (오차 ${p.error}%)`
   },
+  /** 예측식의 재료 — 고정분 · 보정비 · 기준 측정 / PDF 안 이미지 · 기준 PDF */
+  'report.fitCalibration': {
+    en: 'Calibration: fixed {fixed} B · ratio {ratio} · baseline measured {measured} B vs {pdfImages} B in PDF (PDF {pdf} B)',
+    ko: '예측 재료: 고정분 {fixed} B · 보정비 {ratio} · 기준 측정 {measured} B vs PDF 안 이미지 {pdfImages} B (기준 PDF {pdf} B)'
+  },
   /** 재본 후보와 예측 바이트 — "배율×최대·품질 예측바이트", 목표 안이면 ✓ */
   'report.fitCandidates': {
     en: 'Candidates (predicted bytes): {list}',

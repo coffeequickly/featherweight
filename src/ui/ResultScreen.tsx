@@ -158,6 +158,19 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
                 </Muted>
               </Text>
             )}
+            {fit.calibration === undefined ? null : (
+              <Text>
+                <Muted>
+                  {t('report.fitCalibration', {
+                    fixed: fit.calibration.fixed.toLocaleString(),
+                    ratio: fit.calibration.ratio.toFixed(3),
+                    measured: fit.calibration.baselineMeasured.toLocaleString(),
+                    pdfImages: fit.calibration.pdfImageBytes.toLocaleString(),
+                    pdf: fit.calibration.pdfBytes.toLocaleString()
+                  })}
+                </Muted>
+              </Text>
+            )}
             {/* 후보별 예측 — 탈락한 후보의 예측이 맞았는지는 그 설정으로 실제 내보내 견줘야 안다 */}
             {fit.probes === undefined || fit.probes.length === 0 ? null : (
               <Text>

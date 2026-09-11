@@ -441,6 +441,14 @@ export type FitReport = {
   }
   /** 재본 후보 수 — 기준 패스는 빼고 */
   candidates?: number
+  /** 예측식의 재료 — 예측이 빗나갈 때 어디서 빗나갔는지 보려고 남긴다 */
+  calibration?: {
+    fixed: number
+    ratio: number
+    baselineMeasured: number
+    pdfImageBytes: number
+    pdfBytes: number
+  }
   /** 최종 패스마다(첫 시도 + 재시도) 뽑은 설정과 실제 PDF 바이트 — 마지막이 저장된 것 */
   attempts?: Array<{
     multiplier: number
