@@ -76,21 +76,11 @@ export function applyProfile(settings: Settings, profile: CompressionProfile): S
   }
 }
 
-/**
- * 이미지 바이트 합계. jpeg 는 그중 JPEG 로 낸 몫 — 예전 예측식이 갈라 썼고 지금은 참고용으로만 남긴다.
- * 숫자 하나만 주면 전부 total 로 본다.
- */
-export type ImageBytes = { total: number; jpeg: number }
-
-export function asImageBytes(value: number | ImageBytes): ImageBytes {
-  return typeof value === 'number' ? { total: value, jpeg: 0 } : value
-}
-
 /** 후보 하나를 재본 결과. 사다리 칸일 수도, 칸 사이를 메운 변형일 수도 있다. */
 export type Probe = {
   profile: CompressionProfile
   /** 이 프로필로 인코딩했을 때의 이미지 바이트 */
-  bytes: ImageBytes
+  bytes: number
 }
 
 export type FitOutcome =
@@ -156,19 +146,17 @@ export const FIGMA_JPEG_QUALITY = 0.76
  * 품질 순). 같은 잣대로 잰 기준 패스와 PDF 안 실제 이미지 바이트의 비(calibrationRatio)가 인코더 차이를
  * 흡수한다. 31장 덱 실측: 우리 셈 48MB 가 PDF 안에서 8.9MB — 그대로 더하면 고정분이 0 으로 잘린다.
  */
-export function predictSize(fixed: number, imageBytes: number | ImageBytes, ratio = 1): number {
-  const bytes = asImageBytes(imageBytes)
-  return fixed + Math.max(0, bytes.total) * ratio
+export function predictSize(fixed: number, imageBytes: number, ratio = 1): number {
+  return fixed + Math.max(0, imageBytes) * ratio
 }
 
 /**
  * 보정비 = PDF 안의 실제 이미지 바이트 / 기준 패스를 Figma 품질로 잰 바이트.
  * 잴 수 없으면 1, 터무니없으면 잘라 낸다. 기준 패스도 후보와 같은 잣대(figmaSizeOf)로 재야 비가 맞다.
  */
-export function calibrationRatio(pdfImageBytes: number, baseline: number | ImageBytes): number {
-  const bytes = asImageBytes(baseline)
-  if (bytes.total <= 0 || pdfImageBytes <= 0) return 1
-  return Math.min(2, Math.max(0.05, pdfImageBytes / bytes.total))
+export function calibrationRatio(pdfImageBytes: number, baselineBytes: number): number {
+  if (baselineBytes <= 0 || pdfImageBytes <= 0) return 1
+  return Math.min(2, Math.max(0.05, pdfImageBytes / baselineBytes))
 }
 
 /**
@@ -185,7 +173,7 @@ export function chooseProfile(
   probes: readonly Probe[],
   fixed: number,
   targetBytes: number,
-  baselineImageBytes: number | ImageBytes,
+  baselineImageBytes: number,
   ratio = 1
 ): FitOutcome {
   const baselinePredicted = predictSize(fixed, baselineImageBytes, ratio)

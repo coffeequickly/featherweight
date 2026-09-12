@@ -36,7 +36,7 @@ const MB = 1024 * 1024
 /** 사다리 칸(또는 품질만 바꾼 변형)을 잰 결과 */
 const probe = (index: number, imageBytes: number, quality?: number): Probe => ({
   profile: quality === undefined ? PROFILE_LADDER[index] : { ...PROFILE_LADDER[index], quality },
-  bytes: { total: imageBytes, jpeg: 0 }
+  bytes: imageBytes
 })
 
 describe('PROFILE_LADDER', () => {
@@ -244,19 +244,19 @@ describe('chooseProfile — 칸 사이 변형', () => {
 describe('보정 — 기준 패스를 Figma 품질로 잰 값 대비 PDF 안 실제', () => {
   it('비율 = PDF 안 실제 / 기준 패스 측정값. 못 재면 1, 터무니없으면 잘라 낸다', () => {
     expect(calibrationRatio(9 * MB, 18 * MB)).toBeCloseTo(0.5)
-    expect(calibrationRatio(10 * MB, { total: 18 * MB, jpeg: 6 * MB })).toBeCloseTo(10 / 18)
+    expect(calibrationRatio(10 * MB, 18 * MB)).toBeCloseTo(10 / 18)
     // 예측 = 고정분 + 보정비 × 전체 — JPEG 몫을 따로 더하지 않는다(Figma 가 다시 인코딩한다)
-    expect(predictSize(1 * MB, { total: 2 * MB, jpeg: 1 * MB }, 0.5)).toBe(2 * MB)
+    expect(predictSize(1 * MB, 2 * MB, 0.5)).toBe(2 * MB)
     expect(calibrationRatio(0, 18 * MB)).toBe(1)
     expect(calibrationRatio(9 * MB, 0)).toBe(1)
-    expect(calibrationRatio(9 * MB, { total: 9 * MB, jpeg: 9 * MB })).toBe(1)
+    expect(calibrationRatio(9 * MB, 9 * MB)).toBe(1)
     expect(calibrationRatio(1 * MB, 100 * MB)).toBe(0.05)
     expect(calibrationRatio(100 * MB, 1 * MB)).toBe(2)
   })
 
   it('보정비는 전체에 고르게 곱한다 — 재는 값이 이미 Figma 품질이라 JPEG 몫을 따로 두지 않는다', () => {
     expect(predictSize(1 * MB, 20 * MB, 0.5)).toBe(11 * MB)
-    expect(predictSize(1 * MB, { total: 20 * MB, jpeg: 5 * MB }, 0.5)).toBe(11 * MB)
+    expect(predictSize(1 * MB, 20 * MB, 0.5)).toBe(11 * MB)
     // 우리 셈 18MB 가 PDF 안에서는 9MB — 보정 없이는 넘치고, 보정하면 10MB 안에 든다
     const outcome = chooseProfile([probe(4, 18 * MB)], 1 * MB, 10 * MB, 30 * MB, 0.5)
     expect(outcome).toEqual({ kind: 'fits', profile: PROFILE_LADDER[4], predicted: 10 * MB })
@@ -268,7 +268,7 @@ describe('보정 — 기준 패스를 Figma 품질로 잰 값 대비 PDF 안 실
     // 지금은 후보 출력을 Figma 품질(76)로 다시 인코딩한 크기를 재므로 한 비율로 충분하다(실측 근거는 fitToSize.ts)
     const heavyJpeg: Probe = {
       profile: PROFILE_LADDER[4],
-      bytes: { total: 18 * MB, jpeg: 12 * MB }
+      bytes: 18 * MB
     }
     expect(predictSize(1 * MB, heavyJpeg.bytes, 0.2)).toBeCloseTo(4.6 * MB)
     expect(FIGMA_JPEG_QUALITY).toBe(0.76)
@@ -310,10 +310,10 @@ describe('probeOrder — 잘라 넣기가 켜져 있으면 기준이 목표를 �
     const KB = 1000
     // 재본 값(검토 재현 — 실측 아님). 기준(3번 칸)은 1,000KB
     const probes: Probe[] = [
-      { profile: PROFILE_LADDER[2], bytes: { total: 980 * KB, jpeg: 980 * KB } },
-      { profile: PROFILE_LADDER[4], bytes: { total: 900 * KB, jpeg: 900 * KB } }
+      { profile: PROFILE_LADDER[2], bytes: 980 * KB },
+      { profile: PROFILE_LADDER[4], bytes: 900 * KB }
     ]
-    const outcome = chooseProfile(probes, 0, 990 * KB, { total: 1000 * KB, jpeg: 1000 * KB })
+    const outcome = chooseProfile(probes, 0, 990 * KB, 1000 * KB)
     expect(outcome.kind).toBe('fits')
     if (outcome.kind === 'fits') expect(sharpnessOrder(outcome.profile, PROFILE_LADDER[2])).toBe(0)
   })
@@ -425,11 +425,23 @@ describe('decideFit — 저장할 PDF 와 결과 상태는 실제 바이트로 �
     ).toBe('missed')
   })
 
-  it('최종 패스가 없으면 기준 실측으로 — 기준이 목표 안이면 already-small', () => {
+  it('최종 패스가 없으면 기준 실측으로 판정한다 — 결과 카드 문구가 여기서 갈린다', () => {
+    // 기준 그대로 저장: 예측이 무엇이었든 실제 바이트가 목표 안이면 맞춘 것이다
     expect(
       decideFit(target, { profile: baseline, actual: 4_900_000 }, [], false, 'already-small')
         .outcome
     ).toBe('already-small')
+    expect(
+      decideFit(target, { profile: baseline, actual: 4_900_000 }, [], false, 'fits').outcome
+    ).toBe('fits')
+    // 기준이 목표를 넘고 더 줄일 칸도 없다 — 하한을 알린다
+    expect(
+      decideFit(target, { profile: baseline, actual: 6_000_000 }, [], false, 'unreachable').outcome
+    ).toBe('unreachable')
+    // 예측은 맞출 수 있다고 했는데 실제로는 넘었다 — 이번 시도에서 못 맞춘 것
+    expect(
+      decideFit(target, { profile: baseline, actual: 6_000_000 }, [], false, 'fits').outcome
+    ).toBe('missed')
   })
 
   it('UI 가 저장할 슬롯 — 새 조각이 오면 그것, 아니면 메인이 고른 보관본 또는 마지막 측정본', () => {

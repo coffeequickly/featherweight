@@ -17,7 +17,6 @@ import {
   clampTargetMb,
   CompressionProfile,
   fixedBytes,
-  ImageBytes,
   mbToBytes,
   predictSize,
   Probe,
@@ -421,10 +420,7 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     PROFILE_LADDER[BASELINE_INDEX],
     settings.cropToVisible
   )
-  const baselineBytes: ImageBytes = baselineProbe ?? {
-    total: measured.imageBytes,
-    jpeg: measured.imageJpegBytes
-  }
+  const baselineBytes = baselineProbe ?? measured.imageBytes
   const ratio = calibrationRatio(measured.pdfOwnImageBytes, baselineBytes)
 
   const probes = await runProbes(
@@ -443,11 +439,10 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     outcome: outcome.kind,
     predictedBytes: outcome.predicted,
     profile: { ...chosenProfile },
-    candidates: probes.length,
     calibration: {
       fixed,
       ratio,
-      baselineMeasured: baselineBytes.total,
+      baselineMeasured: baselineBytes,
       pdfImageBytes: measured.pdfImageBytes,
       pdfOwnImageBytes: measured.pdfOwnImageBytes,
       pdfBytes: measured.pdfBytes
@@ -588,7 +583,7 @@ async function runProbes(
   order: string[],
   fixed: number,
   targetBytes: number,
-  baselineBytes: ImageBytes,
+  baselineBytes: number,
   ratio: number,
   cropToVisible: boolean
 ): Promise<Probe[]> {
@@ -651,14 +646,11 @@ async function probeBytes(
   order: string[],
   profile: CompressionProfile,
   cropToVisible: boolean
-): Promise<ImageBytes | null> {
+): Promise<number | null> {
   const items = await probeItemsFor(order, profile, cropToVisible)
   if (items.length === 0) return null
   const reqId = nextRequestId('probe')
-  const promise = awaitResponse<{ totalBytes: number; jpegBytes: number; failed: number }>(
-    reqId,
-    PROBE_TIMEOUT_MS
-  )
+  const promise = awaitResponse<{ totalBytes: number; failed: number }>(reqId, PROBE_TIMEOUT_MS)
   emit<ImageProbeHandler>('image:probe', {
     reqId,
     items,
@@ -666,7 +658,7 @@ async function probeBytes(
     reencodeOpaquePng: profile.reencodeOpaquePng
   })
   const result = await promise
-  return { total: result.totalBytes, jpeg: result.jpegBytes }
+  return result.totalBytes
 }
 
 async function probeItemsFor(
@@ -690,7 +682,6 @@ async function probeItemsFor(
 type Measured = {
   pdfBytes: number
   imageBytes: number
-  imageJpegBytes: number
   pdfImageBytes: number
   pdfOwnImageBytes: number
 }

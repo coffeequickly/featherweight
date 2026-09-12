@@ -114,7 +114,6 @@ export async function exportFrame(
           imagesCropped: images.cropped,
           imagesRecovered: images.recovered,
           imageHashes: images.seen,
-          bytesJpeg: images.bytesJpeg,
           bytesBefore: images.bytesBefore,
           bytesAfter: images.bytesAfter,
           bytesUntouched: images.bytesUntouched,

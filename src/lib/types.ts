@@ -217,13 +217,15 @@ export type StoredFont = FontRef & {
 }
 
 export type PartStats = {
-  imagesProcessed: number
-  /** 그중 보이는 창만 잘라 넣은 원본 수 — 품질을 지키고도 바이트가 줄 때만 (lib/imageCrop.ts) */
-  imagesCropped: number
-  /** 조각을 만들다 실패해 기존 방식(W₀)으로 물러선 원본 수 — 출력은 정상 */
-  imagesRecovered: number
-  /** 우리가 만든 JPEG 출력 바이트 — PDF 에 그대로(DCT) 실린다. 나머지는 Figma 가 다시 넣는다 */
-  bytesJpeg: number
+  /**
+   * 이 쪽에서 손댄·잘라 넣은·물러선 원본의 해시. 세지 않고 해시로 들고 다니는 이유는
+   * 여러 쪽에 깔린 같은 사진을 한 장으로 세기 위해서다 (useExport 가 합집합을 만든다)
+   */
+  imagesProcessed: string[]
+  /** 그중 보이는 창만 잘라 넣은 원본 — 품질을 지키고도 바이트가 줄 때만 (lib/imageCrop.ts) */
+  imagesCropped: string[]
+  /** 조각을 만들다 실패해 기존 방식(W₀)으로 물러선 원본 — 출력은 정상 */
+  imagesRecovered: string[]
   /** 이 쪽의 서로 다른 이미지 해시. 쪽마다 합쳐 "이미지 N장" 을 체크리스트와 같은 기준으로 센다 */
   imageHashes: string[]
   bytesBefore: number
@@ -415,8 +417,6 @@ export interface FitMeasuredHandler extends EventHandler {
     reqId: string
     pdfBytes: number
     imageBytes: number
-    /** imageBytes 중 우리가 만든 JPEG 몫 */
-    imageJpegBytes: number
     pdfImageBytes: number
     /** pdfImageBytes 중 우리가 넣은 이미지(치수 일치) 몫 — 나머지는 Figma 가 그림자·마스크를 래스터화한 것 */
     pdfOwnImageBytes: number
@@ -441,8 +441,6 @@ export type FitReport = {
     quality: number
     reencodeOpaquePng: boolean
   }
-  /** 재본 후보 수 — 기준 패스는 빼고 */
-  candidates?: number
   /** 예측식의 재료 — 예측이 빗나갈 때 어디서 빗나갔는지 보려고 남긴다 */
   calibration?: {
     fixed: number
@@ -677,7 +675,6 @@ export interface ImageProbeResultHandler extends EventHandler {
     reqId: string
     totalBytes: number
     /** totalBytes 중 우리가 만든 JPEG 몫 — 보정하지 않는다 */
-    jpegBytes: number
     failed: number
   }) => void
 }

@@ -12,7 +12,7 @@ import {
 } from '../src/lib/cropWindow'
 import { DEFAULT_SETTINGS, Settings } from '../src/lib/types'
 import { settleResponse } from '../src/main/bridge'
-import { forgetReplacements, imageUsagesOf, shrinkImages } from '../src/main/images'
+import { forgetReplacements, ImageStats, imageUsagesOf, shrinkImages } from '../src/main/images'
 import { windowOf } from '../src/lib/imageCrop'
 import { rememberSize } from '../src/main/imageSize'
 
@@ -199,6 +199,14 @@ const run = (root: FakeNode) =>
 const fillOf = (root: FakeNode, id: string) =>
   (root.children.find((c) => c.id === id) as FakeNode).fills[0]
 
+/** 손댄 원본은 해시로 쌓인다(쪽마다 세지 않으려고) — 단언은 개수로 본다 */
+const counts = (stats: ImageStats) => ({
+  ...stats,
+  processed: stats.processed.length,
+  cropped: stats.cropped.length,
+  recovered: stats.recovered.length
+})
+
 describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
   it('가로만 확대된 FILL도 로컬 상자의 구도로 창을 계산한다', () => {
     const node = rect('scaled', 100, 100, fill())
@@ -224,12 +232,11 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
       const stats = await run(root)
       expect(root.children.map((node) => node.fills[0].imageHash)).toEqual(Array(4).fill('new-1'))
       expect(fillOf(root, 'A').imageTransform).toEqual(T_A)
-      expect(stats).toMatchObject({
+      expect(counts(stats)).toMatchObject({
         processed: 1,
         cropped: 0,
         recovered: 1,
-        bytesAfter: 500_000,
-        bytesJpeg: 500_000
+        bytesAfter: 500_000
       })
       expect(stats.warnings).toHaveLength(0)
     }
@@ -242,7 +249,7 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
     const stats = await run(root)
     expect(created).toEqual(['new-1'])
     expect(fillOf(root, 'A')).toMatchObject({ imageHash: 'new-1', imageTransform: T_A })
-    expect(stats).toMatchObject({ cropped: 0, recovered: 0, bytesAfter: 500_000 })
+    expect(counts(stats)).toMatchObject({ cropped: 0, recovered: 0, bytesAfter: 500_000 })
   })
 
   it('밀도가 크게 높아지는 후보는 작은 절감으로도 조각이다', async () => {
@@ -251,7 +258,7 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
     manyBytes = [490_000] // W₀ 의 98%
     const stats = await run(root)
     expect(fillOf(root, 'A')).toMatchObject({ scaleMode: 'CROP', imageHash: 'new-2' })
-    expect(stats).toMatchObject({ cropped: 1, bytesAfter: 490_000 })
+    expect(counts(stats)).toMatchObject({ cropped: 1, bytesAfter: 490_000 })
   })
 
   it('조각 합이 W₀ 보다 작으면 자리마다 조각을 CROP + T′ 로 꽂는다', async () => {
@@ -261,12 +268,11 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
     expect(sent).toBe(1) // W₀ 한 번
     expect(sentMany).toBe(1) // 조각 넷은 한 번에
     expect(created).toEqual(['new-1', 'new-2', 'new-3', 'new-4', 'new-5']) // W₀ + 조각 4
-    expect(stats).toMatchObject({
+    expect(counts(stats)).toMatchObject({
       processed: 1,
       cropped: 1,
       bytesBefore: 3_000_000,
-      bytesAfter: 307_000,
-      bytesJpeg: 307_000
+      bytesAfter: 307_000
     })
 
     const a = fillOf(root, 'A')
@@ -296,7 +302,7 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
     expect(sentMany).toBe(1)
     expect(created).toHaveLength(5)
     expect(fillOf(second, 'A').imageHash).toBe('new-2')
-    expect(stats).toMatchObject({ processed: 1, cropped: 1, bytesAfter: 307_000 })
+    expect(counts(stats)).toMatchObject({ processed: 1, cropped: 1, bytesAfter: 307_000 })
   })
 
   it('조각 합이 W₀ 이상이면 W₀ 다 — 조각은 만들지도 않는다', async () => {
@@ -311,7 +317,7 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
       imageTransform: T_A
     })
     expect(fillOf(root, 'C')).toMatchObject({ scaleMode: 'FILL', imageHash: 'new-1' })
-    expect(stats).toMatchObject({ processed: 1, cropped: 0, bytesAfter: 500_000 })
+    expect(counts(stats)).toMatchObject({ processed: 1, cropped: 0, bytesAfter: 500_000 })
   })
 
   it('통째로 보는 자리가 있으면 조각을 묻지도 않는다 — W₀ 가 남아야 해서', async () => {
@@ -320,7 +326,7 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
     expect(sentMany).toBe(0)
     expect(created).toEqual(['new-1'])
     expect(fillOf(root, 'E')).toMatchObject({ scaleMode: 'FILL', imageHash: 'new-1' })
-    expect(stats).toMatchObject({ processed: 1, cropped: 0 })
+    expect(counts(stats)).toMatchObject({ processed: 1, cropped: 0 })
   })
 
   it('조각 인코딩이 실패하면 W₀ 로 물러서고 복구로 센다 — 절감 부족과 다르다', async () => {
@@ -329,7 +335,7 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
     const stats = await run(root)
     expect(created).toEqual(['new-1'])
     expect(fillOf(root, 'B')).toMatchObject({ scaleMode: 'CROP', imageHash: 'new-1' })
-    expect(stats).toMatchObject({
+    expect(counts(stats)).toMatchObject({
       processed: 1,
       cropped: 0,
       recovered: 1,
@@ -348,7 +354,7 @@ describe('shrinkImages — 보이는 창만 잘라 넣기', () => {
       () => false
     )
     expect(created).toEqual(['new-1'])
-    expect(stats).toMatchObject({ processed: 1, cropped: 0 })
+    expect(counts(stats)).toMatchObject({ processed: 1, cropped: 0 })
   })
 })
 
@@ -367,7 +373,7 @@ describe('잘라 넣기 끄기', () => {
     expect(sentMany).toBe(0)
     expect(created).toEqual(['new-1'])
     expect(fillOf(root, 'A')).toMatchObject({ scaleMode: 'CROP', imageHash: 'new-1' })
-    expect(stats).toMatchObject({ processed: 1, cropped: 0 })
+    expect(counts(stats)).toMatchObject({ processed: 1, cropped: 0 })
   })
 
   it('저장된 옛 설정에 항목이 없으면 기본은 켬', async () => {

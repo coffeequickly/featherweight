@@ -100,7 +100,6 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
     )
     expect(small).toEqual({
       totalBytes: 300_000,
-      jpegBytes: 300_000,
       failed: 0,
       cropped: 1,
       recovered: 0
@@ -130,7 +129,6 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
     )
     expect(tally).toEqual({
       totalBytes: 500_000,
-      jpegBytes: 500_000,
       failed: 0,
       cropped: 0,
       recovered: 1
@@ -177,8 +175,7 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
     // 줄여도 안 작아지는 것
     const notSmaller: Encoded = { bytes: 3_000_000, mime: 'image/jpeg', sized: 2_000_000 }
     expect(tallyProbe([item()], lookup(notSmaller, [], 1_100_000))).toMatchObject({
-      totalBytes: 1_100_000,
-      jpegBytes: 0
+      totalBytes: 1_100_000
     })
     expect(tallyProbe([item()], lookup(notSmaller, [], null))).toMatchObject({
       totalBytes: 3_000_000
@@ -189,8 +186,7 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
     // 줄인 것이 원본보다 작으니 쓴다 — 더하는 값은 sized
     const whole: Encoded = { bytes: 2_900_000, mime: 'image/jpeg', sized: 1_500_000 }
     expect(tallyProbe([item()], lookup(whole, [], 1_100_000))).toMatchObject({
-      totalBytes: 1_500_000,
-      jpegBytes: 1_500_000
+      totalBytes: 1_500_000
     })
     // 조각 채택도 bytes 끼리 비교(export 와 같다) — 더할 때는 조각의 sized
     const w: Encoded = { bytes: 500_000, mime: 'image/jpeg', sized: 480_000 }
@@ -200,11 +196,10 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
         [item({ pieces: [{ targetLongEdge: 640, crop: rect }], densityGain: 1 })],
         lookup(w, [piece])
       )
-    ).toMatchObject({ totalBytes: 250_000, jpegBytes: 250_000, cropped: 1 })
+    ).toMatchObject({ totalBytes: 250_000, cropped: 1 })
     // sized 가 없으면 bytes 그대로
     expect(tallyProbe([item()], lookup({ bytes: 700_000, mime: 'image/png' }, []))).toMatchObject({
-      totalBytes: 700_000,
-      jpegBytes: 0
+      totalBytes: 700_000
     })
   })
 
@@ -216,7 +211,6 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
     )
     expect(tally).toEqual({
       totalBytes: 700_000,
-      jpegBytes: 700_000,
       failed: 0,
       cropped: 1,
       recovered: 0
@@ -229,7 +223,7 @@ describe('tallyProbe — export 와 같은 규칙으로 더한다', () => {
       [item({ pieces: [{ targetLongEdge: 640, crop: rect }], densityGain: 1 })],
       lookup(w, [{ bytes: 100_000, mime: 'image/png' }])
     )
-    expect(tally).toMatchObject({ totalBytes: 100_000, jpegBytes: 0, cropped: 1 })
+    expect(tally).toMatchObject({ totalBytes: 100_000, cropped: 1 })
   })
 })
 
@@ -248,16 +242,16 @@ describe('크롭이 예측에 들어가면 더 선명한 프로필이 목표에 
       lookup(w, [{ bytes: 300_000, mime: 'image/jpeg' }])
     )
     const wholeOnly = tallyProbe([item()], lookup(w, []))
-    const baselineBytes = { total: 600_000, jpeg: 600_000 } // 기준 칸은 이미 목표 안
+    const baselineBytes = 600_000 // 기준 칸은 이미 목표 안
 
     const chosenWith = chooseProfile(
-      [{ profile: sharper, bytes: { total: withCrops.totalBytes, jpeg: withCrops.jpegBytes } }],
+      [{ profile: sharper, bytes: withCrops.totalBytes }],
       fixed,
       target,
       baselineBytes
     )
     const chosenWithout = chooseProfile(
-      [{ profile: sharper, bytes: { total: wholeOnly.totalBytes, jpeg: wholeOnly.jpegBytes } }],
+      [{ profile: sharper, bytes: wholeOnly.totalBytes }],
       fixed,
       target,
       baselineBytes

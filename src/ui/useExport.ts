@@ -104,10 +104,6 @@ function imageBytesOf(parts: readonly PdfPart[]): number {
   return parts.reduce((sum, part) => sum + part.stats.bytesAfter + part.stats.bytesUntouched, 0)
 }
 
-function imageJpegBytesOf(parts: readonly PdfPart[]): number {
-  return parts.reduce((sum, part) => sum + part.stats.bytesJpeg, 0)
-}
-
 /** ui-preview 캡처 자동화용 — Figma 안에서는 전역이 없어 항상 null */
 function previewReport(): ExportReport | null {
   return (window as { __PREVIEW_REPORT__?: ExportReport }).__PREVIEW_REPORT__ ?? null
@@ -210,7 +206,6 @@ export function useExport(
           reqId: done.reqId ?? '',
           pdfBytes: merged.bytes.length,
           imageBytes: imageBytesOf(collected),
-          imageJpegBytes: imageJpegBytesOf(collected),
           pdfImageBytes: merged.images.bytes,
           pdfOwnImageBytes: merged.images.own
         })
@@ -221,7 +216,6 @@ export function useExport(
           reqId: done.reqId ?? '',
           pdfBytes: 0,
           imageBytes: 0,
-          imageJpegBytes: 0,
           pdfImageBytes: 0,
           pdfOwnImageBytes: 0
         })
@@ -317,22 +311,16 @@ export function useExport(
           t('report.saved', { file: done.fileName, size: formatBytes(bytes.length) })
         )
 
-        const stats = collected.reduce(
-          (sum, part) => ({
-            imagesProcessed: sum.imagesProcessed + part.stats.imagesProcessed,
-            imagesCropped: sum.imagesCropped + part.stats.imagesCropped,
-            imagesRecovered: sum.imagesRecovered + part.stats.imagesRecovered,
-            fallbacks: [...sum.fallbacks, ...part.stats.fallbacks],
-            imageWarnings: [...sum.imageWarnings, ...part.stats.imageWarnings]
-          }),
-          {
-            imagesProcessed: 0,
-            imagesCropped: 0,
-            imagesRecovered: 0,
-            fallbacks: [] as Array<{ nodeId: string; reason: Reason }>,
-            imageWarnings: [] as Array<{ nodeId: string; reason: Reason }>
-          }
-        )
+        // 여러 쪽에 깔린 같은 사진은 한 장 — 해시를 합쳐 센다(결과 카드의 "N장 중 M장")
+        const union = (pick: (part: PdfPart) => readonly string[]): number =>
+          new Set(collected.flatMap((part) => pick(part))).size
+        const stats = {
+          imagesProcessed: union((part) => part.stats.imagesProcessed),
+          imagesCropped: union((part) => part.stats.imagesCropped),
+          imagesRecovered: union((part) => part.stats.imagesRecovered),
+          fallbacks: collected.flatMap((part) => part.stats.fallbacks),
+          imageWarnings: collected.flatMap((part) => part.stats.imageWarnings)
+        }
         // 장수는 서로 다른 원본으로 센다 — PDF 안의 이미지 객체 수(쪽마다 한 벌씩)로 세면
         // 체크리스트의 "54장" 이 결과에서 "66장" 이 돼 뭘 놓쳤나 싶어진다. 바이트는 파일 그대로.
         const distinctImages = new Set(collected.flatMap((part) => part.stats.imageHashes))
@@ -391,6 +379,8 @@ export function useExport(
     parts.current = []
     measured.current = null
     best.current = null
+    // 앞 실행이 취소된 뒤 늦게 도착한 원본이 남아 있을 수 있다 — 새 실행은 빈 캐시에서 시작한다
+    forgetOriginals()
     startedAt.current = Date.now()
     setBusy(true)
     setError(null)

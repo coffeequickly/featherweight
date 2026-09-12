@@ -29,15 +29,17 @@ import { knownEdge, knownSize, persistEdgeCache, readSize, rememberSize } from '
 import { awaitResponse, nextRequestId } from './bridge'
 
 export type ImageStats = {
-  processed: number
+  /**
+   * 손댄 원본의 해시. 쪽마다 세면 여러 쪽에 깔린 같은 사진이 쪽 수만큼 세어져
+   * "이미지 1장 중 31장 축소" 가 된다 — 결과 카드는 이 해시를 합쳐 서로 다른 장수를 말한다
+   */
+  processed: string[]
   /** processed 중 보이는 창만 잘라 넣은 원본 — 품질을 지키고도 바이트가 줄 때만 (lib/imageCrop.ts) */
-  cropped: number
+  cropped: string[]
   /** 조각을 만들다 실패해 W₀ 로 물러선 원본 — 출력은 정상이다. 경고가 아니라 안내 */
-  recovered: number
+  recovered: string[]
   bytesBefore: number
   bytesAfter: number
-  /** bytesAfter 중 우리가 만든 JPEG — PDF 에 그대로 실린다 (목표 용량 예측의 보정 제외분) */
-  bytesJpeg: number
   /** 손대지 않고 통과시킨 이미지의 바이트 합 — 목표 용량 예측용 */
   bytesUntouched: number
   warnings: Reason[]
@@ -255,12 +257,11 @@ export async function shrinkImages(
 ): Promise<ImageStats> {
   const usages = collectImageUsages(root)
   const stats: ImageStats = {
-    processed: 0,
-    cropped: 0,
-    recovered: 0,
+    processed: [],
+    cropped: [],
+    recovered: [],
     bytesBefore: 0,
     bytesAfter: 0,
-    bytesJpeg: 0,
     bytesUntouched: 0,
     warnings: [],
     seen: [...new Set(usages.map((usage) => usage.imageHash))]
@@ -293,31 +294,29 @@ export async function shrinkImages(
         try {
           const attempt = await cropOne(crop, whole, settings, sendMany)
           if (attempt.kind === 'pieces') chosen = attempt.pieces
-          else if (attempt.kind === 'failed') stats.recovered += 1
+          else if (attempt.kind === 'failed') stats.recovered.push(plan.imageHash)
         } catch {
           // 취소로 끊긴 것이면 복구할 것도 없다 — 바로 나간다
           if (isCancelled()) break
           // 조각 생성·되읽기·브리지 예외는 W₀ 로 합류한다. 원본으로 돌아가면 이미 만든
           // 축소본과 바이트 통계가 사라지고 기존보다 큰 PDF 가 나간다. 출력은 정상이니 안내로만
-          stats.recovered += 1
+          stats.recovered.push(plan.imageHash)
         }
       }
 
-      stats.processed += 1
+      stats.processed.push(plan.imageHash)
       if (chosen === null || crop === undefined) {
         byHash.set(plan.imageHash, whole.hash)
         applied += 1
         stats.bytesAfter += whole.bytes
-        if (whole.mime === 'image/jpeg') stats.bytesJpeg += whole.bytes
         continue
       }
 
-      stats.cropped += 1
+      stats.cropped.push(plan.imageHash)
       for (let at = 0; at < crop.pieces.length; at += 1) {
         const piece = chosen[at]
         applied += 1
         stats.bytesAfter += piece.bytes
-        if (piece.mime === 'image/jpeg') stats.bytesJpeg += piece.bytes
         for (const fill of crop.pieces[at].fills) {
           byFill.set(fillKey(fill.nodeId, fill.fillIndex), {
             hash: piece.hash,

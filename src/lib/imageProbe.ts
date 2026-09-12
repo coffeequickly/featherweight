@@ -68,8 +68,6 @@ export type EncodedLookup = {
 
 export type ProbeTally = {
   totalBytes: number
-  /** JPEG 로 실리는 몫 */
-  jpegBytes: number
   /** 캐시에 없어 재보지 못한 항목 — 원본 크기로 셌다 */
   failed: number
   /** 조각으로 센 항목 */
@@ -84,7 +82,7 @@ export type ProbeTally = {
  *   그 외 → chooseCrop 이 고른 쪽
  */
 export function tallyProbe(items: readonly ImageProbeItem[], lookup: EncodedLookup): ProbeTally {
-  const tally: ProbeTally = { totalBytes: 0, jpegBytes: 0, failed: 0, cropped: 0, recovered: 0 }
+  const tally: ProbeTally = { totalBytes: 0, failed: 0, cropped: 0, recovered: 0 }
 
   for (const item of items) {
     if (item.originalBytes <= KEEP_BYTES_FLOOR) {
@@ -125,9 +123,7 @@ export function tallyProbe(items: readonly ImageProbeItem[], lookup: EncodedLook
       }
     }
     for (const piece of chosen) {
-      const bytes = piece.sized ?? piece.bytes
-      tally.totalBytes += bytes
-      if (piece.mime === 'image/jpeg') tally.jpegBytes += bytes
+      tally.totalBytes += piece.sized ?? piece.bytes
     }
   }
 

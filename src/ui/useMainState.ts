@@ -182,7 +182,6 @@ export function useMainState(): MainState {
           // 재기가 통째로 실패하면 원본 크기로 센다 — 예측이 커지는 쪽이라 목표를 넘기지는 않는다.
           // 회신을 안 하면 메인이 타임아웃까지 기다린다
           totalBytes: payload.items.reduce((sum, item) => sum + item.originalBytes, 0),
-          jpegBytes: 0,
           failed: payload.items.length
         }))
         .then((result) => {
