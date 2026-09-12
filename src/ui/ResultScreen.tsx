@@ -129,7 +129,6 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
                 {t('report.fitProfile', {
                   scale: fit.profile.multiplier,
                   max: fit.profile.maxEdge,
-                  min: fit.profile.minEdge,
                   quality: Math.round(fit.profile.quality * 100),
                   png: fit.profile.reencodeOpaquePng ? 'no' : 'yes'
                 })}

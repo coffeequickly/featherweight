@@ -846,14 +846,15 @@ const MESSAGES = {
     ko: '내보낸 파일은 {actual}로 목표 용량 {target}을 초과했습니다. 목표 용량을 조정하거나 최소 용량 프리셋으로 다시 내보내세요.'
   },
   /**
-   * 자동으로 고른 최종 설정 — 배율 · 최대 · 최소 · JPEG 품질. 칸 이름만으론 알 수 없어 적는다.
-   * png 가 'yes' 면 맨 위 칸(PNG 를 그대로 둠). 예측·실제·보정 재료는 화면에 안 적고 플러그인 콘솔에만
+   * 자동으로 고른 최종 설정 — 배율 · 최대 · JPEG 품질. 칸 이름만으론 알 수 없어 적는다. 한 줄에 들어가야
+   * 해서(카드 너비 약 390px) 최소 변은 뺀다 — 플러그인 콘솔의 [fit] 로그에는 전부 있다.
+   * png 가 'yes' 면 맨 위 칸(PNG 를 그대로 둠). 예측·실제·보정 재료도 화면에 안 적는다
    */
   'report.fitProfile': {
     en: (p) =>
-      `Chosen automatically: scale ${p.scale}× · max ${p.max}px · min ${p.min}px · JPEG quality ${p.quality}%${p.png === 'yes' ? ' · PNG kept' : ''}`,
+      `Auto: scale ${p.scale}× · max ${p.max}px · JPEG ${p.quality}%${p.png === 'yes' ? ' · PNG kept' : ''}`,
     ko: (p) =>
-      `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · 최소 ${p.min}px · JPEG 품질 ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''}`
+      `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · JPEG ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''}`
   },
   /** 한도 안에서 다시 뽑았지만 실제 크기가 목표를 넘었다 — 저장은 됐다, 사실만 말한다 */
   'report.fitMissed': {
