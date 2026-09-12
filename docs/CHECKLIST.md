@@ -44,7 +44,7 @@ Options tab is the build you mean to ship.
       document with a generous target keeps Balanced ("Already under…")
 - [ ] Target: typing "0.8" works, an emptied field falls back to the previous
       value (never silently 0.5), and −/+ step by 1 MB (0.5 ↔ 1 at the bottom).
-      Resolution and quality are locked in the Images tab with a line saying why
+      Image size and quality are locked in the Images tab with a line saying why
 - [ ] Selecting 30 frames shows the list at once and the canvas keeps
       responding while the counts fill in; thumbnails arrive in batches rather
       than all at the end; clicking around inside the same frames (or inside a
@@ -69,7 +69,7 @@ Options tab is the build you mean to ship.
 - [ ] Under **Advanced** sit three bars — Largest (px) · Smallest (px) · Scale
       (×) — each showing its own value and the ends of its own ladder. Folded,
       the header still reads all three. A line says what the scale means
-      ("Stays sharp when zoomed to 150%. That is 108 DPI in print.")
+      ("Stays sharp zoomed to 150%, or 108 DPI in print.")
 - [ ] Every bar responds across its whole range. Dragging Largest below Smallest
       is impossible — the ladder itself is trimmed, and the other bar never
       moves on its own. A stored pair that crosses (an old install with 1600
@@ -96,10 +96,12 @@ Options tab is the build you mean to ship.
       thumbnail, its name, size, pages and seconds. Text and Images are
       accordions — the head carries the summary, right-aligned in both — and
       open by default only when something in them needs attention
-- [ ] Result reasons are noun phrases, not sentences ("Nexa Heavy font file
-      missing", not "There is no usable font file for…"), each a row with a
-      count and a chevron; clicking one selects those layers on canvas.
+- [ ] Result reasons are noun phrases, not sentences ("Font file required: Nexa
+      Heavy", not "A font file is required for…"), each a row with a count and a
+      chevron; clicking one selects those layers on canvas.
       Image warnings live under Images, not under Text
+- [ ] A document with no text shows no Text section at all, and one with no
+      images shows no Images section
 - [ ] Result shows the first lines of the embedded text with "See all" — and
       **See all actually opens the subpage**, where the text can be selected and
       copied
@@ -186,8 +188,9 @@ for a document with nothing to outline; `report=1` for the result card).
 - [ ] A layer with superscript/subscript text (e.g. "1st, 2nd" with Position:
       Superscript) stays as outlines and looks exactly as in Figma; the
       pre-flight Text row and the report both say "superscript/subscript"
-- [ ] A bulleted or numbered list keeps its bullets/numbers (stays as outlines)
-      and the report says "bulleted/numbered list"
+- [ ] A bulleted or numbered list exports as real text with the marker where
+      Figma drew it (`pdftotext` shows the bullet or number); a right-to-left
+      list stays outlined with that reason
 - [ ] Text used as a mask, text with Multiply blend, text inside a 50% opacity
       group, and text overflowing a clipping frame all stay as outlines with
       their own reason; text inside a card with a filled drop shadow is still
@@ -299,8 +302,8 @@ for a document with nothing to outline; `report=1` for the result card).
       over 32 MB whose names don't match skipped (4 of 370, reported as not
       checked) the peak is 400 MB in 0.6 s. The 64 MB cap is on retained faces,
       not on the peak
-- [ ] A font outside the catalog shows "no file" and stays as outlines — the
-      checklist's Fonts row warns with the font's name and "Add fonts ›" opens
+- [ ] A font outside the catalog shows "Font file required" and stays as
+      outlines — the Start row warns with the font's name and "Fonts ›" opens
       the Fonts screen
 - [ ] Offline (Wi-Fi off): catalog fonts fall back to outlines and the PDF still
       exports cleanly
@@ -311,6 +314,20 @@ for a document with nothing to outline; `report=1` for the result card).
       `pdfimages -list` shows the original dimensions and encoding
 - [ ] An oversized screenshot is downscaled; no image exceeds its target
 - [ ] Transparent PNGs stay PNG (no black boxes)
+- [ ] Options → "Trim pictures to the visible area" is on by default. With a
+      document whose fills are cropped, the exported PDF carries piece-sized
+      images (`pdfimages -list`), they sit where Figma draws them, and the same
+      export with the toggle off is larger
+- [ ] The Images tab status line reads "Trim pictures to the visible area: on ·
+      applies to N partly visible images" (off → "… are stored in full"), and
+      "Options ›" opens the Options tab
+- [ ] The Images list columns are Visible area · Original · Stored · Trimmed; a
+      trimmed row's Stored is the piece size, and a row clipped by its frame
+      shows "none" under Trimmed with the note below the list
+- [ ] The result card counts trimmed images, and any that fell back say they
+      were downscaled in full instead
+- [ ] A rotated CROP fill, a FILL at 90°, and a photo with EXIF orientation 6
+      all come out in the same place as Figma draws them
 - [ ] A cropped or aspect-mismatched fill keeps the density its visible part
       needs — `pdfimages -list` x-ppi for it is no lower than for a plainly
       placed image at the same scale
@@ -323,8 +340,9 @@ for a document with nothing to outline; `report=1` for the result card).
 
 ## Fit to Size
 
-Exports twice, so budget time. Watch the progress bar — it must fill in one
-direction only, never restart at the second pass.
+Exports a baseline pass, then the chosen one, and up to two more if the finished
+file came out over the target. Budget time. Watch the progress bar — it must fill
+in one direction only, never restart at a later pass.
 
 - [ ] A target well above the document's size finishes in one pass and reports
       "already under" — the file is byte-identical to the same export with the
@@ -337,6 +355,16 @@ direction only, never restart at the second pass.
       without burning a second pass
 - [ ] Cancelling mid-search still leaves a usable PDF and no `__sheaf_tmp__`
       layers
+- [ ] The saved file's size (`pdfinfo`) equals the number on the result card —
+      the measured merge is what gets saved, not a fresh one
+- [ ] The result card carries one settings line under the verdict: "Auto: scale
+      2× · max 4096px · JPEG 92%" (plus "· PNG kept" on the top rung), and no
+      prediction or candidate numbers — those live in the plugin console
+- [ ] A target the first candidate misses shows "The file came out over the
+      target. Re-exporting with the next candidate (1/2)" and saves the retry
+- [ ] When nothing fits, the card says "could not meet …" with the number of
+      re-exports, and the file is still saved
+- [ ] Cancelling during a retry pass saves nothing and leaves no `__sheaf_tmp__`
 
 ## Document safety
 

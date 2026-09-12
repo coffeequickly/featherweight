@@ -12,7 +12,7 @@ MIT · plugin id `1672509720278498323`
 ```bash
 npm run lint && npm test && npm run verify:catalog   # verify:catalog hits the network
 npm run install:local                                # load the build into Figma for manual QA
-# work through docs/CHECKLIST.md → "Release QA"
+# work through docs/CHECKLIST.md (Manual QA)
 
 npm version patch                                    # or minor / major
 git push --follow-tags                               # CI builds the GitHub Release + zip
@@ -107,18 +107,22 @@ A text-heavy résumé drops from ~10MB to under 1MB.
 
 🪶 SMART IMAGE COMPRESSION
 Images are downscaled to the size they are actually displayed at, then
-re-encoded. Pick a preset — Sharp / Balanced / Smallest — and see the exact
-numbers it sets, or open the Images tab for resolution (1× to 4×, up to 288 DPI
-for print) and quality. Every image is listed with the size it starts at and the
-size it ends up, so you can see the setting land before you export. Logos and
-already-small images pass through untouched, so nothing that was sharp gets muddy.
+re-encoded. Pick a preset — Sharp / Balanced / Smallest / Target — and see the
+exact numbers it sets, or open the Images tab for image size (Largest, Smallest
+and Scale, up to 288 DPI for print) and quality. Every image is listed with its
+visible area, where it starts and the size it ends up, so you can see the setting
+land before you export. A picture that is only partly visible is stored as just
+that visible area when that makes the file smaller. Logos and already-small
+images pass through untouched, so nothing that was sharp gets muddy.
 
 🪶 FIT TO A TARGET SIZE
 Have a 5MB upload limit? Type the number. Featherweight exports once to measure,
 then finds the best image quality that still fits and re-exports at that
-setting. Quality never drops below a floor — if your target is out of reach it
-gives you the smallest possible file and tells you what that floor is, instead
-of quietly wrecking your images.
+setting. It measures the finished PDF too, and if it came out over the target it
+re-exports with the next candidate. The result card says which settings it chose.
+Quality never drops below a floor — if your target is out of reach it gives you
+the smallest possible file and tells you what that floor is, instead of quietly
+wrecking your images.
 
 🪶 KNOW BEFORE YOU EXPORT
 Six tabs follow the work: Start, Order, Fonts, Images, Options, Result. Start
@@ -315,6 +319,8 @@ is a real differentiator against the paid/subscription plugins in this category.
 
 Match the existing version history — one line, leading with the change type:
 
+- 3.2: "New: a picture that is only partly visible is stored as just that visible area, when doing so makes the file smaller without losing sharpness anywhere (Options → Trim pictures to the visible area, on by default). Image size is three bars — Largest, Smallest, Scale — with four of your own images drawn above them, and the Images list shows visible area, original, stored size and trimmed share. Target size now measures the finished PDF and re-exports with the next candidate if it came out over, and the result card says which settings it chose."
+- 3.1: "New: bulleted and numbered lists export as real text — the bullet or number is drawn where Figma puts it, so it stays selectable and searchable. Lists in right-to-left scripts keep their outlines."
 - "Fix: the font path 'copy' button didn't respond to clicks at all."
 - "Fix: logos and small images now pass through untouched. UI polish across all tabs."
 - "Windows: correct font folder paths and shortcuts. Locale-aware number formatting."

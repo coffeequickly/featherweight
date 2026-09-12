@@ -15,6 +15,8 @@ Featherweight fixes the text problem itself:
   selectable, searchable, copy-pasteable and ATS-parseable.
 - **Smart image downscaling** — images are resized to their displayed size before
   export; anything already within the frame's budget passes through untouched.
+  A picture that is only partly visible is stored as just that visible area when
+  doing so makes the file smaller without losing sharpness.
 - **Fit to a target size** — name a number (say 5 MB) and Featherweight finds the
   best image quality that still fits, or tells you the smallest it can reach.
 
@@ -35,6 +37,20 @@ Korean line-break joiners no longer force outlines either.
 **New in 2.3** — hyperlinks on text stay clickable in the PDF (Advanced →
 Keep hyperlinks). **OTF fonts** can be added now, not just TTF. The font
 folder picker explains itself.
+
+**New in 3.2** — pictures that are only partly visible are stored as just the
+visible area, when that makes the file smaller without losing sharpness anywhere
+(Options → "Trim pictures to the visible area", on by default). Image size is now
+three bars — Largest · Smallest · Scale — with four of the document's own images
+drawn to their real aspect ratio above them, and the Images list shows visible
+area, original, stored size and trimmed share per row. Target size measures the
+finished PDF and re-exports with the next candidate if it came out over, predicts
+from Figma's own re-encoding (within about 3% on three real documents), and the
+result card says which settings it chose.
+
+**New in 3.1** — bulleted and numbered lists export as real text. The bullet or
+number is drawn where Figma puts it, so it stays selectable and searchable. Lists
+in right-to-left scripts keep their outlines.
 
 **New in 3.0** — six tabs that follow the work: **Start · Order · Fonts ·
 Images · Options · Result**. Start shows only what needs you and the tab holding
@@ -139,8 +155,9 @@ and why, and clicking a reason selects them on canvas:
 - Superscript and subscript text — Figma synthesizes superscripts for glyphs the
   font lacks (and, once mixed, for the whole layer); redrawing with the font's
   own `sups`/`subs` glyphs looked different and left commas at body size
-- Bulleted and numbered lists — the bullets and numbers are not part of the
-  text data Figma exposes, so they can't be redrawn yet
+- Lists in right-to-left scripts — the marker position can't be measured, so
+  they keep their outlines (bulleted and numbered lists otherwise export as
+  real text, since 3.1)
 - Text whose font file can't be obtained, or containing glyphs the font lacks
 
 ## Good to know
@@ -184,7 +201,7 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
   선택·검색·복사가 되고 ATS가 읽습니다. Inter(Figma 기본 서체), Roboto, Pretendard
   등 60종은 자동으로 받아 넣습니다. 글 위주 이력서가 10MB에서 1MB 아래로 내려갑니다.
 - **보이는 크기에 맞춘 이미지 압축** — 이미지는 실제로 표시되는 크기에 맞춰 줄이고
-  다시 인코딩합니다. 선명하게 / 균형 / 최소 용량 / 목표 용량 중 하나를 고르면 끝이고,
+  다시 인코딩합니다. 고화질 / 균형 / 최소 용량 / 목표 용량 중 하나를 고르면 끝이고,
   이미지 탭 맨 위에서 언제든 바꿀 수 있습니다. 숫자를 직접 정하고 싶으면 고급 옵션을
   펼쳐 **최대**(한 장이 넘을 수 없는 px) · **최소**(아무리 작게 놓여도 이 밑으로는 안
   줄임) · **배율**(놓인 크기의 몇 배로 담을까)을 각각 잡습니다. 셋 다 제 값이 그대로
@@ -199,9 +216,15 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
   잘라 쓰거나 비율이 어긋나게 채운 이미지는 보이는 부분이 제 밀도를 가지려면 원본이
   더 커야 합니다. 그것까지 셈해서 필요한 만큼만 남깁니다.
 
+  일부만 보이는 이미지는 모든 자리의 선명도를 지키면서 파일이 실제로 작아질 때만
+  보이는 영역만 저장합니다(옵션 탭 "보이는 영역만 저장", 기본 켬). 이미지 탭 목록은
+  줄마다 보이는 영역 · 원본 · 저장 크기 · 잘린 영역을 보여 줍니다.
+
 - **목표 용량 맞추기** — 업로드 한도가 5MB라면 숫자만 적으세요. 한 번 내보내 크기를
-  재고, 그 안에 드는 가장 좋은 화질을 찾아 다시 내보냅니다. 화질에는 하한이 있어서
-  목표가 무리면 가능한 가장 작은 파일과 함께 그 하한을 알려 드립니다.
+  재고, 그 안에 드는 가장 좋은 화질을 찾아 다시 내보냅니다. 완성된 PDF의 실제 크기를
+  다시 재서 목표를 넘으면 다음 후보로 최대 두 번 더 내보내고, 결과 탭에 자동으로 고른
+  설정을 적습니다. 화질에는 하한이 있어서 목표가 무리면 가능한 가장 작은 파일과 함께
+  그 하한을 알려 드립니다.
 - **내보내기 전에 미리 확인** — 시작·정렬·폰트·이미지·옵션·결과 여섯 탭이 작업
   순서대로 놓여 있습니다. 시작 탭은 손볼 것만 보여 주고, 그것이 든 탭은 색으로
   알려 줍니다 — 없는 폰트, 왜 아웃라인으로 남는 텍스트인지, 그 레이어로 가는 링크까지.

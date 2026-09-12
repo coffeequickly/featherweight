@@ -213,10 +213,6 @@ const MESSAGES = {
   'presets.reset': { en: 'Back to Balanced', ko: '균형 프리셋으로' },
   /** 어느 타일도 안 켜진 이유 — 상태에 이름이 없으면 "왜 아무것도 안 켜졌지" 가 된다 */
   'presets.custom': { en: 'Custom', ko: '직접 설정' },
-  'presets.fromPreset': {
-    en: '{label} preset settings',
-    ko: '{label} 프리셋 설정입니다'
-  },
   'presets.resetTip': {
     en: 'You set the numbers yourself. This returns to the Balanced preset.',
     ko: '값을 직접 설정한 상태입니다. 균형 프리셋으로 되돌립니다.'
@@ -237,10 +233,10 @@ const MESSAGES = {
   'images.qualitySays': {
     en: (p) =>
       Number(p.quality) >= 0.9
-        ? 'JPEG quality. Above 0.90 the difference is hard to see, and the file grows fast.'
+        ? 'JPEG quality. Above 90% the difference is hard to see, and the file grows fast.'
         : Number(p.quality) <= 0.7
-          ? 'JPEG quality. Below 0.70 flat areas start to band.'
-          : 'JPEG quality. 0.80 is a safe middle for screen and print.',
+          ? 'JPEG quality. Below 70% flat areas start to band.'
+          : 'JPEG quality. 80% is a safe middle for screen and print.',
     ko: (p) =>
       Number(p.quality) >= 0.9
         ? 'JPEG 품질. 90% 이상에서는 화질 차이는 작지만 파일 용량은 빠르게 늘어납니다.'
@@ -318,10 +314,6 @@ const MESSAGES = {
     ko: (p) =>
       `${Number(p.multiplier) * 100}%까지 확대해도 선명하고, 인쇄로는 ${Math.round(Number(p.multiplier) * 72)} DPI입니다.`
   },
-  'images.largestSays': {
-    en: 'The largest placed image becomes {target}px. Smaller ones keep only what they show.',
-    ko: '가장 크게 배치된 이미지는 {target}px로 저장됩니다. 더 작게 배치된 이미지는 필요한 크기만 남깁니다.'
-  },
   /**
    * 최대가 배율을 이길 때만. 화면의 바 이름 그대로 "최대" 라고 불러야 한다 —
    * "한 장 상한" 이라고 쓰면 바로 위 바가 그것인 줄 모르고 어디를 만져야 할지 알 수 없다.
@@ -349,7 +341,7 @@ const MESSAGES = {
   'images.repCut': { en: '{original} → {target}px', ko: '{original} → {target}px' },
   'images.repKept': { en: '{original}px, unchanged', ko: '{original}px 그대로' },
   'images.mixedFrames': {
-    en: 'Frames vary in size; the largest is {size}pt.',
+    en: 'Frames vary in size; the largest, {size}pt, is used for the calculation.',
     ko: '프레임 크기가 서로 달라 가장 큰 {size}pt를 기준으로 계산합니다.'
   },
   /** 바이트가 아니라 픽셀이다 — 바이트는 그림 내용에 따라 갈려서 내보내기 전에 못 말한다 */
@@ -374,11 +366,11 @@ const MESSAGES = {
     ko: '보이는 영역만 저장: 꺼짐 · 일부만 보이는 이미지 {count}장도 전체를 저장합니다.'
   },
   'images.cropOnNone': {
-    en: 'Visible-area trimming is on — no images are partly visible.',
+    en: 'Trim pictures to the visible area: on — no images are partly visible.',
     ko: '보이는 영역만 저장: 켜짐 · 일부만 보이는 이미지는 없습니다.'
   },
   'images.cropOffNone': {
-    en: 'Visible-area trimming is off — no images are partly visible.',
+    en: 'Trim pictures to the visible area: off — no images are partly visible.',
     ko: '보이는 영역만 저장: 꺼짐 · 일부만 보이는 이미지는 없습니다.'
   },
   'images.cropGo': { en: 'Options ›', ko: '옵션 ›' },
@@ -405,7 +397,7 @@ const MESSAGES = {
    * 목록의 열 이름. 숫자만 두면 무슨 비인지 모른다 — "42%만 씀" 이 뭔 소리냐는 제보(2026-09-11).
    * 쓰는 영역 = 지면에 보이는 원본 넓이의 비, 잘라냄 = 잘라 넣으며 버리는 원본 넓이의 비
    */
-  'images.headUsed': { en: 'Visible area', ko: '표시 영역' },
+  'images.headUsed': { en: 'Visible area', ko: '보이는 영역' },
   'images.headFrom': { en: 'Original', ko: '원본' },
   'images.headTo': { en: 'Stored', ko: '저장 크기' },
   'images.headCut': { en: 'Trimmed', ko: '잘린 영역' },
@@ -423,14 +415,14 @@ const MESSAGES = {
   'images.clippedSays': {
     en: (p) =>
       (Number(p.count) === 1
-        ? `One image extends past the frame and is cut off. Only ${p.percent}% of it is shown.`
-        : `${p.count} images extend past the frame and are cut off. As little as ${p.percent}% of one is shown.`) +
-      ' The part outside the frame is not trimmed — the whole image is scaled — so it still takes up pixels in the PDF. Cropping it in Figma makes both files smaller.',
+        ? `One image extends past the frame, so only ${p.percent}% of it is shown.`
+        : `${p.count} images extend past the frame; as little as ${p.percent}% of one is shown.`) +
+      ' The part outside the frame still takes up pixels in the PDF, because the whole image is scaled rather than trimmed. Cropping it in Figma lets just the visible area be stored, so the PDF gets smaller.',
     ko: (p) =>
       (Number(p.count) === 1
-        ? `이미지 1장이 프레임 밖으로 넘쳐 잘립니다. ${p.percent}%만 보입니다.`
-        : `이미지 ${p.count}장이 프레임 밖으로 넘쳐 잘립니다. 적게는 ${p.percent}%만 보입니다.`) +
-      ' 프레임 밖으로 넘친 부분은 제거하지 않고 전체 이미지를 축소하므로 PDF 용량에 영향을 줍니다. Figma에서 미리 잘라 두면 원본과 PDF를 모두 줄일 수 있습니다.'
+        ? `이미지 1장이 프레임 밖으로 넘쳐 ${p.percent}%만 보입니다.`
+        : `이미지 ${p.count}장이 프레임 밖으로 넘쳐 적게는 ${p.percent}%만 보입니다.`) +
+      ' 프레임 밖으로 넘친 부분도 전체 이미지를 축소해 넣으므로 PDF 용량을 차지합니다. Figma에서 이미지를 잘라 두면 보이는 영역만 저장할 수 있어 PDF가 작아집니다.'
   },
   'images.listUnsized': { en: 'reading size', ko: '크기 읽는 중' },
   'images.listMore': {
@@ -439,8 +431,8 @@ const MESSAGES = {
   },
   'images.listNone': { en: 'No images in this document', ko: '이 문서에 이미지가 없습니다' },
   'images.fitLocked': {
-    en: 'Target size mode chooses the resolution and quality. Pick another preset above to set them yourself.',
-    ko: '목표 용량 모드에서는 해상도와 화질을 자동으로 설정합니다. 직접 조정하려면 다른 프리셋을 선택하세요.'
+    en: 'Target size mode sets the image size and quality. Pick another preset above to set them yourself.',
+    ko: '목표 용량 모드에서는 이미지 크기와 품질을 자동으로 설정합니다. 직접 조정하려면 위의 다른 프리셋을 선택하세요.'
   },
 
   'settings.sectionCareful': { en: 'Use with care', ko: '주의가 필요한 옵션' },
@@ -715,7 +707,7 @@ const MESSAGES = {
   },
   /** 최종 PDF 의 실제 크기가 목표를 넘어 다음 후보로 다시 뽑는 중 */
   'progress.retry': {
-    en: 'The file came out over the target — re-exporting with the next candidate ({current}/{total})',
+    en: 'The file came out over the target. Re-exporting with the next candidate ({current}/{total})',
     ko: '실제 크기가 목표를 넘어 다음 후보로 다시 내보내는 중 ({current}/{total})'
   },
   'progress.refine': {
@@ -784,8 +776,9 @@ const MESSAGES = {
   },
   /** 조각을 만들다 실패해 기존 방식으로 물러선 원본 — 출력은 정상. 처리 실패(경고)와 구분한다 */
   'result.imagesRecovered': {
-    en: (p) => `${n(Number(p.count), 'image was', 'images were')} optimized the usual way instead`,
-    ko: '{count}장은 기존 방식으로 최적화했습니다'
+    en: (p) =>
+      `${n(Number(p.count), 'image was', 'images were')} downscaled in full instead, not trimmed`,
+    ko: '{count}장은 보이는 영역만 저장하지 못해 전체 이미지를 축소했습니다'
   },
   /** 파일 안에서 이미지가 차지하는 몫 — 더 줄일 값어치가 있는지 판단할 근거다 */
   'result.imageShare': {
@@ -842,8 +835,8 @@ const MESSAGES = {
     ko: '이미 {target} 이하입니다. 가능한 가장 높은 화질을 유지했습니다.'
   },
   'report.fitOver': {
-    en: 'The exported file is {actual}, above the {target} target. Try a lower target or the Smallest preset.',
-    ko: '내보낸 파일은 {actual}로 목표 용량 {target}을 초과했습니다. 목표 용량을 조정하거나 최소 용량 프리셋으로 다시 내보내세요.'
+    en: 'The exported file is {actual}, larger than the target {target}. Try a lower target or the Smallest preset.',
+    ko: '내보낸 파일은 {actual}로, 목표 용량 {target}보다 큽니다. 목표 용량을 조정하거나 최소 용량 프리셋으로 다시 내보내세요.'
   },
   /**
    * 자동으로 고른 최종 설정 — 배율 · 최대 · JPEG 품질. 칸 이름만으론 알 수 없어 적는다. 한 줄에 들어가야
@@ -859,8 +852,8 @@ const MESSAGES = {
   /** 한도 안에서 다시 뽑았지만 실제 크기가 목표를 넘었다 — 저장은 됐다, 사실만 말한다 */
   'report.fitMissed': {
     en: (p) =>
-      `Could not meet ${p.target} this time — re-exported ${n(Number(p.count), 'more time', 'more times')}, the file is ${p.actual}. Try a lower target or the Smallest preset.`,
-    ko: '이번 시도에서는 {target}을 맞추지 못했습니다 — {count}번 다시 뽑았지만 실제 {actual}입니다. 목표를 낮추거나 최소 용량 프리셋으로 다시 내보내세요.'
+      `Target ${p.target}: could not meet it this time. Re-exported ${n(Number(p.count), 'more time', 'more times')} and the file is ${p.actual}. Try a lower target or the Smallest preset.`,
+    ko: '목표 용량 {target}: 이번 시도에서는 맞추지 못했습니다. {count}번 다시 내보냈지만 파일은 {actual}입니다. 목표를 낮추거나 최소 용량 프리셋으로 다시 내보내세요.'
   },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",
@@ -981,8 +974,8 @@ const MESSAGES = {
 
   // ── 폰트 구하기 실패 사유 ───────────────────────────────
   'font.needUpload': {
-    en: 'A font file is required for {family} {style}.',
-    ko: '{family} {style} 폰트 파일이 필요합니다.'
+    en: 'Font file required: {family} {style}',
+    ko: '폰트 파일 필요: {family} {style}'
   },
   'font.loadFailed': {
     en: (p) =>
