@@ -546,8 +546,10 @@ export type ResizeRequestPayload = {
   targetLongEdge: number
   quality: number
   reencodeOpaquePng: boolean
-  /** 탐색용 캐시 키 — UI 가 원본을 들고 있으려고 쓴다 (docs/FIT-TO-SIZE.md) */
+  /** 원본 식별자 — 후보 인코딩 결과를 최종 출력에서 재사용한다. */
   imageHash?: string
+  /** 기준 패스에서만 원본을 탐색용으로 보관한다. */
+  keepOriginal?: boolean
 }
 
 export interface ImageResizeHandler extends EventHandler {
@@ -575,6 +577,7 @@ export interface ImageResizeResultHandler extends EventHandler {
 /** 한 원본에서 조각 여럿 — UI 가 한 번만 디코드하고 job 마다 자르고 줄이고 인코딩한다 */
 export type ResizeManyRequestPayload = {
   reqId: string
+  imageHash?: string
   bytes: Uint8Array
   quality: number
   reencodeOpaquePng: boolean

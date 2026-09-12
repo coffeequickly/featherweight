@@ -1,0 +1,751 @@
+{
+  "runs": [
+    {
+      "event": "done",
+      "run": "base-fit-1",
+      "time": 1789216938.009721,
+      "seconds": 87.0,
+      "bytes": 9778716,
+      "profile": "1.75x 2560 JPEG92",
+      "pages": 31,
+      "startRSSMiB": 1015.2,
+      "peakRSSMiB": 2910.9,
+      "lastRSSMiB": 1745.9,
+      "sampleCount": 225
+    },
+    {
+      "event": "done",
+      "run": "new-fit-1",
+      "time": 1789217081.311585,
+      "seconds": 81.2,
+      "bytes": 9778718,
+      "startRSSMiB": 1812.4,
+      "peakRSSMiB": 3814.9,
+      "lastRSSMiB": 2876.7,
+      "sampleCount": 212
+    },
+    {
+      "event": "done",
+      "run": "base-fit-2",
+      "time": 1789217282.760331,
+      "seconds": 84.2,
+      "bytes": 9778725,
+      "startRSSMiB": 2775.5,
+      "peakRSSMiB": 4027.7,
+      "lastRSSMiB": 3243.8,
+      "sampleCount": 293
+    },
+    {
+      "event": "done",
+      "run": "new-fit-2",
+      "time": 1789217432.261507,
+      "seconds": 80.9,
+      "bytes": 9778718,
+      "startRSSMiB": 3391.0,
+      "peakRSSMiB": 3955.6,
+      "lastRSSMiB": 1751.8,
+      "sampleCount": 258
+    },
+    {
+      "event": "done",
+      "run": "base-fit-3",
+      "time": 1789217570.182931,
+      "seconds": 87.5,
+      "bytes": 9778717,
+      "startRSSMiB": 2139.3,
+      "peakRSSMiB": 3349.9,
+      "lastRSSMiB": 2243.5,
+      "sampleCount": 234
+    },
+    {
+      "event": "done",
+      "run": "base-balanced",
+      "time": 1789217659.145026,
+      "seconds": 39.2,
+      "bytes": 7888648,
+      "startRSSMiB": 1966.3,
+      "peakRSSMiB": 2472.5,
+      "lastRSSMiB": 1370.5,
+      "sampleCount": 138
+    },
+    {
+      "event": "done",
+      "run": "new-fit-3",
+      "time": 1789217797.519137,
+      "seconds": 83.7,
+      "bytes": 9778718,
+      "startRSSMiB": 1332.0,
+      "peakRSSMiB": 3204.4,
+      "lastRSSMiB": 2586.6,
+      "sampleCount": 209
+    },
+    {
+      "event": "done",
+      "run": "new-balanced",
+      "time": 1789217880.59479,
+      "seconds": 38.3,
+      "bytes": 7888645,
+      "startRSSMiB": 2594.6,
+      "peakRSSMiB": 2752.2,
+      "lastRSSMiB": 2384.7,
+      "sampleCount": 134
+    },
+    {
+      "event": "done",
+      "run": "new-cancel",
+      "time": 1789217928.8328478,
+      "seconds": 0.732,
+      "startRSSMiB": 2384.8,
+      "peakRSSMiB": 3051.0,
+      "lastRSSMiB": 2406.8,
+      "sampleCount": 91
+    },
+    {
+      "event": "done",
+      "run": "new-balanced-restart",
+      "time": 1789218002.569424,
+      "seconds": 38.2,
+      "bytes": 7888648,
+      "startRSSMiB": 2406.9,
+      "peakRSSMiB": 2611.5,
+      "lastRSSMiB": 1742.9,
+      "sampleCount": 138
+    },
+    {
+      "event": "done",
+      "run": "new-stress",
+      "time": 1789218485.190201,
+      "seconds": 33.0,
+      "bytes": 5790440,
+      "startRSSMiB": 2105.3,
+      "peakRSSMiB": 2842.6,
+      "lastRSSMiB": 1750.8,
+      "sampleCount": 174
+    },
+    {
+      "event": "done",
+      "run": "base-stress",
+      "time": 1789218562.701035,
+      "seconds": 35.8,
+      "bytes": 5790440,
+      "startRSSMiB": 1921.9,
+      "peakRSSMiB": 3036.4,
+      "lastRSSMiB": 1988.8,
+      "sampleCount": 118
+    }
+  ],
+  "fitMeanSeconds": {
+    "base": 86.23333333333333,
+    "new": 81.93333333333334,
+    "improvementPercent": 4.986470815616539
+  },
+  "comparisons": [
+    {
+      "file": "fw-reuse-base-balanced.pdf",
+      "bytes": 7888648,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-base-fit-1.pdf",
+      "bytes": 9778716,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-base-fit-2.pdf",
+      "bytes": 9778725,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-base-fit-3.pdf",
+      "bytes": 9778717,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-base-stress.pdf",
+      "bytes": 5790440,
+      "pages": 3,
+      "imageStreamsIncludingMasks": 96,
+      "fontCount": 4,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-new-balanced-restart.pdf",
+      "bytes": 7888648,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-new-balanced.pdf",
+      "bytes": 7888645,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-new-fit-1.pdf",
+      "bytes": 9778718,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-new-fit-2.pdf",
+      "bytes": 9778718,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-new-fit-3.pdf",
+      "bytes": 9778718,
+      "pages": 31,
+      "imageStreamsIncludingMasks": 132,
+      "fontCount": 20,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    },
+    {
+      "file": "fw-reuse-new-stress.pdf",
+      "bytes": 5790440,
+      "pages": 3,
+      "imageStreamsIncludingMasks": 96,
+      "fontCount": 4,
+      "textHashEqual": true,
+      "fontsEqual": true,
+      "imagesEqual": true,
+      "sizesEqual": true,
+      "contentsEqual": true,
+      "linksEqual": true
+    }
+  ],
+  "notes": [
+    "App-wide RSS sampled every 0.5s; phase windows include UI start/save handling. Not isolated plugin/GPU allocation.",
+    "new-cancel.seconds is cancel-button-to-confirmed-state latency, not export duration.",
+    "Fit runs interleaved base/new three times; balanced and stress pairs single runs.",
+    "Fit/balanced comparisons use base-fit-1/base-balanced; metadata/title differences excluded."
+  ],
+  "renderComparisons": {
+    "fit": {
+      "a": "fw-reuse-base-fit-1.pdf",
+      "b": "fw-reuse-new-fit-1.pdf",
+      "bytes": [
+        9778716,
+        9778718
+      ],
+      "pages": [
+        31,
+        31
+      ],
+      "textEqual": true,
+      "fontsEqual": true,
+      "imageDataEqual": true,
+      "images": [
+        132,
+        132
+      ],
+      "pageSizesEqual": true,
+      "render": [
+        {
+          "page": 1,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 2,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 3,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 4,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 5,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 6,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 7,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 8,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 9,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 10,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 11,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 12,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 13,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 14,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 15,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 16,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 17,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 18,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 19,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 20,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 21,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 22,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 23,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 24,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 25,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 26,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 27,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 28,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 29,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 30,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 31,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        }
+      ]
+    },
+    "balanced": {
+      "a": "fw-reuse-base-balanced.pdf",
+      "b": "fw-reuse-new-balanced.pdf",
+      "bytes": [
+        7888648,
+        7888645
+      ],
+      "pages": [
+        31,
+        31
+      ],
+      "textEqual": true,
+      "fontsEqual": true,
+      "imageDataEqual": true,
+      "images": [
+        132,
+        132
+      ],
+      "pageSizesEqual": true,
+      "render": [
+        {
+          "page": 1,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 2,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 3,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 4,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 5,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 6,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 7,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 8,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 9,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 10,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 11,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 12,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 13,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 14,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 15,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 16,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 17,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 18,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 19,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 20,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 21,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 22,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 23,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 24,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 25,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 26,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 27,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 28,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 29,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 30,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 31,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        }
+      ]
+    },
+    "stress": {
+      "a": "fw-reuse-base-stress.pdf",
+      "b": "fw-reuse-new-stress.pdf",
+      "bytes": [
+        5790440,
+        5790440
+      ],
+      "pages": [
+        3,
+        3
+      ],
+      "textEqual": true,
+      "fontsEqual": true,
+      "imageDataEqual": true,
+      "images": [
+        96,
+        96
+      ],
+      "pageSizesEqual": true,
+      "render": [
+        {
+          "page": 1,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 2,
+          "dpi": 35,
+          "equal": true,
+          "maxDifference": 0
+        },
+        {
+          "page": 3,
+          "dpi": 144,
+          "equal": true,
+          "maxDifference": 0
+        }
+      ]
+    }
+  }
+}

@@ -9,12 +9,145 @@
 
 import { Encoded, ProbeTally, tallyProbe } from '../lib/imageProbe'
 import { imageDimensions } from '../lib/imageHeader'
+import { ByteCache, ImageWorkQueue } from '../lib/imageWork'
 import { KEEP_BYTES_FLOOR, keepsOriginal } from '../lib/imageTarget'
 import { CropRect, ImageProbeItem } from '../lib/types'
-import { cloneBitmap, decodeImage, encodePiece, figmaSizeOf, isPng, resizeDecoded } from './resize'
+import {
+  cloneBitmap,
+  decodeImage,
+  encodePiece,
+  figmaSizeOf,
+  isPng,
+  resizeDecoded,
+  resizeImage,
+  resizeMany,
+  ResizeRequest,
+  ResizeResult,
+  ResizeManyRequest,
+  ResizeManyResult
+} from './resize'
 
 /** 캐시 총량 상한. 넘으면 오래된 것부터 버린다. */
 const MAX_CACHE_BYTES = 200 * 1024 * 1024
+
+type CachedImage = Extract<ResizeResult, { ok: true }>
+const encodedImages = new ByteCache<CachedImage>(64 * 1024 * 1024)
+const workQueue = new ImageWorkQueue(192 * 1024 * 1024, 4)
+let generation = 0
+let reuseHits = 0
+export function imageCacheStats(): {
+  originalBytes: number
+  encodedBytes: number
+  reuseHits: number
+} {
+  return { originalBytes: cachedBytes, encodedBytes: encodedImages.bytes, reuseHits }
+}
+function checkGeneration(expected: number): void {
+  if (expected !== generation) throw new Error('Image work cancelled')
+}
+function workCost(bytes: Uint8Array): number {
+  const size = imageDimensions(bytes)
+  // Source + clone/crop + intermediate + canvas, at four bytes per pixel each.
+  return size === null ? Infinity : size.width * size.height * 16 + bytes.byteLength
+}
+function encodedKey(
+  hash: string,
+  target: number,
+  quality: number,
+  png: boolean,
+  crop?: CropRect
+): string {
+  return JSON.stringify([
+    hash,
+    target,
+    quality,
+    png,
+    crop === undefined ? null : [crop.x0, crop.y0, crop.w, crop.h]
+  ])
+}
+function retain(key: string, result: CachedImage, expected: number): void {
+  checkGeneration(expected)
+  if (result.changed) encodedImages.set(key, result)
+}
+
+/** Only probe output is retained. Ordinary exports do not acquire an original-image cache. */
+export async function resizeImageCached(
+  request: ResizeRequest & { imageHash?: string }
+): Promise<ResizeResult> {
+  const expected = generation
+  try {
+    const hit =
+      request.imageHash === undefined
+        ? undefined
+        : encodedImages.get(
+            encodedKey(
+              request.imageHash,
+              request.targetLongEdge,
+              request.quality,
+              request.reencodeOpaquePng
+            )
+          )
+    if (hit !== undefined) {
+      reuseHits += 1
+      return hit
+    }
+    return await workQueue.run(workCost(request.bytes), async () => {
+      checkGeneration(expected)
+      const result = await resizeImage(request)
+      checkGeneration(expected)
+      return result
+    })
+  } catch (error) {
+    return { ok: false, reason: String(error) }
+  }
+}
+
+export async function resizeManyCached(
+  request: ResizeManyRequest & { imageHash?: string }
+): Promise<ResizeManyResult> {
+  const expected = generation
+  try {
+    const results = request.jobs.map((job) =>
+      request.imageHash === undefined
+        ? undefined
+        : encodedImages.get(
+            encodedKey(
+              request.imageHash,
+              job.targetLongEdge,
+              request.quality,
+              request.reencodeOpaquePng,
+              job.crop
+            )
+          )
+    )
+    const missing = request.jobs
+      .map((job, at) => ({ job, at }))
+      .filter(({ at }) => results[at] === undefined)
+    reuseHits += results.length - missing.length
+    if (missing.length > 0) {
+      const fresh = await workQueue.run(workCost(request.bytes), async () => {
+        checkGeneration(expected)
+        const result = await resizeMany({ ...request, jobs: missing.map(({ job }) => job) })
+        checkGeneration(expected)
+        return result
+      })
+      if (!fresh.ok) return fresh
+      missing.forEach(({ at }, index) => {
+        results[at] = { ...fresh.results[index], ok: true, changed: true }
+      })
+    }
+    checkGeneration(expected)
+    return {
+      ok: true,
+      results: results.map((result) => {
+        if (result === undefined) throw new Error('Missing image result')
+        return result
+      })
+    }
+  } catch (error) {
+    return { ok: false, reason: String(error) }
+  }
+}
 
 const originals = new Map<string, Uint8Array>()
 // 원본을 그대로 넣을 때 PDF 안에서 차지할 크기 — 한 번 재면 실행 내내 같다
@@ -24,7 +157,12 @@ let cachedBytes = 0
 // 줄인 출력은 그 치수로, 원본 그대로 가는 것은 원본 치수(EXIF 방향 반영)로 들어간다
 const ownSizes = new Set<string>()
 
-export function rememberOwnSize(width: number, height: number): void {
+export function imageCacheGeneration(): number {
+  return generation
+}
+
+export function rememberOwnSize(width: number, height: number, expected = generation): void {
+  if (expected !== generation) return
   ownSizes.add(`${width}x${height}`)
 }
 
@@ -40,7 +178,7 @@ export function rememberOriginal(imageHash: string, bytes: Uint8Array): void {
   // 혼자서 상한을 넘는 원본은 들고 있어 봐야 다른 것을 다 밀어낸다 — 재보지 않고 원본 크기로 센다
   if (bytes.length > MAX_CACHE_BYTES) return
 
-  originals.set(imageHash, bytes)
+  originals.set(imageHash, bytes.buffer.byteLength === bytes.byteLength ? bytes : bytes.slice())
   cachedBytes += bytes.length
 
   // Map 은 삽입 순서를 지키므로 앞쪽이 가장 오래된 것이다
@@ -52,9 +190,16 @@ export function rememberOriginal(imageHash: string, bytes: Uint8Array): void {
     sizedOriginals.delete(oldest.value)
     cachedBytes -= dropped === undefined ? 0 : dropped.length
   }
+  // Originals take priority: cache reuse must not change which candidates can be measured.
+  encodedImages.resize(Math.min(64 * 1024 * 1024, MAX_CACHE_BYTES - cachedBytes))
 }
 
 export function forgetOriginals(): void {
+  generation += 1
+  workQueue.cancelPending()
+  encodedImages.clear()
+  encodedImages.resize(64 * 1024 * 1024)
+  reuseHits = 0
   originals.clear()
   sizedOriginals.clear()
   ownSizes.clear()
@@ -85,6 +230,7 @@ export async function probeImageBytes(
   quality: number,
   reencodeOpaquePng: boolean
 ): Promise<ProbeTally> {
+  const expected = generation
   // 1) 원본마다 무엇을 만들어야 하는지 모은다
   type Want = { targets: Set<number>; pieces: Map<string, { crop: CropRect; target: number }> }
   const wants = new Map<string, Want>()
@@ -112,27 +258,35 @@ export async function probeImageBytes(
     if (sizedOriginals.has(imageHash)) continue
     const original = originals.get(imageHash)
     if (original === undefined) continue // 캐시에 없다 — lookup 이 null 을 주고 원본 크기로 센다
-    sizedOriginals.set(imageHash, await figmaSizeOf(original))
+    const size = await workQueue.run(workCost(original), async () => {
+      checkGeneration(expected)
+      return await figmaSizeOf(original)
+    })
+    checkGeneration(expected)
+    sizedOriginals.set(imageHash, size)
   }
 
   // 3) 원본마다 한 번 디코드해 전부 인코딩한다. 실패는 항목 단위로 null — 집계가 알아서 물러선다
   const wholes = new Map<string, Encoded | null>()
   const pieces = new Map<string, Encoded | null>()
-  for (const [imageHash, want] of wants) {
+  const one = async (imageHash: string, want: Want): Promise<void> => {
+    checkGeneration(expected)
     const original = originals.get(imageHash)
-    if (original === undefined) continue // 캐시에 없다 — lookup 이 null 을 주고 failed 로 센다
+    if (original === undefined) return // 캐시에 없다 — lookup 이 null 을 주고 failed 로 센다
 
     let decoded: ImageBitmap
     try {
       decoded = await decodeImage(original)
     } catch {
-      continue
+      return
     }
     const sourcePng = isPng(original)
     // 마지막 W₀ 인코딩이 원본 비트맵을 가져가 닫는다 — 그러면 finally 가 다시 닫지 않는다
     let consumed = false
     try {
+      checkGeneration(expected)
       for (const [key, job] of want.pieces) {
+        checkGeneration(expected)
         try {
           const out = await encodePiece(
             decoded,
@@ -141,6 +295,11 @@ export async function probeImageBytes(
             sourcePng,
             reencodeOpaquePng,
             quality
+          )
+          retain(
+            encodedKey(imageHash, job.target, quality, reencodeOpaquePng, job.crop),
+            { ...out, ok: true, changed: true },
+            expected
           )
           // 더하는 값은 우리 바이트가 아니라 Figma 가 다시 인코딩한 뒤의 크기(sized)
           pieces.set(`${imageHash}|${key}`, {
@@ -155,6 +314,7 @@ export async function probeImageBytes(
       // W₀ — 마지막 목표는 원본 비트맵을 그대로 쓴다(인코딩이 닫는다), 그 앞은 복사본으로
       const targets = [...want.targets]
       for (let at = 0; at < targets.length; at += 1) {
+        checkGeneration(expected)
         const last = at === targets.length - 1
         const key = `${imageHash}|${targets[at]}`
         try {
@@ -171,11 +331,14 @@ export async function probeImageBytes(
             wholes.set(key, null)
             continue
           }
+          retain(encodedKey(imageHash, targets[at], quality, reencodeOpaquePng), result, expected)
           // 원본을 그대로 넣게 되는 자리(안 줄였거나, 줄여도 안 작아졌다)는 원본이 PDF 안에서
           // 차지할 크기가 필요하다 — Figma 는 손대지 않은 원본도 다시 인코딩한다
           const keeps = !result.changed || keepsOriginal(original.length, result.bytes.length)
           if (keeps && !sizedOriginals.has(imageHash)) {
-            sizedOriginals.set(imageHash, await figmaSizeOf(original))
+            const size = await figmaSizeOf(original)
+            checkGeneration(expected)
+            sizedOriginals.set(imageHash, size)
           }
           wholes.set(key, {
             bytes: result.bytes.length,
@@ -190,6 +353,13 @@ export async function probeImageBytes(
       if (!consumed) decoded.close()
     }
   }
+
+  await Promise.all(
+    [...wants].map(([hash, want]) =>
+      workQueue.run(workCost(originals.get(hash) ?? new Uint8Array()), () => one(hash, want))
+    )
+  )
+  checkGeneration(expected)
 
   // 4) export 와 같은 규칙으로 더한다
   const tally = tallyProbe(items, {

@@ -44,8 +44,15 @@ import {
 import { settleResponse } from './bridge'
 import { backfillFontFacts } from './fontFacts'
 import { resetFontCache } from './fontSource'
-import { forgetOriginals, probeImageBytes, rememberOriginal, rememberOwnSize } from './imageCache'
-import { resizeImage, resizeMany } from './resize'
+import {
+  forgetOriginals,
+  imageCacheGeneration,
+  probeImageBytes,
+  rememberOriginal,
+  rememberOwnSize,
+  resizeImageCached,
+  resizeManyCached
+} from './imageCache'
 import { ValidationOutcome, validateSources } from './validateText'
 
 export type Notice = { message: string; error: boolean } | null
@@ -150,19 +157,22 @@ export function useMainState(): MainState {
 
     // 메인에는 Canvas 가 없다. 리사이즈 요청이 오면 여기서 처리해 돌려준다. (PRD C3)
     const offResize = on<ImageResizeHandler>('image:resize', (payload) => {
+      const generation = imageCacheGeneration()
       // 목표 용량 탐색이 같은 원본을 여러 설정으로 다시 재봐야 해서 들고 있는다
-      if (payload.imageHash !== undefined) rememberOriginal(payload.imageHash, payload.bytes)
-      void resizeImage(payload).then((result) => {
-        if (result.ok) rememberOwnSize(result.width, result.height)
+      if (payload.keepOriginal === true && payload.imageHash !== undefined)
+        rememberOriginal(payload.imageHash, payload.bytes)
+      void resizeImageCached(payload).then((result) => {
+        if (result.ok) rememberOwnSize(result.width, result.height, generation)
         emit<ImageResizeResultHandler>('image:resize:result', { reqId: payload.reqId, ...result })
       })
     })
 
     // 조각 여럿 — 원본을 한 번만 디코드한다 (resize.ts resizeMany)
     const offResizeMany = on<ImageResizeManyHandler>('image:resizeMany', (payload) => {
-      void resizeMany(payload).then((result) => {
+      const generation = imageCacheGeneration()
+      void resizeManyCached(payload).then((result) => {
         if (result.ok)
-          for (const piece of result.results) rememberOwnSize(piece.width, piece.height)
+          for (const piece of result.results) rememberOwnSize(piece.width, piece.height, generation)
         emit<ImageResizeManyResultHandler>('image:resizeMany:result', {
           reqId: payload.reqId,
           ...result

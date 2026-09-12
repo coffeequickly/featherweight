@@ -378,6 +378,7 @@ async function cropOne(
     sendMany({
       reqId,
       bytes: original,
+      imageHash: crop.imageHash,
       quality: settings.quality,
       reencodeOpaquePng: settings.reencodeOpaquePng,
       jobs: missing.map(({ piece }) => ({ targetLongEdge: piece.targetLongEdge, crop: piece.rect }))
@@ -488,9 +489,8 @@ async function shrinkOne(
     targetLongEdge: plan.targetLongEdge,
     quality: settings.quality,
     reencodeOpaquePng: settings.reencodeOpaquePng,
-    // 목표 용량 탐색 때만 — UI 가 원본을 들고 있어야 후보를 다시 재본다. 일반 내보내기에서
-    // 실어 보내면 UI 가 원본을 200MB 까지 쌓아 둔다
-    imageHash: keepOriginal === undefined ? undefined : plan.imageHash
+    imageHash: plan.imageHash,
+    keepOriginal: keepOriginal !== undefined
   })
   const result = await promise
 
