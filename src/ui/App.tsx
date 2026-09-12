@@ -1,11 +1,4 @@
-import {
-  Banner,
-  Container,
-  Divider,
-  IconWarning16,
-  useWindowResize,
-  VerticalSpace
-} from '@create-figma-plugin/ui'
+import { Banner, Container, Divider, IconWarning16, VerticalSpace } from '@create-figma-plugin/ui'
 import { emit } from '@create-figma-plugin/utilities'
 import { Component, ComponentChildren, Fragment, JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
@@ -14,7 +7,7 @@ import { suggestFileName } from '../lib/fileName'
 import { fontReadiness, uploadedProblems } from '../lib/fontStatus'
 import { MessageKey, t } from '../lib/i18n'
 import { outlinedTexts } from '../lib/preflight'
-import { DEFAULT_SETTINGS, FrameThumbsRequestHandler, ResizeWindowHandler } from '../lib/types'
+import { DEFAULT_SETTINGS, FrameThumbsRequestHandler } from '../lib/types'
 import { PLUGIN_VERSION } from './buildInfo'
 import { ExportFooter } from './ExportFooter'
 import { FontFamilyPage } from './FontFamilyPage'
@@ -120,11 +113,6 @@ function AppBody(): JSX.Element {
     settings.embedText,
     settings.keepLinks,
     settings.glyphFallback
-  )
-
-  useWindowResize(
-    (size: { width: number; height: number }) => emit<ResizeWindowHandler>('resize:window', size),
-    { minWidth: 360, minHeight: 400, maxWidth: 720, maxHeight: 1200 }
   )
 
   /**
@@ -286,6 +274,7 @@ function AppBody(): JSX.Element {
                 preflight={preflight}
                 disabled={exporter.busy}
                 onChange={main.applySettings}
+                onGoOptions={() => setTab('options')}
               />
             ) : null}
 

@@ -1,21 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  MIN_TARGET_LONG_EDGE,
   settleDelayMs,
   transformScale,
-  processFloor,
   ImageUsage,
   isProcessable,
   keepsOriginal,
-  needsDownscale,
+  shouldShrink,
   planImageTargets,
   scaledSize,
-  targetFor,
-  skipFloor
+  targetFor
 } from '../src/lib/imageTarget'
 
-const SETTINGS = { multiplier: 1.5 as const, maxEdge: 1920 as const }
+const SETTINGS = { multiplier: 1.5, maxEdge: 1920, minEdge: 1024 } as const
 
 function usage(
   nodeId: string,
@@ -24,16 +21,16 @@ function usage(
   height: number,
   scaleMode: ImageUsage['scaleMode'] = 'FILL'
 ): ImageUsage {
-  return { nodeId, imageHash, name: nodeId, width, height, scaleMode }
+  return { nodeId, imageHash, name: nodeId, width, height, scaleMode, visible: 1 }
 }
 
 describe('targetFor', () => {
   it('표시 크기의 multiplier 배', () => {
-    expect(targetFor(usage('n', 'h', 600, 400), SETTINGS)).toBe(900)
+    expect(targetFor(usage('n', 'h', 1000, 700), SETTINGS)).toBe(1500)
   })
 
   it('긴 변 기준이다', () => {
-    expect(targetFor(usage('n', 'h', 400, 600), SETTINGS)).toBe(900)
+    expect(targetFor(usage('n', 'h', 700, 1000), SETTINGS)).toBe(1500)
   })
 
   it('maxEdge 를 넘지 않는다', () => {
@@ -41,18 +38,20 @@ describe('targetFor', () => {
   })
 
   it('소수점은 올린다 (하한 위에서)', () => {
-    expect(targetFor(usage('n', 'h', 501, 10), SETTINGS)).toBe(752)
+    expect(targetFor(usage('n', 'h', 1001, 10), SETTINGS)).toBe(1502)
   })
 
   it('multiplier 1 이고 하한보다 크면 표시 크기 그대로', () => {
-    expect(targetFor(usage('n', 'h', 800, 400), { multiplier: 1, maxEdge: 3840 })).toBe(800)
+    expect(
+      targetFor(usage('n', 'h', 1400, 400), { multiplier: 1, maxEdge: 3840, minEdge: 1024 })
+    ).toBe(1400)
   })
 
-  it('작게 표시돼도 하한(640) 아래로 줄이지 않는다 — 로고가 뭉개지지 않게', () => {
-    expect(targetFor(usage('n', 'h', 93, 31), SETTINGS)).toBe(MIN_TARGET_LONG_EDGE)
-    expect(targetFor(usage('n', 'h', 600, 400), { multiplier: 1, maxEdge: 3840 })).toBe(
-      MIN_TARGET_LONG_EDGE
-    )
+  it('작게 표시돼도 하한 아래로 줄이지 않는다 — 로고가 뭉개지지 않게', () => {
+    expect(targetFor(usage('n', 'h', 93, 31), SETTINGS)).toBe(SETTINGS.minEdge)
+    expect(
+      targetFor(usage('n', 'h', 600, 400), { multiplier: 1, maxEdge: 3840, minEdge: 1024 })
+    ).toBe(1024)
   })
 })
 
@@ -108,14 +107,14 @@ describe('planImageTargets', () => {
   })
 })
 
-describe('needsDownscale', () => {
+describe('shouldShrink', () => {
   it('원본이 목표보다 크면 줄인다', () => {
-    expect(needsDownscale(3000, 900)).toBe(true)
+    expect(shouldShrink(3000, 900)).toBe(true)
   })
 
   it('원본이 목표 이하면 그대로 둔다 — 키우지 않는다', () => {
-    expect(needsDownscale(900, 900)).toBe(false)
-    expect(needsDownscale(500, 900)).toBe(false)
+    expect(shouldShrink(900, 900)).toBe(false)
+    expect(shouldShrink(500, 900)).toBe(false)
   })
 })
 
@@ -142,20 +141,6 @@ describe('keepsOriginal', () => {
     expect(keepsOriginal(1000, 1200)).toBe(true)
     expect(keepsOriginal(1000, 1000)).toBe(true)
     expect(keepsOriginal(1000, 800)).toBe(false)
-  })
-})
-
-describe('processFloor', () => {
-  it('프레임 긴 변 × 배율 — A4 프레임이면 그 예산 아래 이미지는 안 건드린다', () => {
-    expect(processFloor({ multiplier: 1.5, maxEdge: 2048 }, 842)).toBe(1263)
-  })
-
-  it('16:9 1920 프레임, 1x 면 1920 이 기준선이다', () => {
-    expect(processFloor({ multiplier: 1, maxEdge: 3840 }, 1920)).toBe(1920)
-  })
-
-  it('maxEdge 를 넘지 않는다', () => {
-    expect(processFloor({ multiplier: 2, maxEdge: 2048 }, 4000)).toBe(2048)
   })
 })
 
@@ -222,23 +207,30 @@ describe('settleDelayMs', () => {
   })
 })
 
-describe('skipFloor', () => {
-  const base = { multiplier: 1.5 as const, maxEdge: 2048 as const }
-
-  it('프레임 예산과 절대 하한 중 큰 쪽을 쓴다', () => {
-    // A4(595pt) × 1.5 = 893 — 1000px 로고가 처리 대상이 되던 자리
-    expect(skipFloor({ ...base, minEdge: 1024 }, 595)).toBe(1024)
+describe('shouldShrink — 손댈지는 이미지마다 제 목표로', () => {
+  it('제 목표보다 크면 손댄다', () => {
+    expect(shouldShrink(1920, 640)).toBe(true)
   })
 
-  it('프레임이 크면 예산이 이긴다', () => {
-    expect(skipFloor({ ...base, minEdge: 640 }, 1920)).toBe(2048)
+  it('제 목표 이하면 그대로 둔다', () => {
+    expect(shouldShrink(600, 640)).toBe(false)
+    expect(shouldShrink(640, 640)).toBe(false)
   })
 
-  it('상한을 넘지 않는다 — 예산 쪽은 maxEdge 로 잘린다', () => {
-    expect(skipFloor({ ...base, minEdge: 640 }, 9999)).toBe(2048)
+  // 하한은 이제 목표 안에 이미 들어 있다(targetFor 가 max 로 올린다) — 여기서 다시 안 본다
+  it('목표가 하한으로 올라온 뒤라면 그 이하는 그대로다', () => {
+    expect(shouldShrink(1000, 1024)).toBe(false)
+    expect(shouldShrink(1600, 1024)).toBe(true)
   })
 
-  it('하한이 상한보다 크면 하한이 이긴다 — 그만큼 아무것도 안 건드린다', () => {
-    expect(skipFloor({ multiplier: 1, maxEdge: 1024, minEdge: 1600 }, 595)).toBe(1600)
+  // 실측(2026-09-09): 1920pt 프레임 2× 에서 프레임 예산은 3840 이었다.
+  // 300pt 자리의 1920px 썸네일이 그 관문을 통과해 원본 그대로 실렸다.
+  it('작은 자리에 놓인 큰 그림이 더 이상 빠져나가지 않는다', () => {
+    const target = 640 // 300pt × 2배 = 600 → 하한 640
+    expect(shouldShrink(1920, target)).toBe(true)
+  })
+
+  it('프레임이 커도 제 자리가 작으면 손댄다 — 프레임 예산과 무관하다', () => {
+    expect(shouldShrink(3000, 1200)).toBe(true)
   })
 })

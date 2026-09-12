@@ -5,12 +5,18 @@ import {
   applyProfile,
   BASELINE_INDEX,
   calibrationRatio,
-  candidateIndices,
+  decideFit,
+  FitAttempt,
+  fitAttemptPlan,
+  resolveSave,
+  MAX_FIT_RETRIES,
+  probeOrder,
+  retryCandidates,
   chooseProfile,
+  describeProfile,
   clampTargetMb,
   CompressionProfile,
   fixedBytes,
-  ImageBytes,
   mbToBytes,
   predictSize,
   Probe,
@@ -18,17 +24,11 @@ import {
   sameProfile,
   sharperVariants
 } from './lib/fitToSize'
-import { skipFloor, transformScale } from './lib/imageTarget'
+import { PixelSize } from './lib/imageDensity'
 import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
 import { exportFrame, removeLeftoverClones } from './main/exporter'
-import {
-  forgetReplacements,
-  forgetSeenImages,
-  OriginalSink,
-  planFor,
-  seenImageInfo
-} from './main/images'
+import { forgetReplacements, forgetSeenImages, OriginalSink, probeItemsOf } from './main/images'
 import { loadEdgeCache } from './main/imageSize'
 import {
   clearFonts,
@@ -58,8 +58,12 @@ import {
   FontBytesHandler,
   FontBytesResultHandler,
   ImageResizeHandler,
+  ImageResizeManyHandler,
+  ImageResizeManyResultHandler,
   ImageResizeResultHandler,
   NoticeHandler,
+  ResizeManyRequestPayload,
+  ResizeManyResultPayload,
   ResizeRequestPayload,
   ResizeResultPayload,
   PdfPartHandler,
@@ -80,7 +84,6 @@ import {
   ProgressHandler,
   Reason,
   ToastHandler,
-  ResizeWindowHandler,
   StoredFont,
   StoredFontsHandler,
   TextRunSource,
@@ -136,6 +139,12 @@ export default async function main(): Promise<void> {
   on<ImageResizeResultHandler>('image:resize:result', (payload: ResizeResultPayload) => {
     settleResponse(payload.reqId, payload)
   })
+  on<ImageResizeManyResultHandler>(
+    'image:resizeMany:result',
+    (payload: ResizeManyResultPayload) => {
+      settleResponse(payload.reqId, payload)
+    }
+  )
 
   // 목표 용량 탐색: UI 가 머지해 잰 실제 PDF 크기
   on<ImageProbeResultHandler>('image:probe:result', (payload) => {
@@ -213,13 +222,12 @@ export default async function main(): Promise<void> {
     scheduleSelection()
   })
 
-  on<ResizeWindowHandler>('resize:window', (size) => {
-    figma.ui.resize(size.width, size.height)
-  })
-
   // 같은 프레임의 글자·폰트·이미지를 고치면 체크리스트가 따라 바뀐다 (선택 목록은 그대로)
   watchContentChanges()
 
+  // 크기 고정. 줄이면 상태 카드의 사유 줄과 정상 줄이 두 줄로 접히면서 오른쪽 링크와 겹친다
+  // (실기 392px 에서 재현). 탭 여섯과 프리셋 타일 넷이 서로 다른 최소 폭을 요구해서,
+  // 하나의 폭에 맞춰 설계하고 그 폭을 지키는 편이 정직하다.
   showUI({ width: WINDOW_WIDTH, height: WINDOW_HEIGHT })
 }
 
@@ -338,6 +346,9 @@ async function runPass(
       sendResizeRequest: (payload: ResizeRequestPayload) => {
         emit<ImageResizeHandler>('image:resize', payload)
       },
+      sendResizeManyRequest: (payload: ResizeManyRequestPayload) => {
+        emit<ImageResizeManyHandler>('image:resizeMany', payload)
+      },
       keepOriginal,
       // 이미지 진행은 그 페이지 몫(1/총쪽수) 안에서만 움직인다
       onImageProgress: (current, total) => {
@@ -390,7 +401,8 @@ async function runFitExport(order: string[], settings: Settings, outName: string
   }
 
   reportProgress(t('progress.measure'), 1, FIT_BASELINE)
-  const measured = await requestMeasurement(outName)
+  // 목표 안이면 이 병합본을 보관본에도 둔다 — 더 선명한 후보와 재시도가 전부 넘치면 이걸로 돌아온다
+  const measured = await requestMeasurement(outName, targetBytes)
 
   // 크기를 못 쟀으면(머지 실패) 예측할 근거가 없다 — 기준 결과로 조용히 마무리한다
   if (measured.pdfBytes <= 0) {
@@ -398,19 +410,68 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     return
   }
 
-  // 고정분은 PDF 안에 실제로 든 이미지를 뺀 나머지. 우리가 센 바이트는 Figma 가 다시
-  // 압축해 넣는 몫만큼 부풀어 있어서 그 비율로 후보 예측을 보정한다 (fitToSize.predictSize)
-  const fixed = fixedBytes(measured.pdfBytes, measured.pdfImageBytes)
-  const baselineBytes: ImageBytes = { total: measured.imageBytes, jpeg: measured.imageJpegBytes }
-  const ratio = calibrationRatio(measured.pdfImageBytes, baselineBytes)
+  // 고정분은 PDF 에서 우리가 넣은 이미지를 뺀 나머지 — Figma 가 그림자·마스크를 스스로 래스터화한
+  // 이미지는 우리 설정으로 안 움직이니 고정분에 남긴다. 보정비도 우리 몫끼리 (fitToSize.predictSize)
+  const fixed = fixedBytes(measured.pdfBytes, measured.pdfOwnImageBytes)
+  // 기준 패스도 후보와 같은 잣대(Figma 품질로 다시 인코딩한 크기)로 재서 보정비를 잡는다. 못 재면
+  // (잴 이미지가 없다) 기준 패스가 실제로 넣은 바이트로 — 그때는 후보도 없다
+  const baselineProbe = await probeBytes(
+    order,
+    PROFILE_LADDER[BASELINE_INDEX],
+    settings.cropToVisible
+  )
+  const baselineBytes = baselineProbe ?? measured.imageBytes
+  const ratio = calibrationRatio(measured.pdfOwnImageBytes, baselineBytes)
 
-  const probes = await runProbes(order, fixed, targetBytes, baselineBytes, settings.minEdge, ratio)
+  const probes = await runProbes(
+    order,
+    fixed,
+    targetBytes,
+    baselineBytes,
+    ratio,
+    settings.cropToVisible
+  )
   const outcome = chooseProfile(probes, fixed, targetBytes, baselineBytes, ratio)
+  const chosenProfile =
+    outcome.kind === 'already-small' ? PROFILE_LADDER[BASELINE_INDEX] : outcome.profile
   const fit: FitReport = {
     targetBytes,
     outcome: outcome.kind,
-    predictedBytes: outcome.predicted
+    predictedBytes: outcome.predicted,
+    profile: { ...chosenProfile },
+    calibration: {
+      fixed,
+      ratio,
+      baselineMeasured: baselineBytes,
+      pdfImageBytes: measured.pdfImageBytes,
+      pdfOwnImageBytes: measured.pdfOwnImageBytes,
+      pdfBytes: measured.pdfBytes
+    },
+    probes: probes.map((probe) => ({
+      ...probe.profile,
+      predicted: Math.round(predictSize(fixed, probe.bytes, ratio))
+    }))
   }
+  // 후보별 예측치 — 어느 칸이 왜 떨어졌는지는 여기서만 볼 수 있다(플러그인 콘솔)
+  console.log(
+    '[fit] target',
+    targetBytes,
+    'fixed',
+    fixed,
+    'ratio',
+    ratio.toFixed(3),
+    'baseline measured',
+    measured.pdfBytes,
+    'baseline images(export raw/pdf/pdf own)',
+    `${measured.imageBytes}/${measured.pdfImageBytes}/${measured.pdfOwnImageBytes}`,
+    'chosen',
+    describeProfile(chosenProfile),
+    'predicted',
+    outcome.predicted,
+    probes.map(
+      (probe) => `${describeProfile(probe.profile)} → ${predictSize(fixed, probe.bytes, ratio)}`
+    )
+  )
 
   // 기준 그대로가 답이면 다시 뽑지 않는다 — 부분을 안 보내면 UI 가 방금 머지해 둔 것을
   // 그대로 저장한다. 세 경우가 여기로 온다:
@@ -422,14 +483,94 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     sameProfile(outcome.profile, PROFILE_LADDER[BASELINE_INDEX]) ||
     cancelled
   if (keepBaseline) {
+    if (!cancelled) {
+      const decision = decideFit(
+        targetBytes,
+        { profile: PROFILE_LADDER[BASELINE_INDEX], actual: measured.pdfBytes },
+        [],
+        false,
+        outcome.kind
+      )
+      fit.outcome = decision.outcome
+    }
     emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: first.skipped, fit })
     return
   }
 
-  reportProgress(t('progress.refine'), 0, FIT_FINAL)
-  const chosen = applyProfile(settings, outcome.profile)
-  const second = await runPass(order, chosen, FIT_FINAL)
-  emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: second.skipped, fit })
+  // 최종 패스 — 그리고 다운로드 전에 완성된 PDF 의 실제 바이트를 잰다. 예측이 낮게 나와 목표를
+  // 살짝 넘긴 실행이 실제로 있었다(5.7·5.9 MB 목표, +0.5%·+0.7%). 넘으면 같은 해상도의 품질 조정
+  // 후보부터 한도 안에서 다시 뽑고, 판단은 실제 바이트로만 한다. 측정한 병합본은 UI 가 보관하므로
+  // 맞은 결과는 그대로 저장된다 — 다시 병합하지 않는다
+  const baselineActual: FitAttempt = {
+    profile: PROFILE_LADDER[BASELINE_INDEX],
+    actual: measured.pdfBytes
+  }
+  const plan = fitAttemptPlan(outcome.profile)
+  const attempts: FitAttempt[] = []
+  let skipped: DoneReport['skipped'] = []
+  let measureFailed = false
+  /** 병합·측정이 실패한 패스의 설정 — 저장되는 것이 그 재병합본이면 설정도 그것으로 적는다 */
+  let failedProfile: CompressionProfile | null = null
+  for (let index = 0; index < plan.length; index += 1) {
+    const profile = plan[index]
+    reportProgress(
+      index === 0
+        ? t('progress.refine')
+        : t('progress.retry', { current: index, total: MAX_FIT_RETRIES }),
+      0,
+      FIT_FINAL
+    )
+    const pass = await runPass(order, applyProfile(settings, profile), FIT_FINAL)
+    skipped = pass.skipped
+    if (cancelled) break
+    reportProgress(t('progress.measure'), 1, FIT_FINAL)
+    const check = await requestMeasurement(outName, targetBytes)
+    // 크기를 못 쟀으면(머지 실패) 판단할 근거가 없다 — 이 패스의 결과로 마무리한다
+    if (check.pdfBytes <= 0) {
+      measureFailed = true
+      failedProfile = profile
+      break
+    }
+    attempts.push({ profile, actual: check.pdfBytes })
+    console.log(
+      '[fit] attempt',
+      index,
+      describeProfile(profile),
+      'actual',
+      check.pdfBytes,
+      'target',
+      targetBytes
+    )
+    if (check.pdfBytes <= targetBytes) break
+  }
+  if (cancelled) {
+    emit<DoneHandler>('done', { fileName: outName, cancelled, skipped, fit })
+    return
+  }
+  // 저장할 것과 결과 상태는 실제 바이트로 정한다 — 예측은 탐색 정보일 뿐
+  const decision = decideFit(
+    targetBytes,
+    baselineActual,
+    attempts,
+    retryCandidates(outcome.profile).length > 0,
+    outcome.kind
+  )
+  // 측정이 실패한 패스가 있으면 저장할 것과 적을 설정을 다시 정한다 — 목표 안 보관본이 있으면 그것
+  const keptFits =
+    baselineActual.actual <= targetBytes ||
+    attempts.some((attempt) => attempt.actual <= targetBytes)
+  const save = resolveSave(decision, measureFailed, keptFits, failedProfile)
+  fit.outcome = decision.outcome
+  fit.profile = { ...save.profile }
+  fit.attempts = attempts.map((attempt) => ({ ...attempt.profile, actual: attempt.actual }))
+  console.log(
+    '[fit] decision',
+    save.saveBest ? 'best' : 'last',
+    describeProfile(save.profile),
+    decision.outcome,
+    measureFailed ? '(measure failed)' : ''
+  )
+  emit<DoneHandler>('done', { fileName: outName, cancelled, skipped, fit, saveBest: save.saveBest })
 }
 
 /**
@@ -442,13 +583,15 @@ async function runProbes(
   order: string[],
   fixed: number,
   targetBytes: number,
-  baselineBytes: ImageBytes,
-  minEdge: Settings['minEdge'],
-  ratio: number
+  baselineBytes: number,
+  ratio: number,
+  cropToVisible: boolean
 ): Promise<Probe[]> {
   const probes: Probe[] = []
   const baselineFits = predictSize(fixed, baselineBytes, ratio) <= targetBytes
-  const rungs = candidateIndices(BASELINE_INDEX, baselineFits ? 'sharper' : 'smaller').map(
+  // 잘라 넣기가 켜져 있으면 기준이 목표를 넘어도 더 선명한 칸을 앞에 세운다 — 조각 채택은 인코딩 뒤
+  // 절감률로 정해져 칸마다 달라서, 더 선명한 칸이 더 작을 수 있다 (fitToSize.probeOrder)
+  const rungs = probeOrder(BASELINE_INDEX, baselineFits, cropToVisible).map(
     (index) => PROFILE_LADDER[index]
   )
   // 진행 표시용 — 칸 사이 변형은 최대 둘
@@ -458,27 +601,14 @@ async function runProbes(
   const probe = async (profile: CompressionProfile): Promise<boolean | null> => {
     step += 1
     reportProgress(t('progress.probe', { current: step, total }), step / total, FIT_PROBE)
-    const items = await probeItemsFor(order, profile, minEdge)
-    if (items.length === 0) return null // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
-
-    const reqId = nextRequestId('probe')
-    const promise = awaitResponse<{ totalBytes: number; jpegBytes: number; failed: number }>(
-      reqId,
-      PROBE_TIMEOUT_MS
-    )
-    emit<ImageProbeHandler>('image:probe', {
-      reqId,
-      items,
-      quality: profile.quality,
-      reencodeOpaquePng: profile.reencodeOpaquePng
-    })
-    const result = await promise
-    const bytes: ImageBytes = { total: result.totalBytes, jpeg: result.jpegBytes }
+    const bytes = await probeBytes(order, profile, cropToVisible)
+    if (bytes === null) return null // 잴 이미지가 없다 — 고정분만 남았으니 더 봐야 소용없다
     probes.push({ profile, bytes })
     return predictSize(fixed, bytes, ratio) <= targetBytes
   }
 
   let fitted: CompressionProfile | undefined
+  // 좋은 것부터 — 처음 목표에 드는 칸이 가장 선명한 답이다
   for (const rung of rungs) {
     if (cancelled) return probes
     const fits = await probe(rung)
@@ -500,52 +630,49 @@ async function runProbes(
   return probes
 }
 
+/**
+ * 하한은 프로필이 들고 있다 — 예전에는 사용자의 `settings.minEdge` 를 넘겼는데,
+ * 그러면 최소를 올려 둔 사용자에게만 목표 용량이 덜 줄어든다. 화질을 알아서 정해 달라고
+ * 맡긴 모드에서 사용자 설정이 탐색의 바닥을 막으면 안 된다.
+ *
+ * 항목은 **쪽마다** 만든다 — PDF 에는 쪽마다 한 벌씩 실리고, 같은 원본도 쪽마다 창·목표가
+ * 다를 수 있다. 같은 결과는 UI 가 인코딩 캐시로 재사용한다(imageCache.probeImageBytes).
+ */
+/**
+ * 이 프로필로 문서의 이미지를 인코딩했을 때 PDF 안에서 차지할 바이트(UI 가 Figma 품질로 다시 인코딩해 잰다).
+ * 잴 이미지가 없으면 null.
+ */
+async function probeBytes(
+  order: string[],
+  profile: CompressionProfile,
+  cropToVisible: boolean
+): Promise<number | null> {
+  const items = await probeItemsFor(order, profile, cropToVisible)
+  if (items.length === 0) return null
+  const reqId = nextRequestId('probe')
+  const promise = awaitResponse<{ totalBytes: number; failed: number }>(reqId, PROBE_TIMEOUT_MS)
+  emit<ImageProbeHandler>('image:probe', {
+    reqId,
+    items,
+    quality: profile.quality,
+    reencodeOpaquePng: profile.reencodeOpaquePng
+  })
+  const result = await promise
+  return result.totalBytes
+}
+
 async function probeItemsFor(
   order: string[],
   profile: CompressionProfile,
-  minEdge: Settings['minEdge']
+  cropToVisible: boolean
 ): Promise<ImageProbeItem[]> {
-  const seen = seenImageInfo()
-  const byHash = new Map<string, ImageProbeItem>()
-
+  const items: ImageProbeItem[] = []
   for (const id of order) {
     const node = await figma.getNodeByIdAsync(id)
     if (node === null || node.removed || !('absoluteTransform' in node)) continue
-
-    const frame = node as SceneNode
-    const scale = transformScale(frame.absoluteTransform)
-    // 탐색도 실제 export 와 같은 기준을 써야 예측이 맞는다
-    const floor = skipFloor(
-      { ...profile, minEdge },
-      Math.max(frame.width * scale.x, frame.height * scale.y)
-    )
-
-    for (const plan of planFor(frame, profile)) {
-      const info = seen.get(plan.imageHash)
-      if (info === undefined) continue // 기준 패스에서 못 본 이미지 — 셀 근거가 없다
-
-      const skip = info.longEdge <= floor
-      const found = byHash.get(plan.imageHash)
-      if (found === undefined) {
-        byHash.set(plan.imageHash, {
-          imageHash: plan.imageHash,
-          targetLongEdge: plan.targetLongEdge,
-          skip,
-          originalBytes: info.bytes,
-          uses: 1
-        })
-        continue
-      }
-      // 같은 이미지를 여러 프레임이 쓰면 가장 크게 쓰는 쪽에 맞춘다. 인코딩은 한 번이지만
-      // PDF 에는 쪽마다 한 벌씩 실리므로 쓰는 쪽 수를 센다 — 31장에 깔린 배경을 한 번으로
-      // 세면 기준(쪽별 합)보다 30벌이 빠져 후보가 전부 "맞는다" 고 나온다
-      found.targetLongEdge = Math.max(found.targetLongEdge, plan.targetLongEdge)
-      found.skip = found.skip && skip
-      found.uses += 1
-    }
+    items.push(...probeItemsOf(node as SceneNode, profile, cropToVisible))
   }
-
-  return [...byHash.values()]
+  return items
 }
 
 /**
@@ -555,16 +682,17 @@ async function probeItemsFor(
 type Measured = {
   pdfBytes: number
   imageBytes: number
-  imageJpegBytes: number
   pdfImageBytes: number
+  pdfOwnImageBytes: number
 }
 
-async function requestMeasurement(outName: string): Promise<Measured> {
+async function requestMeasurement(outName: string, keepUnder?: number): Promise<Measured> {
   const reqId = nextRequestId('fit')
   const promise = awaitResponse<Measured>(reqId, MEASURE_TIMEOUT_MS)
   emit<DoneHandler>('done', {
     reqId,
     measureOnly: true,
+    keepUnder,
     fileName: outName,
     cancelled: false,
     skipped: []
@@ -695,10 +823,15 @@ async function sendScan(nodes: ExportableNode[], isStale: () => boolean): Promis
   emit<FontsHandler>('fonts', scan.fonts)
 
   const hashes = scan.frames.flatMap((frame) => frame.images.map((usage) => usage.imageHash))
-  const preflightWith = (edges: Record<string, number>, sizing: boolean): void => {
+  const preflightWith = (sizes: Record<string, PixelSize>, sizing: boolean): void => {
+    const edges: Record<string, number> = {}
+    for (const [hash, size] of Object.entries(sizes)) {
+      edges[hash] = Math.max(size.width, size.height)
+    }
     emit<PreflightHandler>('preflight', {
       frames: scan.frames,
       imageEdges: edges,
+      imageSizes: sizes,
       textRejects: scan.textRejects,
       sizing
     })

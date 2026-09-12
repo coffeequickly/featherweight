@@ -15,6 +15,8 @@ Featherweight fixes the text problem itself:
   selectable, searchable, copy-pasteable and ATS-parseable.
 - **Smart image downscaling** — images are resized to their displayed size before
   export; anything already within the frame's budget passes through untouched.
+  A picture that is only partly visible is stored as just that visible area when
+  doing so makes the file smaller without losing sharpness.
 - **Fit to a target size** — name a number (say 5 MB) and Featherweight finds the
   best image quality that still fits, or tells you the smallest it can reach.
 
@@ -35,6 +37,20 @@ Korean line-break joiners no longer force outlines either.
 **New in 2.3** — hyperlinks on text stay clickable in the PDF (Advanced →
 Keep hyperlinks). **OTF fonts** can be added now, not just TTF. The font
 folder picker explains itself.
+
+**New in 3.2** — pictures that are only partly visible are stored as just the
+visible area, when that makes the file smaller without losing sharpness anywhere
+(Options → "Trim pictures to the visible area", on by default). Image size is now
+three bars — Largest · Smallest · Scale — with four of the document's own images
+drawn to their real aspect ratio above them, and the Images list shows visible
+area, original, stored size and trimmed share per row. Target size measures the
+finished PDF and re-exports with the next candidate if it came out over, predicts
+from Figma's own re-encoding (within about 3% on three real documents), and the
+result card says which settings it chose.
+
+**New in 3.1** — bulleted and numbered lists export as real text. The bullet or
+number is drawn where Figma puts it, so it stays selectable and searchable. Lists
+in right-to-left scripts keep their outlines.
 
 **New in 3.0** — six tabs that follow the work: **Start · Order · Fonts ·
 Images · Options · Result**. Start shows only what needs you and the tab holding
@@ -58,7 +74,7 @@ freezes the canvas, and image-heavy exports are faster.
 
 **New in 2.0** — one screen instead of tabs (3.0 brought tabs back, arranged by
 the order of the work rather than by feature). Presets became tiles that show
-the numbers they set, a *Before you export* checklist said what would change,
+the numbers they set, a _Before you export_ checklist said what would change,
 and missing fonts could be picked out of a font folder in one go.
 
 ## How it works
@@ -83,11 +99,11 @@ Open Sans, Montserrat, Lato, Poppins, IBM Plex, JetBrains Mono…) and 17 Korean
 
 The Fonts screen lists every font your document uses, in one of three states:
 
-| State | What happens |
-|---|---|
-| In catalog | Downloaded from a CDN (jsDelivr) at export time and embedded. Nothing to do |
+| State        | What happens                                                                                                                                                                                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In catalog   | Downloaded from a CDN (jsDelivr) at export time and embedded. Nothing to do                                                                                                                                                                                                |
 | Added by you | Add a static TTF or OTF once — or pick your font folder and the matching files are found for you (`.ttc` collections — the format macOS and Windows ship system fonts in, from Helvetica Neue to Gulim — work; the right face is picked). Stored and embedded from then on |
-| No file | **Kept as outlines** — identical look, you just don't get the size and search benefits |
+| No file      | **Kept as outlines** — identical look, you just don't get the size and search benefits                                                                                                                                                                                     |
 
 **Fonts are never substituted.** If a font can't be embedded, the original
 outlines stay exactly as Figma drew them.
@@ -139,8 +155,9 @@ and why, and clicking a reason selects them on canvas:
 - Superscript and subscript text — Figma synthesizes superscripts for glyphs the
   font lacks (and, once mixed, for the whole layer); redrawing with the font's
   own `sups`/`subs` glyphs looked different and left commas at body size
-- Bulleted and numbered lists — the bullets and numbers are not part of the
-  text data Figma exposes, so they can't be redrawn yet
+- Lists in right-to-left scripts — the marker position can't be measured, so
+  they keep their outlines (bulleted and numbered lists otherwise export as
+  real text, since 3.1)
 - Text whose font file can't be obtained, or containing glyphs the font lacks
 
 ## Good to know
@@ -184,14 +201,30 @@ Featherweight는 텍스트 자체를 고치고, 파일을 필요한 크기로 �
   선택·검색·복사가 되고 ATS가 읽습니다. Inter(Figma 기본 서체), Roboto, Pretendard
   등 60종은 자동으로 받아 넣습니다. 글 위주 이력서가 10MB에서 1MB 아래로 내려갑니다.
 - **보이는 크기에 맞춘 이미지 압축** — 이미지는 실제로 표시되는 크기에 맞춰 줄이고
-  다시 인코딩합니다. 선명하게 / 균형 / 최소 용량 중 하나를 고르면 어떤 숫자가
-  적용되는지 바로 보이고, 이미지 탭에서 해상도(1×~4×, 인쇄 기준 최대 288 DPI)와
-  품질을 직접 정할 수도 있습니다. 이 문서의 이미지가 몇 px에서 몇 px이 되는지
-  한 줄씩 보여 주므로, 설정이 어디에 닿는지 내보내기 전에 확인됩니다. 로고와 작은
-  이미지는 손대지 않으니 선명하던 것이 뭉개지지 않습니다.
+  다시 인코딩합니다. 고화질 / 균형 / 최소 용량 / 목표 용량 중 하나를 고르면 끝이고,
+  이미지 탭 맨 위에서 언제든 바꿀 수 있습니다. 숫자를 직접 정하고 싶으면 고급 옵션을
+  펼쳐 **최대**(한 장이 넘을 수 없는 px) · **최소**(아무리 작게 놓여도 이 밑으로는 안
+  줄임) · **배율**(놓인 크기의 몇 배로 담을까)을 각각 잡습니다. 셋 다 제 값이 그대로
+  보여서 어떤 값도 다른 값을 조용히 덮어쓰지 않습니다.
+
+  그 위에는 이 문서의 실제 이미지 넷을 진짜 가로세로 비로 그립니다 — 점선이 지금
+  크기, 칠한 사각형이 내보낼 크기, 사선은 손대지 않는 것입니다. 바를 움직이면 사각형이
+  따라 움직이므로 설정이 어디에 닿는지 내보내기 전에 눈으로 확인됩니다. 아래 목록은
+  같은 것을 숫자로 한 줄씩 말하고, 줄을 누르면 캔버스에서 그 레이어를 보여 줍니다.
+  로고와 작은 이미지는 손대지 않으니 선명하던 것이 뭉개지지 않습니다.
+
+  잘라 쓰거나 비율이 어긋나게 채운 이미지는 보이는 부분이 제 밀도를 가지려면 원본이
+  더 커야 합니다. 그것까지 셈해서 필요한 만큼만 남깁니다.
+
+  일부만 보이는 이미지는 모든 자리의 선명도를 지키면서 파일이 실제로 작아질 때만
+  보이는 영역만 저장합니다(옵션 탭 "보이는 영역만 저장", 기본 켬). 이미지 탭 목록은
+  줄마다 보이는 영역 · 원본 · 저장 크기 · 잘린 영역을 보여 줍니다.
+
 - **목표 용량 맞추기** — 업로드 한도가 5MB라면 숫자만 적으세요. 한 번 내보내 크기를
-  재고, 그 안에 드는 가장 좋은 화질을 찾아 다시 내보냅니다. 화질에는 하한이 있어서
-  목표가 무리면 가능한 가장 작은 파일과 함께 그 하한을 알려 드립니다.
+  재고, 그 안에 드는 가장 좋은 화질을 찾아 다시 내보냅니다. 완성된 PDF의 실제 크기를
+  다시 재서 목표를 넘으면 다음 후보로 최대 두 번 더 내보내고, 결과 탭에 자동으로 고른
+  설정을 적습니다. 화질에는 하한이 있어서 목표가 무리면 가능한 가장 작은 파일과 함께
+  그 하한을 알려 드립니다.
 - **내보내기 전에 미리 확인** — 시작·정렬·폰트·이미지·옵션·결과 여섯 탭이 작업
   순서대로 놓여 있습니다. 시작 탭은 손볼 것만 보여 주고, 그것이 든 탭은 색으로
   알려 줍니다 — 없는 폰트, 왜 아웃라인으로 남는 텍스트인지, 그 레이어로 가는 링크까지.
@@ -255,10 +288,14 @@ npm run package         # dist/*.zip
 npm run ui:preview      # render the UI in a browser without Figma
 ```
 
-To run a development build in Figma: `npm run install:local`, then in the Figma
-desktop app choose Plugins → Development → **Import plugin from manifest…** and
-pick `~/figma-plugins/sheaf/manifest.json`. After that, re-running
-`install:local` is enough — no re-import needed.
+To run a development build in Figma: `npm run build`, then in the Figma desktop
+app choose Plugins → Development → **Import plugin from manifest…** and pick the
+`manifest.json` in this repo (it is generated by the build from the
+`figma-plugin` field in `package.json`). After that, re-running `npm run build`
+is enough — no re-import needed.
+
+`npm run install:local` copies the build into `~/figma-plugins/featherweight/`
+instead, for when you would rather not point Figma at the working tree.
 
 `ui:preview` accepts query flags for reviewing states without Figma:
 `?screen=fonts&lang=en-US&platform=win&frames=12&fit=1&text=clean&bare=1`.
@@ -266,6 +303,14 @@ pick `~/figma-plugins/sheaf/manifest.json`. After that, re-running
 `result` — and `sub` opens a subpage (`outline` / `extracted` / `storage`), with
 `family=` for a font's detail page. `report=1` fills the Result tab as it looks
 after an export. The interface is dark-only since 3.0, so `theme=` does nothing.
+
+Two flags exist for states that only differ by data: `images=none` drops every
+image from the selection, `images=unsized` keeps them but withholds the pixel
+sizes that arrive asynchronously. `measure=.a,.b` prints the boxes of matching
+elements into the page `<title>` — read it with `--dump-dom`. It reports the
+laid-out box **and** where the glyphs actually sit, which are not the same
+thing: the library's `Text` shrinks its own box by 9px and shifts its content
+down by 4px, so padding that is symmetric in CSS can read lopsided on screen.
 
 ### Repo layout
 
@@ -300,13 +345,13 @@ redistribute any font file — your machine fetches the upstream original at
 export time over the jsDelivr CDN. Every URL is pinned to a commit or a package
 version and verified weekly (`.github/workflows/catalog.yml`).
 
-| Source | Families | |
-|---|---|---|
-| [Google Fonts](https://github.com/google/fonts) | 20 | first-party |
-| [Expo Google Fonts](https://github.com/expo/google-fonts) | 36 | static builds of families Google now ships variable-only |
-| [Inter](https://github.com/rsms/inter) | 1 | first-party, v3.19 — the build Figma bundles |
-| [Pretendard](https://github.com/orioncactus/pretendard) | 2 | first-party |
-| [Spoqa Han Sans Neo](https://github.com/spoqa/spoqa-han-sans) | 1 | first-party |
+| Source                                                        | Families |                                                          |
+| ------------------------------------------------------------- | -------- | -------------------------------------------------------- |
+| [Google Fonts](https://github.com/google/fonts)               | 20       | first-party                                              |
+| [Expo Google Fonts](https://github.com/expo/google-fonts)     | 36       | static builds of families Google now ships variable-only |
+| [Inter](https://github.com/rsms/inter)                        | 1        | first-party, v3.19 — the build Figma bundles             |
+| [Pretendard](https://github.com/orioncactus/pretendard)       | 2        | first-party                                              |
+| [Spoqa Han Sans Neo](https://github.com/spoqa/spoqa-han-sans) | 1        | first-party                                              |
 
 Not affiliated with, or endorsed by, any of these projects. Font names are
 trademarks of their respective owners.

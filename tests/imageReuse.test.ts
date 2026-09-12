@@ -97,18 +97,18 @@ describe('shrinkImages — 프레임 간 교체 이미지 재사용', () => {
     expect(created).toEqual(['new-1']) // createImage 도 한 번
     expect(first.fills[0].imageHash).toBe('new-1')
     expect(second.fills[0].imageHash).toBe('new-1')
-    // 통계는 프레임마다 그 쪽에 실리는 만큼 — 기준 측정과 같은 단위
+    // 바이트는 프레임마다 그 쪽에 실리는 만큼 — 기준 측정과 같은 단위.
+    // 손댄 원본은 해시로 쌓이고, 두 쪽이 같은 해시라 결과 카드에서는 한 장으로 센다
     expect(statsA).toMatchObject({
-      processed: 1,
+      processed: ['bg'],
       bytesBefore: 200_000,
-      bytesAfter: 50_000,
-      bytesJpeg: 50_000
+      bytesAfter: 50_000
     })
     expect(statsB).toMatchObject({
-      processed: 1,
+      processed: ['bg'],
       bytesBefore: 200_000,
-      bytesAfter: 50_000,
-      bytesJpeg: 50_000
+      bytesAfter: 50_000
     })
+    expect(new Set([...statsA.processed, ...statsB.processed]).size).toBe(1)
   }, 10_000)
 })

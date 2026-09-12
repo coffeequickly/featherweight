@@ -87,7 +87,14 @@ describe('formatNumber', () => {
 
 describe('사전 무결성', () => {
   const PARAMS = {
+    max: 1920,
+    min: 640,
+    scale: 1.5,
     count: 2,
+    quality: 74,
+    png: 'yes',
+    list: '1.1×1280·74% 4,900,000✓',
+    error: 'NotAllowedError',
     missing: 1,
     total: 3,
     done: 1,
@@ -115,7 +122,7 @@ describe('사전 무결성', () => {
     texts: 2,
     multiplier: 1.5,
     maxEdge: 2048,
-    quality: '0.80',
+    original: 3000,
     file: 'a.ttf',
     chars: '10',
     name: 'Cover',
@@ -123,7 +130,6 @@ describe('사전 무결성', () => {
     family: 'F',
     style: 'S',
     styles: 'S1, S2',
-    error: 'e',
     label: 'L',
     reqId: 'r1',
     hash: 'h',

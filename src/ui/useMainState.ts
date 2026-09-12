@@ -24,6 +24,8 @@ import {
   ImageProbeHandler,
   ImageProbeResultHandler,
   ImageResizeHandler,
+  ImageResizeManyHandler,
+  ImageResizeManyResultHandler,
   ImageResizeResultHandler,
   NoticeHandler,
   Preflight,
@@ -42,8 +44,8 @@ import {
 import { settleResponse } from './bridge'
 import { backfillFontFacts } from './fontFacts'
 import { resetFontCache } from './fontSource'
-import { forgetOriginals, probeImageBytes, rememberOriginal } from './imageCache'
-import { resizeImage } from './resize'
+import { forgetOriginals, probeImageBytes, rememberOriginal, rememberOwnSize } from './imageCache'
+import { resizeImage, resizeMany } from './resize'
 import { ValidationOutcome, validateSources } from './validateText'
 
 export type Notice = { message: string; error: boolean } | null
@@ -151,7 +153,20 @@ export function useMainState(): MainState {
       // 목표 용량 탐색이 같은 원본을 여러 설정으로 다시 재봐야 해서 들고 있는다
       if (payload.imageHash !== undefined) rememberOriginal(payload.imageHash, payload.bytes)
       void resizeImage(payload).then((result) => {
+        if (result.ok) rememberOwnSize(result.width, result.height)
         emit<ImageResizeResultHandler>('image:resize:result', { reqId: payload.reqId, ...result })
+      })
+    })
+
+    // 조각 여럿 — 원본을 한 번만 디코드한다 (resize.ts resizeMany)
+    const offResizeMany = on<ImageResizeManyHandler>('image:resizeMany', (payload) => {
+      void resizeMany(payload).then((result) => {
+        if (result.ok)
+          for (const piece of result.results) rememberOwnSize(piece.width, piece.height)
+        emit<ImageResizeManyResultHandler>('image:resizeMany:result', {
+          reqId: payload.reqId,
+          ...result
+        })
       })
     })
 
@@ -166,11 +181,7 @@ export function useMainState(): MainState {
         .catch(() => ({
           // 재기가 통째로 실패하면 원본 크기로 센다 — 예측이 커지는 쪽이라 목표를 넘기지는 않는다.
           // 회신을 안 하면 메인이 타임아웃까지 기다린다
-          totalBytes: payload.items.reduce(
-            (sum, item) => sum + item.originalBytes * Math.max(1, item.uses),
-            0
-          ),
-          jpegBytes: 0,
+          totalBytes: payload.items.reduce((sum, item) => sum + item.originalBytes, 0),
           failed: payload.items.length
         }))
         .then((result) => {
@@ -219,6 +230,7 @@ export function useMainState(): MainState {
       offFontBytes()
       offSaveResult()
       offResize()
+      offResizeMany()
       offCache()
       offProbe()
       offValidate()

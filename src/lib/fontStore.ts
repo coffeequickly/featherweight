@@ -4,6 +4,7 @@
 
 import { CLIENT_STORAGE_LIMIT, FontRef, StoredFont } from './types'
 
+/** 옛 이름을 유지한다 — 바꾸면 저장된 폰트를 못 찾는다 (src/lib/types.ts 참고) */
 export const FONT_INDEX_KEY = 'sheaf.fonts.v1'
 export const FONT_KEY_PREFIX = 'sheaf.font.'
 

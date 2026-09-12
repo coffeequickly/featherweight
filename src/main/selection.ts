@@ -1,8 +1,10 @@
 import { aggregateFontUsage, sampleCodePoints } from '../lib/fontInventory'
+import { Rect } from '../lib/clipRect'
+import { PixelSize } from '../lib/imageDensity'
 import { transformScale } from '../lib/imageTarget'
 import { FontUsage, FrameItem, PreflightFrame, RawFontSegment, TextReject } from '../lib/types'
-import { imageUsagesOf } from './images'
-import { knownEdge, persistEdgeCache, readEdge, rememberEdge } from './imageSize'
+import { clipFor, imageUsagesOf } from './images'
+import { knownSize, persistEdgeCache, readSize, rememberSize } from './imageSize'
 import { isTemporary } from './temporary'
 import { screenTextNode } from './text'
 
@@ -191,7 +193,10 @@ async function scanNode(
   isStale: () => boolean
 ): Promise<Scan | null> {
   const scan: Scan = { images: [], textCount: 0, fontSegments: [], textRejects: [] }
-  const stack: SceneNode[] = [root]
+  // 클립은 내려가면서 좁아진다 — 넘쳐 잘리는 그림을 재려면 지금 어디까지 보이는지 알아야 한다
+  const stack: Array<{ node: SceneNode; clip: Rect | null }> = [
+    { node: root, clip: clipFor(root, null) }
+  ]
 
   while (stack.length > 0) {
     if (Date.now() - slice.since >= SLICE_MS) {
@@ -200,7 +205,7 @@ async function scanNode(
       slice.since = Date.now()
     }
 
-    const current = stack.pop() as SceneNode
+    const { node: current, clip } = stack.pop() as { node: SceneNode; clip: Rect | null }
     if (current.visible === false) continue
 
     if (current.type === 'TEXT' && current.characters !== '') {
@@ -213,12 +218,13 @@ async function scanNode(
       }
     }
 
-    scan.images.push(...imageUsagesOf(current))
+    scan.images.push(...imageUsagesOf(current, clip))
 
     if ('children' in current) {
+      const inner = clipFor(current, clip)
       // 스택이라 뒤집어 넣어야 문서 순서대로 나온다 (children 도 한 번의 엔진 읽기다)
       for (let index = current.children.length - 1; index >= 0; index -= 1) {
-        stack.push(current.children[index])
+        stack.push({ node: current.children[index], clip: inner })
       }
     }
   }
@@ -260,13 +266,13 @@ const EDGE_PROGRESS_EVERY = 6
 export async function imageEdges(
   hashes: Iterable<string>,
   isStale: () => boolean,
-  onProgress?: (edges: Record<string, number>) => void
-): Promise<Record<string, number>> {
-  const out: Record<string, number> = {}
+  onProgress?: (sizes: Record<string, PixelSize>) => void
+): Promise<Record<string, PixelSize>> {
+  const out: Record<string, PixelSize> = {}
   const missing: string[] = []
 
   for (const hash of new Set(hashes)) {
-    const cached = knownEdge(hash)
+    const cached = knownSize(hash)
     if (cached !== undefined) out[hash] = cached
     else missing.push(hash)
   }
@@ -279,10 +285,10 @@ export async function imageEdges(
     if (isStale()) break
     const image = figma.getImageByHash(hash)
     if (image !== null) {
-      const edge = await readEdge(image)
-      if (edge !== null) {
-        rememberEdge(hash, edge)
-        out[hash] = edge
+      const size = await readSize(image)
+      if (size !== null) {
+        rememberSize(hash, size)
+        out[hash] = size
         sinceProgress += 1
         if (sinceProgress >= EDGE_PROGRESS_EVERY) {
           sinceProgress = 0

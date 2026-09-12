@@ -1,9 +1,16 @@
 // main <-> ui 공유 타입. Figma·DOM 의존 금지. (PRD §7.3)
 
+/**
+ * `sheaf.*` 와 `__sheaf_tmp__` 는 옛 이름이지만 **바꾸면 안 된다.**
+ * clientStorage 키라서 이름을 고치는 순간 기존 사용자의 저장된 설정과 폰트가 통째로
+ * 사라진다(플러그인 입장에서는 처음 실행하는 것과 같다). 임시 노드 이름도 마찬가지다 —
+ * 옛 버전이 남긴 잔여물을 이 이름으로 찾아 지운다.
+ */
 export const TMP_NODE_NAME = '__sheaf_tmp__'
 /** 임시 클론의 소유권 표식(pluginData 키). 이름은 사용자도 쓸 수 있지만 이 키는 우리만 쓴다 */
 export const TMP_MARK_KEY = 'sheaf.tmp'
 import type { MessageKey } from './i18n'
+import type { PixelSize } from './imageDensity'
 
 export const SETTINGS_KEY = 'sheaf.settings.v1'
 
@@ -28,17 +35,22 @@ export type Settings = {
    * PDF 는 1pt = 1/72인치라 배율이 곧 DPI다 — 1× = 72, 2× = 144, 4× = 288.
    * 3·4 는 인쇄용으로 뒤에 넣었다. 옛 저장값(1·1.5·2)은 그대로 유효하다.
    */
-  multiplier: 1 | 1.5 | 2 | 3 | 4
+  multiplier: 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5 | 3 | 3.5 | 4
   /** 긴 변 상한 — HD · FHD · QHD · 4K. 옛 값(1024·1600·2048·4096)은 settingsOptions.snapSettings 가 옮긴다 */
-  maxEdge: 1280 | 1920 | 2560 | 3840
+  maxEdge: 1280 | 1920 | 2560 | 3840 | 5120 | 7680
   /** 원본이 이 픽셀 이하면 아예 손대지 않는다 — 로고·아이콘을 지키는 절대 하한 */
-  minEdge: 640 | 1024 | 1600
+  minEdge: 480 | 640 | 800 | 1024 | 1280 | 1600 | 2048
   reencodeOpaquePng: boolean
   embedText: boolean // Phase 2
   /** 텍스트에 건 URL 하이퍼링크를 PDF 링크 주석으로 넣는다 — 텍스트를 다시 그리며 잃는 것을 되살린다 */
   keepLinks: boolean
   /** 폰트에 없는 글자를 대체 폰트(Inter → Pretendard)로 그린다. 끄면 그 텍스트는 아웃라인 */
   glyphFallback: boolean
+  /**
+   * 보이는 창만 잘라 넣기 (docs/IMAGE-CROP.md). 끄면 예전처럼 이미지를 통째로 줄인다 —
+   * 내보내기와 목표 용량 예측이 같이 꺼진다. 첫 배포의 도망갈 길.
+   */
+  cropToVisible: boolean
   /** 목표 용량에 맞춰 압축을 자동으로 고른다 (docs/FIT-TO-SIZE.md) */
   fitToSize: boolean
   fitTargetMb: number
@@ -51,11 +63,13 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 0.8,
   multiplier: 1.5,
   maxEdge: 1920,
+  // 균형 프리셋과 같아야 한다 — 어긋나면 새 사용자가 "균형" 이라고 보면서 다른 값을 받는다
   minEdge: 640,
   reencodeOpaquePng: true,
   embedText: true,
   keepLinks: true,
   glyphFallback: true,
+  cropToVisible: true,
   fitToSize: false,
   fitTargetMb: 5
 }
@@ -203,9 +217,15 @@ export type StoredFont = FontRef & {
 }
 
 export type PartStats = {
-  imagesProcessed: number
-  /** 우리가 만든 JPEG 출력 바이트 — PDF 에 그대로(DCT) 실린다. 나머지는 Figma 가 다시 넣는다 */
-  bytesJpeg: number
+  /**
+   * 이 쪽에서 손댄·잘라 넣은·물러선 원본의 해시. 세지 않고 해시로 들고 다니는 이유는
+   * 여러 쪽에 깔린 같은 사진을 한 장으로 세기 위해서다 (useExport 가 합집합을 만든다)
+   */
+  imagesProcessed: string[]
+  /** 그중 보이는 창만 잘라 넣은 원본 — 품질을 지키고도 바이트가 줄 때만 (lib/imageCrop.ts) */
+  imagesCropped: string[]
+  /** 조각을 만들다 실패해 기존 방식(W₀)으로 물러선 원본 — 출력은 정상 */
+  imagesRecovered: string[]
   /** 이 쪽의 서로 다른 이미지 해시. 쪽마다 합쳐 "이미지 N장" 을 체크리스트와 같은 기준으로 센다 */
   imageHashes: string[]
   bytesBefore: number
@@ -221,6 +241,7 @@ export type PartStats = {
 // create-figma-plugin 의 emit/on 용 핸들러 시그니처.
 // (타입만 가져온다 — lib 은 런타임 의존을 갖지 않는다.)
 import type { EventHandler } from '@create-figma-plugin/utilities'
+import type { Transform } from './imageTarget'
 
 export interface UiReadyHandler extends EventHandler {
   name: 'ui:ready'
@@ -294,12 +315,35 @@ export type ImageUsage = {
   /** 노드의 표시 크기 (px) */
   width: number
   height: number
+  /** FILL의 창 계산용 로컬 상자. 화면 배율을 적용한 width/height와 구분한다. */
+  localSize?: { width: number; height: number }
   scaleMode: 'FILL' | 'FIT' | 'CROP' | 'TILE'
+  /**
+   * CROP 일 때 원본의 몇 분의 몇이 이 자리에 보이는가(축별, 0~1).
+   * 없으면 온전히 보이는 것으로 본다.
+   */
+  crop?: { x: number; y: number }
+  /**
+   * 이 fill 이 노드의 몇 번째인가 — 조각으로 갈아끼울 때 자리를 집는 데 쓴다.
+   * 선택 시점 예고에는 없어도 되므로 선택이다.
+   */
+  fillIndex?: number
+  /** CROP 의 imageTransform 그대로 — 창을 자르고 T′ 를 만들려면 비뿐 아니라 원점이 필요하다 */
+  cropTransform?: Transform
+  /** FILL·FIT 의 회전(도). 0 이 아니면 창이 축에 나란하지 않아 잘라 넣지 않는다 */
+  paintRotation?: number
+  /**
+   * 클립 안에 남는 넓이의 비(0~1). 1 이면 온전히 보인다.
+   *
+   * 프레임 밖으로 넘치는 그림은 넘친 만큼이 안 보이는데도 목표 픽셀은 노드 전체로 잡힌다 —
+   * 자르지 않고 통째로 줄이기 때문이다. 그 낭비를 화면이 말할 수 있게 재 둔다.
+   */
+  visible: number
 }
 
 export type PreflightFrame = {
   id: string
-  /** 렌더 기준 긴 변(px) — 건너뛸 기준선(skipFloor)을 셈하는 데 쓴다 */
+  /** 렌더 기준 긴 변(px) — 이미지 목표와 그림의 기준이다 */
   longEdge: number
   images: ImageUsage[]
 }
@@ -317,6 +361,11 @@ export type Preflight = {
   frames: PreflightFrame[]
   /** 이미지 해시 → 원본 긴 변(px). 크기를 못 읽은 이미지는 빠진다. */
   imageEdges: Record<string, number>
+  /**
+   * 이미지 해시 → 원본 양변(px). 잘라 쓰거나 비율이 어긋난 자리의 목표를 셈하려면
+   * 긴 변만으로는 부족하다 — 밀도를 정하는 축이 짧은 변일 수 있다.
+   */
+  imageSizes?: Record<string, PixelSize>
   textRejects: TextReject[]
   /** 원본 크기를 아직 읽는 중 — imageEdges 에 빠진 것이 "못 읽음" 이 아니라 "아직" 이다 */
   sizing?: boolean
@@ -368,18 +417,58 @@ export interface FitMeasuredHandler extends EventHandler {
     reqId: string
     pdfBytes: number
     imageBytes: number
-    /** imageBytes 중 우리가 만든 JPEG 몫 */
-    imageJpegBytes: number
     pdfImageBytes: number
+    /** pdfImageBytes 중 우리가 넣은 이미지(치수 일치) 몫 — 나머지는 Figma 가 그림자·마스크를 래스터화한 것 */
+    pdfOwnImageBytes: number
   }) => void
 }
 
 /** Fit to Size 결과 — 리포트에 그대로 보여준다 */
 export type FitReport = {
   targetBytes: number
-  outcome: 'fits' | 'already-small' | 'unreachable'
+  /** missed = 최종 PDF 의 실제 바이트가 목표를 넘어 한도 안에서 다시 뽑아 봤지만 못 맞췄다 */
+  outcome: 'fits' | 'already-small' | 'unreachable' | 'missed'
   /** 예측 크기 — unreachable 이면 이 문서에서 가능한 가장 작은 크기(하한) */
   predictedBytes: number
+  /**
+   * 자동으로 고른 최종 설정. 칸 이름만으로는 알 수 없고(마지막 단계가 품질만 올린 변형을 재본다)
+   * PDF 에서도 못 읽는다(Figma 가 내보낼 때 다시 인코딩) — 결과 탭에 적어야 검증이 된다
+   */
+  profile?: {
+    multiplier: number
+    maxEdge: number
+    minEdge: number
+    quality: number
+    reencodeOpaquePng: boolean
+  }
+  /** 예측식의 재료 — 예측이 빗나갈 때 어디서 빗나갔는지 보려고 남긴다 */
+  calibration?: {
+    fixed: number
+    ratio: number
+    baselineMeasured: number
+    pdfImageBytes: number
+    /** pdfImageBytes 중 우리가 넣은 이미지 몫 — 보정비는 이걸로 잡는다 */
+    pdfOwnImageBytes: number
+    pdfBytes: number
+  }
+  /** 최종 패스마다(첫 시도 + 재시도) 뽑은 설정과 실제 PDF 바이트 — 마지막이 저장된 것 */
+  attempts?: Array<{
+    multiplier: number
+    maxEdge: number
+    minEdge: number
+    quality: number
+    reencodeOpaquePng: boolean
+    actual: number
+  }>
+  /** 재본 후보마다 예측 바이트 — 탈락한 후보의 예측이 맞았는지 실제로 내보내 견주려면 이게 있어야 한다 */
+  probes?: Array<{
+    multiplier: number
+    maxEdge: number
+    minEdge: number
+    quality: number
+    reencodeOpaquePng: boolean
+    predicted: number
+  }>
 }
 
 export type DoneReport = {
@@ -387,6 +476,10 @@ export type DoneReport = {
   reqId?: string
   /** true 면 UI 는 머지해서 크기만 재고 저장하지 않는다 (목표 용량 탐색 1회차) */
   measureOnly?: boolean
+  /** measureOnly 일 때: 잰 바이트가 이 값 이하면 그 병합본을 "목표 안 보관본" 에도 둔다 */
+  keepUnder?: number
+  /** 마지막 done 에서: true 면 마지막 측정본 대신 목표 안 보관본을 저장한다 (fitToSize.decideFit) */
+  saveBest?: boolean
   fit?: FitReport
   fileName: string
   cancelled: boolean
@@ -444,6 +537,9 @@ export interface NoticeHandler extends EventHandler {
   handler: (payload: { message: string; error: boolean }) => void
 }
 
+/** 원본 안에서 잘라 낼 정수 사각형(px) */
+export type CropRect = { x0: number; y0: number; w: number; h: number }
+
 export type ResizeRequestPayload = {
   reqId: string
   bytes: Uint8Array
@@ -474,6 +570,33 @@ export type ResizeResultPayload =
 export interface ImageResizeResultHandler extends EventHandler {
   name: 'image:resize:result'
   handler: (payload: ResizeResultPayload) => void
+}
+
+/** 한 원본에서 조각 여럿 — UI 가 한 번만 디코드하고 job 마다 자르고 줄이고 인코딩한다 */
+export type ResizeManyRequestPayload = {
+  reqId: string
+  bytes: Uint8Array
+  quality: number
+  reencodeOpaquePng: boolean
+  jobs: Array<{ targetLongEdge: number; crop: CropRect }>
+}
+
+export interface ImageResizeManyHandler extends EventHandler {
+  name: 'image:resizeMany'
+  handler: (payload: ResizeManyRequestPayload) => void
+}
+
+export type ResizeManyResultPayload =
+  | {
+      reqId: string
+      ok: true
+      results: Array<{ bytes: Uint8Array; mime: string; width: number; height: number }>
+    }
+  | { reqId: string; ok: false; reason: string }
+
+export interface ImageResizeManyResultHandler extends EventHandler {
+  name: 'image:resizeMany:result'
+  handler: (payload: ResizeManyResultPayload) => void
 }
 
 /** UI 가 clientStorage 의 폰트 바이트를 요청한다 (clientStorage 는 메인 전용). */
@@ -508,6 +631,11 @@ export interface TextValidateResultHandler extends EventHandler {
  * 목표 용량 탐색용. 캐시된 원본을 주어진 설정으로 재인코딩해 바이트 합계만 돌려준다.
  * 실제 fill 교체도, Figma 왕복도 없다 — 그래서 후보를 여러 개 재도 싸다.
  */
+/**
+ * 목표 용량 예측 항목 — **쪽마다 하나**. PDF 에는 쪽마다 부분 PDF 를 따로 뽑아 합치므로 같은 원본도
+ * 쪽마다 한 벌씩 실리고, 창·목표는 쪽마다 다를 수 있다. 같은 결과만 인코딩 캐시로 재사용한다.
+ * 채택(W₀ 인가 조각인가)은 export 와 같은 규칙(lib/imageCrop chooseCrop)으로 tallyProbe 가 정한다.
+ */
 export type ImageProbeItem = {
   imageHash: string
   targetLongEdge: number
@@ -515,11 +643,10 @@ export type ImageProbeItem = {
   skip: boolean
   /** 원본 바이트 수. skip 이거나 캐시에 없을 때 이 값으로 센다. */
   originalBytes: number
-  /**
-   * 이 이미지를 쓰는 쪽(프레임) 수. 인코딩은 한 번이지만 쪽마다 부분 PDF 를 따로 뽑아
-   * 합치므로 PDF 에는 쪽 수만큼 실린다 — 기준 측정이 쪽별로 더한 것과 같은 단위로 세야 한다
-   */
-  uses: number
+  /** 이 쪽에서 조각으로 바꿀 수 있는 계획. 없으면 W₀ 그대로 */
+  pieces?: Array<{ targetLongEdge: number; crop: CropRect }>
+  /** 조각들의 최소 밀도 이득(기존 대비 배) — chooseCrop 의 인자 */
+  densityGain?: number
 }
 
 /**
@@ -548,7 +675,6 @@ export interface ImageProbeResultHandler extends EventHandler {
     reqId: string
     totalBytes: number
     /** totalBytes 중 우리가 만든 JPEG 몫 — 보정하지 않는다 */
-    jpegBytes: number
     failed: number
   }) => void
 }
@@ -575,12 +701,6 @@ export interface NodesFocusHandler extends EventHandler {
 export interface ToastHandler extends EventHandler {
   name: 'toast'
   handler: (message: string) => void
-}
-
-/** UI 에서 창 크기를 조절하면 메인이 figma.ui.resize 를 부른다. */
-export interface ResizeWindowHandler extends EventHandler {
-  name: 'resize:window'
-  handler: (size: { width: number; height: number }) => void
 }
 
 export interface ErrorHandler extends EventHandler {

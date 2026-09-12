@@ -2,7 +2,7 @@
 
 import { PdfPart, Reason, Settings, TextRunSource, TMP_MARK_KEY, TMP_NODE_NAME } from '../lib/types'
 import { withTimeout } from '../lib/withTimeout'
-import { ImageRequestSender, OriginalSink, shrinkImages } from './images'
+import { ImageManySender, ImageRequestSender, OriginalSink, shrinkImages } from './images'
 import { ExportableNode, isExportable } from './selection'
 import { isTemporary, markTemporary } from './temporary'
 import {
@@ -29,6 +29,8 @@ export type FrameResult =
 export type FrameContext = {
   settings: Settings
   sendResizeRequest: ImageRequestSender
+  /** 조각 여럿을 한 번에 — 없으면 보이는 창만 잘라 넣기를 하지 않는다 */
+  sendResizeManyRequest?: ImageManySender
   /** 목표 용량 탐색 중일 때만 준다 — 손대지 않은 이미지의 원본을 UI 캐시로 보낸다 */
   keepOriginal?: OriginalSink
   onImageProgress: (current: number, total: number) => void
@@ -79,7 +81,9 @@ export async function exportFrame(
       context.sendResizeRequest,
       context.onImageProgress,
       context.isCancelled,
-      context.keepOriginal
+      context.keepOriginal,
+      // 잘라 넣기를 끄면 조각 요청 통로를 아예 안 준다 — 계획도 요청도 없다
+      context.settings.cropToVisible ? context.sendResizeManyRequest : undefined
     )
     // 취소는 단계 경계에서 본다 — Figma 호출 자체는 못 끊지만 다음 단계로는 안 간다 (PRD §7.4)
     if (context.isCancelled()) return cancelledFrame(id, node.name)
@@ -107,8 +111,9 @@ export async function exportFrame(
         text: text.sources,
         stats: {
           imagesProcessed: images.processed,
+          imagesCropped: images.cropped,
+          imagesRecovered: images.recovered,
           imageHashes: images.seen,
-          bytesJpeg: images.bytesJpeg,
           bytesBefore: images.bytesBefore,
           bytesAfter: images.bytesAfter,
           bytesUntouched: images.bytesUntouched,

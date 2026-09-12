@@ -18,7 +18,14 @@ import { clampTargetMb, MAX_TARGET_MB, MIN_TARGET_MB } from '../lib/fitToSize'
 import { t } from '../lib/i18n'
 import { applyPreset, IMAGE_MODE_IDS, imageModeOf } from '../lib/presets'
 import { Settings } from '../lib/types'
-import { BalanceGlyph, CompressGlyph, ImageGlyph, SparkleGlyph, TargetGlyph } from './glyphs'
+import {
+  BalanceGlyph,
+  CompressGlyph,
+  ImageGlyph,
+  ResetGlyph,
+  SparkleGlyph,
+  TargetGlyph
+} from './glyphs'
 
 type Props = {
   settings: Settings
@@ -51,6 +58,61 @@ const MODE_DETAIL = {
   small: 'presets.detailSmall',
   fit: 'presets.detailFit'
 } as const
+
+/**
+ * 같은 프리셋을 이미지 탭 맨 위에 작게. 타일이 아니라 한 줄짜리 칩이다 —
+ * 여기서는 프리셋이 주인공이 아니라 아래 슬라이더들의 출발점이라서, 자리를 크게 먹으면 안 된다.
+ *
+ * "직접" 은 고를 수 있는 칸이 아니라 상태다. 그래서 다섯 번째 칩으로 붙되 누를 수 없다 —
+ * 아무 칩도 안 켜져 있으면 왜 그런지 알 수 없고, 켜진 것이 늘 하나여야 읽힌다.
+ */
+export function PresetRow({
+  settings,
+  disabled,
+  onChange
+}: {
+  settings: Settings
+  disabled: boolean
+  onChange: (next: Settings) => void
+}): JSX.Element {
+  const mode = imageModeOf(settings)
+
+  return (
+    <div class="presetRow" role="radiogroup">
+      {IMAGE_MODE_IDS.map((id) => {
+        const Icon = MODE_GLYPHS[id]
+        const selected = mode === id
+        return (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            class={`presetChip${selected ? ' presetChipOn' : ''}`}
+            disabled={disabled}
+            title={t(MODE_DETAIL[id])}
+            onClick={() => {
+              if (id === 'fit') {
+                onChange({ ...settings, fitToSize: true })
+                return
+              }
+              onChange(applyPreset(settings, id))
+            }}
+          >
+            <Icon size={12} />
+            <span class="presetChipName">{t(`presets.${id}` as const)}</span>
+          </button>
+        )
+      })}
+      {mode === 'custom' ? (
+        <span class="presetChip presetChipOn presetChipState" title={t('presets.customTip')}>
+          <ResetGlyph size={12} />
+          <span class="presetChipName">{t('presets.custom')}</span>
+        </span>
+      ) : null}
+    </div>
+  )
+}
 
 export function PresetBar({ settings, disabled, onChange, onOpenImages }: Props): JSX.Element {
   const mode = imageModeOf(settings)
@@ -165,7 +227,7 @@ type FitFieldProps = {
  * 글자를 안 받아서 "0.8" 을 칠 수 없었다. 확정(blur·Enter)할 때만 범위로 자르고,
  * 비워 두면 원래 값으로 돌아간다 — 빈칸이 조용히 0.5 가 되면 안 된다.
  */
-function FitField({ settings, disabled, onChange }: FitFieldProps): JSX.Element {
+export function FitField({ settings, disabled, onChange }: FitFieldProps): JSX.Element {
   const [draft, setDraft] = useState(String(settings.fitTargetMb))
 
   // 설정이 밖에서 바뀌면(스테퍼·다른 문서·저장값) 입력칸도 따라간다

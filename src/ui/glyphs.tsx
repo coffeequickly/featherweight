@@ -26,6 +26,15 @@ function Glyph({ size = 12, children }: GlyphProps & { children: JSX.Element }):
   )
 }
 
+/** 여기를 누르면 저기로 간다 — 목록 행 끝의 쐐기. 글자보다 이쪽이 "눌린다" 로 먼저 읽힌다 */
+export function ChevronGlyph({ size }: GlyphProps = {}): JSX.Element {
+  return (
+    <Glyph size={size}>
+      <path d="M9 6l6 6-6 6" />
+    </Glyph>
+  )
+}
+
 /** 품질(JPEG) — 산과 해가 있는 액자 */
 export function ImageGlyph({ size }: GlyphProps = {}): JSX.Element {
   return (
@@ -35,24 +44,6 @@ export function ImageGlyph({ size }: GlyphProps = {}): JSX.Element {
         <circle cx="8.5" cy="8.5" r="1.5" />
         <path d="M21 15l-5-5L5 21" />
       </g>
-    </Glyph>
-  )
-}
-
-/** 배율 — 양쪽 귀퉁이로 벌어지는 화살표. "보이는 크기의 몇 배까지" */
-export function ScaleGlyph({ size }: GlyphProps = {}): JSX.Element {
-  return (
-    <Glyph size={size}>
-      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-    </Glyph>
-  )
-}
-
-/** 상한 — 양 끝이 막힌 가로선. "긴 변이 여기까지" */
-export function EdgeGlyph({ size }: GlyphProps = {}): JSX.Element {
-  return (
-    <Glyph size={size}>
-      <path d="M3 12h18M3 7v10M21 7v10" />
     </Glyph>
   )
 }

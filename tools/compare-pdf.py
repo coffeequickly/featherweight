@@ -2,7 +2,7 @@
 """두 PDF 를 픽셀 단위로 비교한다. "육안 비교 OK" 를 숫자로 바꾸는 도구.
 
   npm run compare -- before.pdf after.pdf
-  npm run compare -- before.pdf after.pdf --dpi 200 --out /tmp/sheaf-diff
+  npm run compare -- before.pdf after.pdf --dpi 200 --out /tmp/fw-diff
 
 before 는 기준(Figma 기본 export 또는 텍스트 임베드 끈 결과),
 after 는 확인할 결과다. (PRD §11 수동 비교, G2)
@@ -103,7 +103,7 @@ def main() -> int:
     if shutil.which("pdftoppm") is None:
         raise SystemExit("pdftoppm 이 없다. `brew install poppler`")
 
-    out_dir = args.out if args.out is not None else Path(tempfile.mkdtemp(prefix="sheaf-diff-"))
+    out_dir = args.out if args.out is not None else Path(tempfile.mkdtemp(prefix="fw-diff-"))
     out_dir.mkdir(parents=True, exist_ok=True)
 
     before_pages = render(args.before, out_dir, args.dpi, "before")

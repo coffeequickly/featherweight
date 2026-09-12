@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
-const PORT = Number(process.env.SHEAF_UI_PORT ?? 9138)
+const PORT = Number(process.env.FEATHERWEIGHT_UI_PORT ?? process.env.SHEAF_UI_PORT ?? 9138)
 
 // 라이트 값은 Figma 플러그인 문서(css-variables)의 Figma Design Light 표 그대로다
 const FIGMA_VARS = `
@@ -38,6 +38,7 @@ const FIGMA_VARS = `
   --figma-color-icon: #000000e5;
   --figma-color-icon-secondary: #00000080;
   --figma-color-icon-brand: #007be5;
+  --figma-color-icon-onbrand: #ffffff;
   --figma-color-icon-success: #14ae5c;
   --figma-color-icon-warning: #ffcd29;
   --figma-color-bg-warning-tertiary: #fff1c2;
@@ -273,6 +274,14 @@ function page(uiScript, query) {
   // ?editor=slides — Slides 문구(슬라이드 N장)로 본다. wide 도 같이 켠다
   const editor = query.get('editor') === 'slides' ? 'slides' : 'figma'
   const edge = Number(query.get('edge') ?? 0) || null
+  // ?images=none — 이미지가 하나도 없는 문서 / ?images=unsized — 있지만 원본 크기를 아직 못 읽은 상태.
+  // 이미지 탭의 그림 상자가 두 경우에 다르게 굴어야 해서(없으면 상자도 없고, 읽는 중이면 자리를 잡는다)
+  // 캡처로 확인할 방법이 필요하다
+  const images = query.get('images') ?? ''
+  // ?measure=.a,.b — 선택자들의 실제 상자를 재서 <title> 로 뱉는다. --dump-dom 으로 읽는다.
+  // Text 컴포넌트가 제 상자를 9px 줄이는 탓에 여백이 눈에 보이는 것과 다른 일이 반복됐다 —
+  // 스크린샷을 눈으로 재는 것보다 이쪽이 정확하다
+  const measure = query.get('measure') ?? ''
   const width = Number(query.get('w') ?? 400)
   const height = Number(query.get('h') ?? 560)
   return `<!doctype html>
@@ -304,6 +313,8 @@ const TEXT_CLEAN = ${textClean}
 const WIDE = ${wide} || ${editor === 'slides' ? 'true' : 'false'}
 const EDITOR = ${JSON.stringify(editor)}
 const EDGE = ${edge === null ? 'null' : edge}
+const IMAGES = ${JSON.stringify(images)}
+const MEASURE = ${JSON.stringify(measure)}
 
 const iframe = document.getElementById('ui')
 iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VARS +
@@ -322,6 +333,29 @@ iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + VAR
     : '') +
   ('${lang}' ? 'Object.defineProperty(navigator,"language",{get:()=>"${lang}"});' : '') +
   UI_SCRIPT + '<\\/script></body></html>'
+
+// ?measure — 렌더가 끝난 뒤 상자를 재서 제목에 싣는다. srcdoc 은 부모와 같은 출처라 들여다볼 수 있다
+if (MEASURE) {
+  setTimeout(() => {
+    const doc = iframe.contentDocument
+    const out = []
+    for (const raw of MEASURE.split(',')) {
+      const sel = raw.trim()
+      if (sel === '') continue
+      doc.querySelectorAll(sel).forEach((el, i) => {
+        const r = el.getBoundingClientRect()
+        // 글자가 실제로 어디 앉는지 — Range 는 조상의 transform 까지 반영한 진짜 줄상자를 준다.
+        // 상자만 재면 Text 의 translateY(4px) 를 놓쳐서 대칭인 줄 알고 넘어간다
+        const range = doc.createRange()
+        range.selectNodeContents(el)
+        const t = range.getBoundingClientRect()
+        out.push(sel + '#' + i + ' box=' + r.top.toFixed(1) + '~' + r.bottom.toFixed(1) +
+          ' 글자=' + t.top.toFixed(1) + '~' + t.bottom.toFixed(1))
+      })
+    }
+    document.title = 'MEASURE ' + (out.length === 0 ? '(없음)' : out.join(' | '))
+  }, 800)
+}
 
 // UI 가 보낸 메시지에 메인 스레드처럼 답한다
 window.addEventListener('message', (event) => {
@@ -387,9 +421,9 @@ window.addEventListener('message', (event) => {
       frames: selection.map((frame, i) => ({
         id: frame.id,
         longEdge: Math.max(frame.width, frame.height),
-        images: imagesFor(i)
+        images: IMAGES === 'none' ? [] : imagesFor(i)
       })),
-      imageEdges: FIXTURE.preflight.imageEdges,
+      imageEdges: IMAGES === 'unsized' ? {} : FIXTURE.preflight.imageEdges,
       textRejects: TEXT_CLEAN ? [] : FIXTURE.preflight.textRejects
     })
   }
@@ -433,14 +467,14 @@ function send(name, ...args) {
 /** 픽스처 프레임 i 가 쓰는 이미지들 — 표지는 큰 사진+로고, 프로젝트 장은 스크린샷 넷+아이콘 넷.
     레이어 이름은 화면 언어를 따른다 — 영문 캡처(마케팅 보드)에 한글 이름이 섞이면 안 된다 */
 function imagesFor(i) {
-  const use = (hash, name, width, height) => ({ nodeId: 'n-' + hash, imageHash: hash, name, width, height, scaleMode: 'FILL' })
+  const use = (hash, name, width, height, visible = 1) => ({ nodeId: 'n-' + hash, imageHash: hash, name, width, height, scaleMode: 'FILL', visible })
   const ko = LANG.toLowerCase().startsWith('ko')
   const cover = ko ? '\ud45c\uc9c0 \ubc30\uacbd' : 'Cover photo'
   const logo = ko ? '\ub85c\uace0' : 'Logo'
   const shot = ko ? '\ud654\uba74 \ucea1\ucc98 0' : 'Screenshot 0'
   const icon = ko ? '\uc544\uc774\ucf58 0' : 'Icon 0'
   switch (i % 3) {
-    case 0: return [use('cover', cover, 595, 397), use('logo', logo, 120, 40)]
+    case 0: return [use('cover', cover, 1280, 853, 0.47), use('logo', logo, 120, 40)]
     case 1: return [use('logo', logo, 120, 40)]
     default: return [0, 1, 2, 3].flatMap((k) => [
       use('shot' + k, shot + (k + 1), 260, 170),

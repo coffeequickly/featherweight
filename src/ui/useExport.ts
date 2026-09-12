@@ -22,7 +22,8 @@ import {
 } from '../lib/types'
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
-import { forgetOriginals } from './imageCache'
+import { forgetOriginals, ownImageSizes } from './imageCache'
+import { savedSource } from '../lib/fitToSize'
 import { downloadPdf, ImageWeight, MergeOutput, mergePdfs, OutlineCost } from './pdf'
 import { drawTextLayer, FontCache } from './textLayer'
 import { loadFontBytes } from './fontSource'
@@ -34,6 +35,10 @@ export type ExportReport = {
   elapsedMs: number
   skipped: DoneReport['skipped']
   imagesProcessed: number
+  /** 그중 보이는 창만 잘라 넣은 원본 수 */
+  imagesCropped: number
+  /** 조각을 만들다 실패해 기존 방식으로 물러선 원본 수 — 출력은 정상 */
+  imagesRecovered: number
   textDrawn: number
   /** 아웃라인으로 남은 텍스트 — 노드별 사유. 이미지 경고는 섞지 않는다(길이가 텍스트 수다) */
   fallbacks: Array<{ nodeId: string; reason: Reason }>
@@ -99,10 +104,6 @@ function imageBytesOf(parts: readonly PdfPart[]): number {
   return parts.reduce((sum, part) => sum + part.stats.bytesAfter + part.stats.bytesUntouched, 0)
 }
 
-function imageJpegBytesOf(parts: readonly PdfPart[]): number {
-  return parts.reduce((sum, part) => sum + part.stats.bytesJpeg, 0)
-}
-
 /** ui-preview 캡처 자동화용 — Figma 안에서는 전역이 없어 항상 null */
 function previewReport(): ExportReport | null {
   return (window as { __PREVIEW_REPORT__?: ExportReport }).__PREVIEW_REPORT__ ?? null
@@ -122,6 +123,8 @@ export function useExport(
   const parts = useRef<PdfPart[]>([])
   // 목표 용량 탐색 1회차 결과. 2회차가 없으면(이미 목표 이하) 이걸 그대로 저장한다.
   const measured = useRef<{ parts: PdfPart[]; merged: MergeOutput | null } | null>(null)
+  /** 목표 안에 든 병합본 — 더 선명한 후보와 재시도가 전부 넘치면 이걸 저장한다 (fitToSize.decideFit) */
+  const best = useRef<{ parts: PdfPart[]; merged: MergeOutput } | null>(null)
   const startedAt = useRef(0)
   // 실행 번호. 늦게 끝난 옛 실행의 머지·측정이 새 실행에 섞이지 않게 완료 시점에 대조한다
   const run = useRef(0)
@@ -155,6 +158,7 @@ export function useExport(
       // 실패로 끝난 실행의 조각을 남기면 다음 실행에 섞여 들어간다
       parts.current = []
       measured.current = null
+      best.current = null
       forgetOriginals()
       setError(payload.message)
       setBusy(false)
@@ -169,6 +173,7 @@ export function useExport(
       return await mergePdfs(collected, {
         title: fileName.replace(/\.pdf$/i, ''),
         createdAt: new Date(),
+        ownImageSizes: ownImageSizes(),
         drawText: wantsText.current
           ? async (document, page, index) => {
               const part = collected.find((candidate) => candidate.index === index)
@@ -194,12 +199,15 @@ export function useExport(
         const merged = await mergeCollected(collected, done.fileName)
         if (mine !== run.current) return // 늦게 끝난 옛 실행 — 새 실행의 측정을 덮어쓰지 않는다
         measured.current = { parts: collected, merged }
+        if (done.keepUnder !== undefined && merged.bytes.length <= done.keepUnder) {
+          best.current = { parts: collected, merged }
+        }
         emit<FitMeasuredHandler>('fit:measured', {
           reqId: done.reqId ?? '',
           pdfBytes: merged.bytes.length,
           imageBytes: imageBytesOf(collected),
-          imageJpegBytes: imageJpegBytesOf(collected),
-          pdfImageBytes: merged.images.bytes
+          pdfImageBytes: merged.images.bytes,
+          pdfOwnImageBytes: merged.images.own
         })
       } catch {
         if (mine !== run.current) return
@@ -208,8 +216,8 @@ export function useExport(
           reqId: done.reqId ?? '',
           pdfBytes: 0,
           imageBytes: 0,
-          imageJpegBytes: 0,
-          pdfImageBytes: 0
+          pdfImageBytes: 0,
+          pdfOwnImageBytes: 0
         })
       }
     }
@@ -223,6 +231,7 @@ export function useExport(
       // 취소 버튼이 이미 화면을 정리했으므로 여기서는 남은 것만 버린다
       if (done.cancelled || !active.current) {
         measured.current = null
+        best.current = null
         forgetOriginals()
         return
       }
@@ -233,12 +242,26 @@ export function useExport(
       }
 
       const stash = measured.current
+      const kept = best.current
       measured.current = null
+      best.current = null
       forgetOriginals()
 
-      // 2회차가 아무것도 안 보냈으면 1회차 결과를 그대로 쓴다 (이미 목표 이하였던 경우)
-      const collected = arrived.length > 0 ? arrived : (stash?.parts ?? [])
-      const premerged = arrived.length > 0 ? null : (stash?.merged ?? null)
+      // 새 조각이 없으면 메인이 고른 슬롯을 쓴다 — 목표 안 보관본이거나 마지막 측정본.
+      // 측정한 병합본을 그대로 저장하므로 잰 바이트와 저장 바이트가 같다
+      const source = savedSource(arrived.length > 0, kept !== null, done.saveBest === true)
+      const collected =
+        source === 'arrived'
+          ? arrived
+          : source === 'best'
+            ? (kept?.parts ?? [])
+            : (stash?.parts ?? [])
+      const premerged =
+        source === 'arrived'
+          ? null
+          : source === 'best'
+            ? (kept?.merged ?? null)
+            : (stash?.merged ?? null)
 
       try {
         if (collected.length === 0) {
@@ -250,6 +273,8 @@ export function useExport(
             elapsedMs: Date.now() - startedAt.current,
             skipped: done.skipped,
             imagesProcessed: 0,
+            imagesCropped: 0,
+            imagesRecovered: 0,
             textDrawn: 0,
             fallbacks: [],
             imageWarnings: [],
@@ -257,7 +282,7 @@ export function useExport(
             substitutions: [],
             fit: done.fit ?? null,
             outlines: { fonts: 0, vectorBytes: 0 },
-            images: { count: 0, bytes: 0 },
+            images: { count: 0, bytes: 0, own: 0 },
             extractable: []
           })
           return
@@ -286,18 +311,16 @@ export function useExport(
           t('report.saved', { file: done.fileName, size: formatBytes(bytes.length) })
         )
 
-        const stats = collected.reduce(
-          (sum, part) => ({
-            imagesProcessed: sum.imagesProcessed + part.stats.imagesProcessed,
-            fallbacks: [...sum.fallbacks, ...part.stats.fallbacks],
-            imageWarnings: [...sum.imageWarnings, ...part.stats.imageWarnings]
-          }),
-          {
-            imagesProcessed: 0,
-            fallbacks: [] as Array<{ nodeId: string; reason: Reason }>,
-            imageWarnings: [] as Array<{ nodeId: string; reason: Reason }>
-          }
-        )
+        // 여러 쪽에 깔린 같은 사진은 한 장 — 해시를 합쳐 센다(결과 카드의 "N장 중 M장")
+        const union = (pick: (part: PdfPart) => readonly string[]): number =>
+          new Set(collected.flatMap((part) => pick(part))).size
+        const stats = {
+          imagesProcessed: union((part) => part.stats.imagesProcessed),
+          imagesCropped: union((part) => part.stats.imagesCropped),
+          imagesRecovered: union((part) => part.stats.imagesRecovered),
+          fallbacks: collected.flatMap((part) => part.stats.fallbacks),
+          imageWarnings: collected.flatMap((part) => part.stats.imageWarnings)
+        }
         // 장수는 서로 다른 원본으로 센다 — PDF 안의 이미지 객체 수(쪽마다 한 벌씩)로 세면
         // 체크리스트의 "54장" 이 결과에서 "66장" 이 돼 뭘 놓쳤나 싶어진다. 바이트는 파일 그대로.
         const distinctImages = new Set(collected.flatMap((part) => part.stats.imageHashes))
@@ -309,14 +332,20 @@ export function useExport(
           elapsedMs: Date.now() - startedAt.current,
           skipped: done.skipped,
           imagesProcessed: stats.imagesProcessed,
+          imagesCropped: stats.imagesCropped,
+          imagesRecovered: stats.imagesRecovered,
           textDrawn: merged.textDrawn,
           substitutions: groupSubstitutions(merged.textSubstitutions),
           fallbacks: [...stats.fallbacks, ...merged.textFallbacks],
           imageWarnings: stats.imageWarnings,
           textEmbedded: wantsText.current,
-          fit: done.fit ?? null,
+          fit: logFit(done.fit ?? null, bytes.length),
           outlines: merged.outlines,
-          images: { count: distinctImages.size, bytes: merged.images.bytes },
+          images: {
+            count: distinctImages.size,
+            bytes: merged.images.bytes,
+            own: merged.images.own
+          },
           extractable: extractableText(collected)
         })
         setError(null)
@@ -349,6 +378,9 @@ export function useExport(
     active.current = true
     parts.current = []
     measured.current = null
+    best.current = null
+    // 앞 실행이 취소된 뒤 늦게 도착한 원본이 남아 있을 수 있다 — 새 실행은 빈 캐시에서 시작한다
+    forgetOriginals()
     startedAt.current = Date.now()
     setBusy(true)
     setError(null)
@@ -372,6 +404,7 @@ export function useExport(
     active.current = false
     parts.current = []
     measured.current = null
+    best.current = null
     forgetOriginals()
     emit<CancelHandler>('cancel')
     setBusy(false)
@@ -387,4 +420,38 @@ export function useExport(
   }, [])
 
   return { busy, progress, report, error, start, retry, cancel, dismiss }
+}
+
+/**
+ * 목표 용량의 예측 대 실제를 콘솔에 남긴다 — 반올림 전 바이트와 오차율, 후보별 예측까지.
+ * "예측 4.7MB·실제 4.7MB" 로는 정확한지 알 수 없다(검토). 결과는 그대로 돌려준다
+ */
+function logFit(fit: FitReport | null, actualBytes: number): FitReport | null {
+  if (fit === null) return fit
+  const error =
+    fit.predictedBytes > 0 ? ((actualBytes - fit.predictedBytes) / fit.predictedBytes) * 100 : 0
+  console.log(
+    '[fit] final predicted',
+    fit.predictedBytes,
+    'actual',
+    actualBytes,
+    `error ${error.toFixed(2)}%`,
+    'target',
+    fit.targetBytes,
+    'chosen',
+    fit.profile,
+    'candidates',
+    (fit.probes ?? []).map(
+      (probe) =>
+        `${probe.multiplier}x${probe.maxEdge} q${Math.round(probe.quality * 100)} → ${probe.predicted}`
+    ),
+    'attempts',
+    (fit.attempts ?? []).map(
+      (attempt) =>
+        `${attempt.multiplier}x${attempt.maxEdge} q${Math.round(attempt.quality * 100)} → ${attempt.actual}`
+    ),
+    'calibration',
+    fit.calibration
+  )
+  return fit
 }

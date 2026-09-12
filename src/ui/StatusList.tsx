@@ -13,6 +13,7 @@ import { fontReadiness } from '../lib/fontStatus'
 import { formatReason, t } from '../lib/i18n'
 import { forecastImages, uniformSize } from '../lib/preflight'
 import { StartIssue, startIssues } from '../lib/startStatus'
+import { ChevronGlyph } from './glyphs'
 import { EditorKind, FontUsage, FrameItem, Preflight, Settings, StoredFont } from '../lib/types'
 import { unitWords } from './units'
 
@@ -74,19 +75,32 @@ function IssueCard({
         <IconWarning16 />
       </div>
       <div class="statusCardBody">
-        <div class="statusCardHead">
-          <Text>{head}</Text>
-        </div>
+        {/* Text 로 감싸지 않는다. Text 는 상자를 9px 줄이고 글자를 4px 내려서(text.module.css)
+            상자와 글자가 어긋난다 — 패딩은 위아래 9px 로 대칭인데 눈으로는 위 8px · 아래 13px 로
+            보였다. 벗기면 줄상자가 곧 글자 자리라 아래 설명줄과 저절로 맞는다 */}
+        <div class="statusCardHead">{head}</div>
         {detail === null ? null : <div class="statusCardDetail">{detail}</div>}
       </div>
-      {go === null ? null : <span class="statusCardGo">{goLabel}</span>}
+      {/* "사유 보기" 라고 적어 두면 카드 안의 또 다른 링크처럼 보인다 — 카드 자체가
+          버튼이므로 끝에 쐐기만 둔다. 글자는 툴팁과 이름표로 남겨 읽어 주는 쪽도 잃지 않는다 */}
+      {go === null ? null : (
+        <span class="statusCardGo">
+          <ChevronGlyph size={14} />
+        </span>
+      )}
     </Fragment>
   )
 
   // 갈 곳이 있으면 진짜 버튼이다 — 클릭 가능한 div 는 Tab 이 건너뛰고 커서도 안 바뀐다
   if (go === null) return <div class="statusCard">{inside}</div>
   return (
-    <button type="button" class="statusCard" onClick={() => onGo(go)}>
+    <button
+      type="button"
+      class="statusCard"
+      title={goLabel}
+      aria-label={`${head} — ${goLabel}`}
+      onClick={() => onGo(go)}
+    >
       {inside}
     </button>
   )
