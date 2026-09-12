@@ -140,202 +140,212 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
 
       {/* 총 개수가 두 갈래로 갈리고, 각 갈래 아래에 그 갈래의 사정이 들여쓰기로 붙는다.
           사유 셋은 "아웃라인" 의 자식이지 형제가 아니다 — 개수 합이 곧 그 위 숫자다 */}
-      <Fold
-        title={t('result.sectionText')}
-        defaultOpen={outlined > 0}
-        summary={
-          outlined === 0 ? (
-            <Muted>{t('result.textFoldOk', { count: total })}</Muted>
-          ) : (
-            <span class="foldWarn">{t('result.textFoldWarn', { total, count: outlined })}</span>
-          )
-        }
-      >
-        {embedded === 0 ? null : (
-          <div class="outcome">
-            <div class="outcomeHead">
-              <span class="outcomeIcon outcomeOk">
-                <IconCheck16 />
-              </span>
-              <Text>{t('result.embedded', { count: embedded })}</Text>
-            </div>
-            {report.substitutions.length === 0 ? null : (
-              <div class="outcomeChildren">
-                {report.substitutions.map((item) => (
-                  <div key={item.family} class="outcomeNote">
-                    <Text>
-                      <Muted>
-                        {t('report.substituted', {
-                          count: item.chars.length,
-                          chars: item.chars.map(charName).join(', '),
-                          family: item.family
-                        })}
-                      </Muted>
-                    </Text>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {outlined === 0 && reasons.length === 0 ? null : (
-          <div class="outcome">
-            <div class="outcomeHead">
-              <span class="outcomeIcon outcomeWarn">
-                <IconWarning16 />
-              </span>
-              <Text>{t('result.outlined', { count: outlined })}</Text>
-              {report.outlines.vectorBytes >= OUTLINE_COST_FLOOR ? (
-                <span class="outcomeCost">
-                  <Text>
-                    <Muted>{formatBytes(report.outlines.vectorBytes)}</Muted>
-                  </Text>
+      {/* 텍스트가 없는 문서면 텍스트 칸 자체를 안 보인다 — "0개 모두 포함" 은 알려 주는 게 없다 */}
+      {total === 0 ? null : (
+        <Fold
+          title={t('result.sectionText')}
+          defaultOpen={outlined > 0}
+          summary={
+            outlined === 0 ? (
+              <Muted>{t('result.textFoldOk', { count: total })}</Muted>
+            ) : (
+              <span class="foldWarn">{t('result.textFoldWarn', { total, count: outlined })}</span>
+            )
+          }
+        >
+          {embedded === 0 ? null : (
+            <div class="outcome">
+              <div class="outcomeHead">
+                <span class="outcomeIcon outcomeOk">
+                  <IconCheck16 />
                 </span>
-              ) : null}
-            </div>
-            <div class="outcomeChildren">
-              {reasons.map((item) => (
-                <button
-                  key={item.reason}
-                  type="button"
-                  class="reasonRow"
-                  title={t('report.clickHint')}
-                  onClick={() => emit<NodesFocusHandler>('nodes:focus', item.ids)}
-                >
-                  <span class="reasonWhy">
-                    <Text>{item.reason}</Text>
-                  </span>
-                  <span class="reasonCount">
-                    <Text>
-                      <Muted>{t('result.countUnit', { count: item.count })}</Muted>
-                    </Text>
-                  </span>
-                  <span class="reasonGo">
-                    <IconChevronRight16 />
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 텍스트 임베드를 켜고 전부 임베드했는데 Type 3 가 남았다면 글리프를 못 지운 것이다 */}
-        {report.textEmbedded && outlined === 0 && report.outlines.fonts > 0 ? (
-          <div class="resultLine resultWarn">
-            <Text>{t('report.leak')}</Text>
-          </div>
-        ) : null}
-      </Fold>
-
-      <Fold
-        title={t('result.sectionImages')}
-        defaultOpen={imageReasons.length > 0}
-        summary={
-          imageReasons.length > 0 ? (
-            <span class="foldWarn">
-              {t('result.imagesWarned', { count: report.imageWarnings.length })}
-            </span>
-          ) : (
-            <Muted>
-              {report.images.count === 0
-                ? t('result.imagesNone')
-                : t('result.imagesAside', {
-                    count: report.imagesProcessed,
-                    total: report.images.count
-                  })}
-            </Muted>
-          )
-        }
-      >
-        {report.images.count === 0 ? null : (
-          <Fragment>
-            {report.imagesProcessed === 0 ? null : (
-              <div class="outcome">
-                <div class="outcomeHead">
-                  <span class="outcomeIcon outcomeOk">
-                    <IconCheck16 />
-                  </span>
-                  <Text>{t('result.imagesShrunk', { count: report.imagesProcessed })}</Text>
-                </div>
+                <Text>{t('result.embedded', { count: embedded })}</Text>
+              </div>
+              {report.substitutions.length === 0 ? null : (
                 <div class="outcomeChildren">
-                  {report.imagesCropped === 0 ? null : (
-                    <div class="outcomeNote">
-                      <Text>
-                        <Muted>{t('result.imagesCropped', { count: report.imagesCropped })}</Muted>
-                      </Text>
-                    </div>
-                  )}
-                  {report.imagesRecovered === 0 ? null : (
-                    <div class="outcomeNote">
+                  {report.substitutions.map((item) => (
+                    <div key={item.family} class="outcomeNote">
                       <Text>
                         <Muted>
-                          {t('result.imagesRecovered', { count: report.imagesRecovered })}
+                          {t('report.substituted', {
+                            count: item.chars.length,
+                            chars: item.chars.map(charName).join(', '),
+                            family: item.family
+                          })}
                         </Muted>
                       </Text>
                     </div>
-                  )}
-                  <div class="outcomeNote">
-                    <Text>
-                      <Muted>
-                        {t('result.imageShare', {
-                          size: formatBytes(report.images.bytes),
-                          percent: imageShare
-                        })}
-                      </Muted>
-                    </Text>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {imagesKept === 0 ? null : (
-              <div class="outcome">
-                <div class="outcomeHead">
-                  <span class="outcomeIcon outcomeOk">
-                    <IconCheck16 />
-                  </span>
-                  <Text>{t('result.imagesKept', { count: imagesKept })}</Text>
-                </div>
-              </div>
-            )}
-
-            {imageReasons.length === 0 ? null : (
-              <div class="outcome">
-                <div class="outcomeHead">
-                  <span class="outcomeIcon outcomeWarn">
-                    <IconWarning16 />
-                  </span>
-                  <Text>{t('result.imagesWarned', { count: report.imageWarnings.length })}</Text>
-                </div>
-                <div class="outcomeChildren">
-                  {imageReasons.map((item) => (
-                    <button
-                      key={item.reason}
-                      type="button"
-                      class="reasonRow"
-                      title={t('report.clickHint')}
-                      onClick={() => emit<NodesFocusHandler>('nodes:focus', item.ids)}
-                    >
-                      <span class="reasonWhy">
-                        <Text>{item.reason}</Text>
-                      </span>
-                      <span class="reasonCount">
-                        <Text>
-                          <Muted>{t('result.countUnit', { count: item.count })}</Muted>
-                        </Text>
-                      </span>
-                      <span class="reasonGo">
-                        <IconChevronRight16 />
-                      </span>
-                    </button>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+
+          {outlined === 0 && reasons.length === 0 ? null : (
+            <div class="outcome">
+              <div class="outcomeHead">
+                <span class="outcomeIcon outcomeWarn">
+                  <IconWarning16 />
+                </span>
+                <Text>{t('result.outlined', { count: outlined })}</Text>
+                {report.outlines.vectorBytes >= OUTLINE_COST_FLOOR ? (
+                  <span class="outcomeCost">
+                    <Text>
+                      <Muted>{formatBytes(report.outlines.vectorBytes)}</Muted>
+                    </Text>
+                  </span>
+                ) : null}
               </div>
-            )}
-          </Fragment>
-        )}
-      </Fold>
+              <div class="outcomeChildren">
+                {reasons.map((item) => (
+                  <button
+                    key={item.reason}
+                    type="button"
+                    class="reasonRow"
+                    title={t('report.clickHint')}
+                    onClick={() => emit<NodesFocusHandler>('nodes:focus', item.ids)}
+                  >
+                    <span class="reasonWhy">
+                      <Text>{item.reason}</Text>
+                    </span>
+                    <span class="reasonCount">
+                      <Text>
+                        <Muted>{t('result.countUnit', { count: item.count })}</Muted>
+                      </Text>
+                    </span>
+                    <span class="reasonGo">
+                      <IconChevronRight16 />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 텍스트 임베드를 켜고 전부 임베드했는데 Type 3 가 남았다면 글리프를 못 지운 것이다 */}
+          {report.textEmbedded && outlined === 0 && report.outlines.fonts > 0 ? (
+            <div class="resultLine resultWarn">
+              <Text>{t('report.leak')}</Text>
+            </div>
+          ) : null}
+        </Fold>
+      )}
+
+      {/* 이미지가 없는 문서도 마찬가지 */}
+      {report.images.count === 0 &&
+      report.imagesProcessed === 0 &&
+      report.imageWarnings.length === 0 ? null : (
+        <Fold
+          title={t('result.sectionImages')}
+          defaultOpen={imageReasons.length > 0}
+          summary={
+            imageReasons.length > 0 ? (
+              <span class="foldWarn">
+                {t('result.imagesWarned', { count: report.imageWarnings.length })}
+              </span>
+            ) : (
+              <Muted>
+                {report.images.count === 0
+                  ? t('result.imagesNone')
+                  : t('result.imagesAside', {
+                      count: report.imagesProcessed,
+                      total: report.images.count
+                    })}
+              </Muted>
+            )
+          }
+        >
+          {report.images.count === 0 ? null : (
+            <Fragment>
+              {report.imagesProcessed === 0 ? null : (
+                <div class="outcome">
+                  <div class="outcomeHead">
+                    <span class="outcomeIcon outcomeOk">
+                      <IconCheck16 />
+                    </span>
+                    <Text>{t('result.imagesShrunk', { count: report.imagesProcessed })}</Text>
+                  </div>
+                  <div class="outcomeChildren">
+                    {report.imagesCropped === 0 ? null : (
+                      <div class="outcomeNote">
+                        <Text>
+                          <Muted>
+                            {t('result.imagesCropped', { count: report.imagesCropped })}
+                          </Muted>
+                        </Text>
+                      </div>
+                    )}
+                    {report.imagesRecovered === 0 ? null : (
+                      <div class="outcomeNote">
+                        <Text>
+                          <Muted>
+                            {t('result.imagesRecovered', { count: report.imagesRecovered })}
+                          </Muted>
+                        </Text>
+                      </div>
+                    )}
+                    <div class="outcomeNote">
+                      <Text>
+                        <Muted>
+                          {t('result.imageShare', {
+                            size: formatBytes(report.images.bytes),
+                            percent: imageShare
+                          })}
+                        </Muted>
+                      </Text>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {imagesKept === 0 ? null : (
+                <div class="outcome">
+                  <div class="outcomeHead">
+                    <span class="outcomeIcon outcomeOk">
+                      <IconCheck16 />
+                    </span>
+                    <Text>{t('result.imagesKept', { count: imagesKept })}</Text>
+                  </div>
+                </div>
+              )}
+
+              {imageReasons.length === 0 ? null : (
+                <div class="outcome">
+                  <div class="outcomeHead">
+                    <span class="outcomeIcon outcomeWarn">
+                      <IconWarning16 />
+                    </span>
+                    <Text>{t('result.imagesWarned', { count: report.imageWarnings.length })}</Text>
+                  </div>
+                  <div class="outcomeChildren">
+                    {imageReasons.map((item) => (
+                      <button
+                        key={item.reason}
+                        type="button"
+                        class="reasonRow"
+                        title={t('report.clickHint')}
+                        onClick={() => emit<NodesFocusHandler>('nodes:focus', item.ids)}
+                      >
+                        <span class="reasonWhy">
+                          <Text>{item.reason}</Text>
+                        </span>
+                        <span class="reasonCount">
+                          <Text>
+                            <Muted>{t('result.countUnit', { count: item.count })}</Muted>
+                          </Text>
+                        </span>
+                        <span class="reasonGo">
+                          <IconChevronRight16 />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Fragment>
+          )}
+        </Fold>
+      )}
 
       {report.extractable.length === 0 ? null : (
         <Section
