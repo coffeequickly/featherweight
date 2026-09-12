@@ -454,7 +454,14 @@ function logFit(fit: FitReport | null, actualBytes: number): FitReport | null {
     (fit.probes ?? []).map(
       (probe) =>
         `${probe.multiplier}x${probe.maxEdge} q${Math.round(probe.quality * 100)} → ${probe.predicted}`
-    )
+    ),
+    'attempts',
+    (fit.attempts ?? []).map(
+      (attempt) =>
+        `${attempt.multiplier}x${attempt.maxEdge} q${Math.round(attempt.quality * 100)} → ${attempt.actual}`
+    ),
+    'calibration',
+    fit.calibration
   )
   return fit
 }

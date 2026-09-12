@@ -974,6 +974,21 @@ button:not([disabled]) *,
   color: inherit;
 }
 
+/* 판정 줄과 설정 줄. 라이브러리 Text 는 한 줄 라벨용(translateY·음수 margin 으로 16px 격자에 맞춘다)이라
+   여러 줄로 감기는 문장을 겹쳐 쌓으면 행간과 간격이 줄마다 달라진다 — 여기서는 보통 블록으로 쌓는다 */
+.fitLine {
+  font-size: 11px;
+  line-height: 1.6;
+  /* 한국어는 기본이 글자 단위로 끊긴다 — "PNG 그대 / 로" 가 그것이다 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.fitLineSub {
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
 /* 접었다 펴는 섹션 — 머리글은 요약만, 궁금하면 펼친다.
    상자를 두르면 접힌 것과 펼친 것이 한 덩어리로 읽힌다 */
 .fold {

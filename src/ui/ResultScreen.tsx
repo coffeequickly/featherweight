@@ -121,71 +121,19 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
         </div>
         {fit === null ? null : (
           <div class={`fileCardFit${missedTarget ? ' fileCardFitWarn' : ''}`}>
-            <Text>{fitLine(fit, report.byteLength)}</Text>
-            {/* 고른 설정은 여기에만 남는다 — PDF 로는 못 읽는다(Figma 가 다시 인코딩) */}
+            <div class="fitLine">{fitLine(fit, report.byteLength)}</div>
+            {/* 고른 설정은 여기에만 남는다 — PDF 로는 못 읽는다(Figma 가 다시 인코딩).
+                예측·실제·보정 재료·후보는 플러그인 콘솔에만 찍는다(useExport.logFit) */}
             {fit.profile === undefined ? null : (
-              <Text>
-                <Muted>
-                  {t('report.fitProfile', {
-                    scale: fit.profile.multiplier,
-                    max: fit.profile.maxEdge,
-                    min: fit.profile.minEdge,
-                    quality: Math.round(fit.profile.quality * 100),
-                    png: fit.profile.reencodeOpaquePng ? 'no' : 'yes',
-                    count: fit.candidates ?? 0,
-                    predicted: Math.round(fit.predictedBytes).toLocaleString(),
-                    actual: (fit.attempts?.[0]?.actual ?? report.byteLength).toLocaleString(),
-                    error: errorPercent(
-                      fit.predictedBytes,
-                      fit.attempts?.[0]?.actual ?? report.byteLength
-                    )
-                  })}
-                </Muted>
-              </Text>
-            )}
-            {/* 다시 뽑았으면 시도마다 실제 바이트 — 마지막이 저장된 것 */}
-            {fit.attempts === undefined || fit.attempts.length < 2 ? null : (
-              <Text>
-                <Muted>
-                  {t('report.fitAttempts', {
-                    list: fit.attempts
-                      .map(
-                        (a) =>
-                          `${a.multiplier}×${a.maxEdge}·${Math.round(a.quality * 100)}% ${a.actual.toLocaleString()}${a.actual <= fit.targetBytes ? '✓' : ''}`
-                      )
-                      .join(' → ')
-                  })}
-                </Muted>
-              </Text>
-            )}
-            {fit.calibration === undefined ? null : (
-              <Text>
-                <Muted>
-                  {t('report.fitCalibration', {
-                    fixed: fit.calibration.fixed.toLocaleString(),
-                    ratio: fit.calibration.ratio.toFixed(3),
-                    measured: fit.calibration.baselineMeasured.toLocaleString(),
-                    pdfImages: fit.calibration.pdfImageBytes.toLocaleString(),
-                    own: fit.calibration.pdfOwnImageBytes.toLocaleString(),
-                    pdf: fit.calibration.pdfBytes.toLocaleString()
-                  })}
-                </Muted>
-              </Text>
-            )}
-            {/* 후보별 예측 — 탈락한 후보의 예측이 맞았는지는 그 설정으로 실제 내보내 견줘야 안다 */}
-            {fit.probes === undefined || fit.probes.length === 0 ? null : (
-              <Text>
-                <Muted>
-                  {t('report.fitCandidates', {
-                    list: fit.probes
-                      .map(
-                        (probe) =>
-                          `${probe.multiplier}×${probe.maxEdge}·${Math.round(probe.quality * 100)}% ${probe.predicted.toLocaleString()}${probe.predicted <= fit.targetBytes ? '✓' : ''}`
-                      )
-                      .join(' · ')
-                  })}
-                </Muted>
-              </Text>
+              <div class="fitLine fitLineSub">
+                {t('report.fitProfile', {
+                  scale: fit.profile.multiplier,
+                  max: fit.profile.maxEdge,
+                  min: fit.profile.minEdge,
+                  quality: Math.round(fit.profile.quality * 100),
+                  png: fit.profile.reencodeOpaquePng ? 'no' : 'yes'
+                })}
+              </div>
             )}
           </div>
         )}
@@ -424,11 +372,6 @@ export function ResultScreen({ report, firstPage, error, onOpenPreview }: Props)
  * 쓸모 있다 — 목표를 다시 잡을 근거가 되는 건 그 숫자다.
  */
 /** 예측 대비 실제의 오차(%) — 부호 붙여서. 예측이 크면 음수(필요 이상으로 압축한 쪽) */
-function errorPercent(predicted: number, actual: number): string {
-  if (predicted <= 0) return '—'
-  const percent = ((actual - predicted) / predicted) * 100
-  return `${percent >= 0 ? '+' : ''}${percent.toFixed(1)}`
-}
 
 function fitLine(fit: NonNullable<ExportReport['fit']>, actualBytes: number): string {
   const target = formatBytes(fit.targetBytes)

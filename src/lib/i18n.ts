@@ -847,35 +847,19 @@ const MESSAGES = {
   },
   /**
    * 자동으로 고른 최종 설정 — 배율 · 최대 · 최소 · JPEG 품질. 칸 이름만으론 알 수 없어 적는다.
-   * png 가 'yes' 면 맨 위 칸(PNG 를 그대로 둠). 예측과 실제 바이트를 같이 적는다 — 예측식이 과하면
-   * 필요 이상으로 압축하는 셈이라, 그 차이가 보여야 한다
+   * png 가 'yes' 면 맨 위 칸(PNG 를 그대로 둠). 예측·실제·보정 재료는 화면에 안 적고 플러그인 콘솔에만
    */
   'report.fitProfile': {
     en: (p) =>
-      `Chosen automatically: scale ${p.scale}× · max ${p.max}px · min ${p.min}px · JPEG quality ${p.quality}%${p.png === 'yes' ? ' · PNG kept' : ''} · ${n(Number(p.count), 'candidate', 'candidates')} measured · predicted ${p.predicted} B, actual ${p.actual} B (${p.error}%)`,
+      `Chosen automatically: scale ${p.scale}× · max ${p.max}px · min ${p.min}px · JPEG quality ${p.quality}%${p.png === 'yes' ? ' · PNG kept' : ''}`,
     ko: (p) =>
-      `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · 최소 ${p.min}px · JPEG 품질 ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''} · 후보 ${p.count}개 재봄 · 예측 ${p.predicted} B, 실제 ${p.actual} B (오차 ${p.error}%)`
-  },
-  /** 예측식의 재료 — 고정분 · 보정비 · 기준 측정 / PDF 안 이미지 · 기준 PDF */
-  'report.fitCalibration': {
-    en: 'Calibration: fixed {fixed} B · ratio {ratio} · baseline measured {measured} B vs {own} B of ours in PDF (all images {pdfImages} B, PDF {pdf} B)',
-    ko: '예측 재료: 고정분 {fixed} B · 보정비 {ratio} · 기준 측정 {measured} B vs PDF 안 우리 이미지 {own} B (이미지 전체 {pdfImages} B, 기준 PDF {pdf} B)'
-  },
-  /** 재본 후보와 예측 바이트 — "배율×최대·품질 예측바이트", 목표 안이면 ✓ */
-  'report.fitCandidates': {
-    en: 'Candidates (predicted bytes): {list}',
-    ko: '후보별 예측 바이트: {list}'
+      `자동 선택 — 배율 ${p.scale}× · 최대 ${p.max}px · 최소 ${p.min}px · JPEG 품질 ${p.quality}%${p.png === 'yes' ? ' · PNG 그대로' : ''}`
   },
   /** 한도 안에서 다시 뽑았지만 실제 크기가 목표를 넘었다 — 저장은 됐다, 사실만 말한다 */
   'report.fitMissed': {
     en: (p) =>
       `Could not meet ${p.target} this time — re-exported ${n(Number(p.count), 'more time', 'more times')}, the file is ${p.actual}. Try a lower target or the Smallest preset.`,
     ko: '이번 시도에서는 {target}을 맞추지 못했습니다 — {count}번 다시 뽑았지만 실제 {actual}입니다. 목표를 낮추거나 최소 용량 프리셋으로 다시 내보내세요.'
-  },
-  /** 시도마다 실제 바이트 — "배율×최대·품질 실제바이트", 목표 안이면 ✓ */
-  'report.fitAttempts': {
-    en: 'Actual size per attempt: {list}',
-    ko: '시도별 실제 바이트: {list}'
   },
   'report.fitUnreachable': {
     en: "Couldn't reach {target}. This document can't go below about {floor} without dropping past the quality floor.",
@@ -996,8 +980,8 @@ const MESSAGES = {
 
   // ── 폰트 구하기 실패 사유 ───────────────────────────────
   'font.needUpload': {
-    en: 'A font file is required for {family} {style}. Select it in Fonts.',
-    ko: '{family} {style} 폰트 파일이 필요합니다. 폰트 화면에서 파일을 선택하세요.'
+    en: 'A font file is required for {family} {style}.',
+    ko: '{family} {style} 폰트 파일이 필요합니다.'
   },
   'font.loadFailed': {
     en: (p) =>
