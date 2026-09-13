@@ -4,7 +4,8 @@
 //
 // 안에 든 것
 //   manifest.json      Figma 가 import 하는 파일
-//   build/*.js         플러그인 본체
+//   build/main.js      플러그인 본체
+//   build/ui.js        플러그인 iframe
 //   INSTALL.md         설치 방법
 //
 // 폰트는 넣지 않는다. 공개 폰트는 플러그인이 내보낼 때 CDN 에서 받고,
@@ -44,7 +45,11 @@ const stage = join(DIST, stem)
 await rm(stage, { recursive: true, force: true })
 await mkdir(stage, { recursive: true })
 await cp(manifestPath, join(stage, 'manifest.json'))
-await cp(join(ROOT, 'build'), join(stage, 'build'), { recursive: true })
+// build/에는 독립 실험 플러그인이 남을 수 있다. 저장소에는 보존하되 배포물에는 런타임만 담는다.
+await mkdir(join(stage, 'build'), { recursive: true })
+await Promise.all(
+  ['main.js', 'ui.js'].map((file) => cp(join(ROOT, 'build', file), join(stage, 'build', file)))
+)
 
 await writeFile(
   join(stage, 'INSTALL.md'),

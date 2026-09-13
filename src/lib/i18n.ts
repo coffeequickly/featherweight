@@ -714,7 +714,15 @@ const MESSAGES = {
     en: 'Re-exporting at the chosen quality',
     ko: '선택한 화질로 다시 내보내는 중'
   },
+  'progress.renderRetry': {
+    en: 'An image was missing from the PDF. Waiting for Figma and retrying once…',
+    ko: 'PDF에서 이미지가 빠져 Figma 렌더링을 기다린 뒤 한 번 더 시도하는 중…'
+  },
   'export.cancelled': { en: 'Cancelled.', ko: '취소했습니다.' },
+  'export.imagesMissing': {
+    en: 'Figma omitted processed images from the PDF twice. The PDF was not saved. Please try again.',
+    ko: 'Figma가 처리한 이미지를 PDF에서 두 번 연속 누락했습니다. 깨진 PDF는 저장하지 않았습니다. 다시 시도해 주세요.'
+  },
   'export.textLost': {
     en: '{count} text layers passed the check but could not be drawn ({reason}). The PDF was not saved. Please try again.',
     ko: '검사를 통과한 텍스트 레이어 {count}개를 처리하지 못했습니다({reason}). PDF는 저장하지 않았습니다. 다시 시도해 주세요.'

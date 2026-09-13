@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 인코딩은 Canvas 가 필요하다 — 결과 크기만 흉내 낸다
 const mocks = vi.hoisted(() => ({
+  resizeImage: vi.fn(),
+  resizeMany: vi.fn(),
   decodeImage: vi.fn(),
   cloneBitmap: vi.fn(),
   resizeDecoded: vi.fn(),
@@ -19,6 +21,11 @@ import { CROP_RULES } from '../src/lib/imageCrop'
 import { CropRect, ImageProbeItem } from '../src/lib/types'
 import {
   forgetOriginals,
+  directImageSelections,
+  imageCacheGeneration,
+  imageCacheStats,
+  resizeImageCached,
+  resizeManyCached,
   ownImageSizes,
   probeImageBytes,
   rememberOriginal,
@@ -53,6 +60,41 @@ beforeEach(() => {
   mocks.decodeImage.mockImplementation(async () => bitmap())
   mocks.cloneBitmap.mockImplementation(async () => bitmap())
   mocks.isPng.mockReturnValue(false)
+})
+
+describe('directImageSelections — export와 같은 후보 선택', () => {
+  it('retained whole encodings provide the exact candidate bytes', async () => {
+    const result = encoded(50_000)
+    mocks.resizeImage.mockResolvedValue(result)
+    await resizeImageCached({
+      imageHash: 'photo',
+      bytes: new Uint8Array(200_000),
+      targetLongEdge: 1000,
+      quality: 0.8,
+      reencodeOpaquePng: true
+    })
+    expect(
+      directImageSelections([item('photo', 200_000)], 0.8, true)[0].images[0].source
+    ).toMatchObject({ bytes: result.bytes, width: 1, height: 1, mime: 'image/jpeg' })
+  })
+
+  it('refuses a missing candidate so the caller can refill or fall back', () => {
+    expect(() => directImageSelections([item('missing', 200_000)], 0.8, true)).toThrow(
+      'missing baseline/candidate'
+    )
+  })
+
+  it('keeps skipped originals with their original dimensions', () => {
+    const bytes = new Uint8Array(200_000)
+    bytes.set([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 24, 0, 32, 0, 0, 0, 0])
+    rememberOriginal('logo', bytes)
+    expect(
+      directImageSelections([item('logo', bytes.length, { skip: true })], 0.8, true)[0]
+    ).toMatchObject({
+      imageHash: 'logo',
+      images: [{ slot: 'whole', source: { key: 'original:logo', bytes, width: 24, height: 32 } }]
+    })
+  })
 })
 
 describe('ownImageSizes — PDF 안에서 우리 이미지를 알아보는 치수', () => {
@@ -234,5 +276,185 @@ describe('probeImageBytes — 쪽마다 센다, 인코딩은 한 번', () => {
     )
     expect(mocks.cloneBitmap).toHaveBeenCalledTimes(1)
     expect(mocks.resizeDecoded).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('candidate bytes reused by final export', () => {
+  const request = () => ({
+    imageHash: 'photo',
+    bytes: new Uint8Array(300_000),
+    targetLongEdge: 1000,
+    quality: 0.8,
+    reencodeOpaquePng: true
+  })
+  async function prime() {
+    const req = request()
+    rememberOriginal(req.imageHash, req.bytes)
+    const whole = encoded(50_000)
+    whole.bytes[0] = 123
+    const piece = encoded(10_000, 'image/png')
+    piece.bytes[0] = 45
+    mocks.resizeDecoded.mockResolvedValue(whole)
+    mocks.encodePiece.mockResolvedValue(piece)
+    await probeImageBytes(
+      [
+        item('photo', req.bytes.length, {
+          pieces: [{ crop: rect, targetLongEdge: 640 }],
+          densityGain: 2
+        })
+      ],
+      req.quality,
+      req.reencodeOpaquePng
+    )
+    return { req, whole, piece }
+  }
+  it('returns identical full-image bytes and metadata without another encode', async () => {
+    const { req, whole } = await prime()
+    expect(await resizeImageCached(req)).toEqual(whole)
+    expect(mocks.resizeImage).not.toHaveBeenCalled()
+    expect(imageCacheStats().reuseHits).toBe(1)
+  })
+  it('reuses PNG crops, encodes only missing crops once and preserves request order', async () => {
+    const { req, piece } = await prime()
+    const fresh = encoded(20_000)
+    mocks.resizeMany.mockResolvedValue({ ok: true, results: [fresh] })
+    const other = { ...rect, x0: 1300 }
+    const result = await resizeManyCached({
+      ...req,
+      jobs: [
+        { crop: other, targetLongEdge: 640 },
+        { crop: rect, targetLongEdge: 640 }
+      ]
+    })
+    expect(result).toEqual({ ok: true, results: [fresh, piece] })
+    expect(mocks.resizeMany).toHaveBeenCalledExactlyOnceWith({
+      ...req,
+      jobs: [{ crop: other, targetLongEdge: 640 }]
+    })
+  })
+  it('separates image identity, dimensions, JPEG quality, PNG option and crop geometry', async () => {
+    const { req } = await prime()
+    mocks.resizeImage.mockResolvedValue(encoded(7))
+    for (const changed of [
+      { imageHash: 'other' },
+      { imageHash: undefined },
+      { targetLongEdge: 999 },
+      { quality: 0.81 },
+      { reencodeOpaquePng: false }
+    ]) {
+      expect(await resizeImageCached({ ...req, ...changed })).toEqual(encoded(7))
+    }
+    mocks.resizeMany.mockResolvedValue({ ok: true, results: [encoded(8)] })
+    for (const crop of [
+      { ...rect, x0: rect.x0 + 1 },
+      { ...rect, y0: rect.y0 + 1 },
+      { ...rect, w: rect.w + 1 },
+      { ...rect, h: rect.h + 1 }
+    ]) {
+      await resizeManyCached({ ...req, jobs: [{ crop, targetLongEdge: 640 }] })
+    }
+    expect(mocks.resizeImage).toHaveBeenCalledTimes(5)
+    expect(mocks.resizeMany).toHaveBeenCalledTimes(4)
+  })
+  it('cache miss and failed crop retain the original failure/fallback contract', async () => {
+    const { req } = await prime()
+    forgetOriginals()
+    mocks.resizeImage.mockResolvedValue({ ok: false, reason: 'decode failed' })
+    mocks.resizeMany.mockResolvedValue({ ok: false, reason: 'crop failed' })
+    expect(await resizeImageCached(req)).toEqual({ ok: false, reason: 'decode failed' })
+    expect(await resizeManyCached({ ...req, jobs: [{ crop: rect, targetLongEdge: 640 }] })).toEqual(
+      { ok: false, reason: 'crop failed' }
+    )
+    expect(imageCacheStats()).toEqual({ originalBytes: 0, encodedBytes: 0, reuseHits: 0 })
+  })
+  it('does not retain unchanged originals a second time', async () => {
+    rememberOriginal('photo', request().bytes)
+    mocks.resizeDecoded.mockResolvedValue({ ...encoded(300_000), changed: false })
+    await probeImageBytes([item('photo', 300_000)], 0.8, true)
+    expect(imageCacheStats().encodedBytes).toBe(0)
+  })
+  it('late completion after cancellation cannot refill caches or add dimensions', async () => {
+    const req = request()
+    rememberOriginal(req.imageHash, req.bytes)
+    const oldGeneration = imageCacheGeneration()
+    let finish!: (value: ReturnType<typeof encoded>) => void
+    mocks.resizeDecoded.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const probing = probeImageBytes([item('photo', req.bytes.length)], 0.8, true)
+    const rejected = expect(probing).rejects.toThrow('cancelled')
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    forgetOriginals()
+    finish(encoded(50_000))
+    await rejected
+    rememberOwnSize(100, 100, oldGeneration)
+    expect(imageCacheStats()).toEqual({ originalBytes: 0, encodedBytes: 0, reuseHits: 0 })
+    expect([...ownImageSizes()]).toEqual([])
+  })
+  it('a cancelled queued image never starts decoding', async () => {
+    const req = request()
+    let finish!: (value: ReturnType<typeof encoded>) => void
+    mocks.resizeImage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const active = resizeImageCached(req)
+    const queued = resizeImageCached({ ...req, imageHash: 'other' })
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    forgetOriginals()
+    expect(await queued).toMatchObject({ ok: false })
+    finish(encoded(4))
+    expect(await active).toMatchObject({ ok: false })
+    expect(mocks.resizeImage).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('probe memory admission and shared retention', () => {
+  it('allows four small originals concurrently without changing page tallies', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    mocks.resizeDecoded.mockImplementation(async () => {
+      await gate
+      return encoded(50_000)
+    })
+    const items = Array.from({ length: 5 }, (_, i) => {
+      const original = new Uint8Array(200_000)
+      // GIF header dimensions suffice for admission; the decoder is mocked here.
+      original.set([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0xf4, 1, 0xf4, 1, 0, 0, 0])
+      rememberOriginal(String(i), original)
+      return item(String(i), original.length)
+    })
+    const result = probeImageBytes(items, 0.8, true)
+    await vi.waitFor(() => expect(mocks.resizeDecoded).toHaveBeenCalledTimes(4))
+    release()
+    expect(await result).toMatchObject({ totalBytes: 125_000, failed: 0 })
+    expect(mocks.resizeDecoded).toHaveBeenCalledTimes(5)
+  })
+  it('gives originals priority and keeps original plus encoded cache within 200 MiB', async () => {
+    rememberOriginal('photo', new Uint8Array(300_000))
+    mocks.resizeDecoded.mockResolvedValue(encoded(50_000))
+    await probeImageBytes([item('photo', 300_000)], 0.8, true)
+    expect(imageCacheStats().encodedBytes).toBe(50_000)
+    const limit = 200 * 1024 * 1024
+    rememberOriginal('large', new Uint8Array(limit))
+    expect(imageCacheStats()).toMatchObject({ originalBytes: limit, encodedBytes: 0 })
+    mocks.resizeImage.mockResolvedValue(encoded(3))
+    expect(
+      await resizeImageCached({
+        imageHash: 'photo',
+        bytes: new Uint8Array(300_000),
+        targetLongEdge: 1000,
+        quality: 0.8,
+        reencodeOpaquePng: true
+      })
+    ).toEqual(encoded(3))
+    forgetOriginals()
   })
 })

@@ -61,6 +61,15 @@ export const PROFILE_LADDER: CompressionProfile[] = [
 /** 기준 export 에 쓰는 프로필 — 사다리 4번째 칸(2048·0.8). Balanced 프리셋(1920·0.8)과 가까운 자리 */
 export const BASELINE_INDEX = 3
 
+/** 부분 직접 교체도 실제 목표 안이면 쓸 수 있다. 넘겼다면 전체 패스로 다시 확인해야 한다. */
+export function canUseDirectFitResult(
+  actualBytes: number,
+  targetBytes: number,
+  complete: boolean
+): boolean {
+  return complete || actualBytes <= targetBytes
+}
+
 /**
  * 프로필을 Settings 에 얹는다. 사다리 값은 UI 세그먼트 union 밖이라 캐스팅이 필요하다 —
  * 이 값들은 계산에만 쓰이고 화면 세그먼트를 그리지 않으므로 안전하다.
@@ -370,9 +379,12 @@ export function decideFit(
 export function savedSource(
   hasArrived: boolean,
   hasBest: boolean,
-  saveBest: boolean
-): 'arrived' | 'best' | 'stash' {
+  saveBest: boolean,
+  saveBaseline = false,
+  hasBaseline = false
+): 'arrived' | 'best' | 'baseline' | 'stash' {
   if (hasArrived) return 'arrived'
+  if (saveBaseline && hasBaseline) return 'baseline'
   return saveBest && hasBest ? 'best' : 'stash'
 }
 

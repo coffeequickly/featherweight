@@ -46,7 +46,10 @@ drawn to their real aspect ratio above them, and the Images list shows visible
 area, original, stored size and trimmed share per row. Target size measures the
 finished PDF and re-exports with the next candidate if it came out over, predicts
 from Figma's own re-encoding (within about 3% on three real documents), and the
-result card says which settings it chose.
+result card says which settings it chose. For verified opaque JPEGs it can reuse
+the measured PDF and replace only its image streams; uncertain structures and
+transparent images stay on Figma's normal export path. A measured PDF that loses
+all processed images is rejected instead of being mistaken for a tiny success.
 
 **New in 3.1** — bulleted and numbered lists export as real text. The bullet or
 number is drawn where Figma puts it, so it stays selectable and searchable. Lists
@@ -324,8 +327,12 @@ tools/**      build, packaging, local install, UI preview, Figma publish
 The split mirrors the plugin runtime's hard constraints. `docs/PRD.md` explains
 the reasoning, `docs/SPIKES.md` records the runtime assumptions verified against
 the real API, `docs/FIT-TO-SIZE.md` covers how the target-size search works,
+`docs/EXPORT-PERFORMANCE.md` documents the guarded direct-PDF fast path and its benchmark,
 `docs/CHECKLIST.md` is the manual QA pass, and `docs/RELEASE.md` is the release
 playbook.
+
+`tools/pdf-direct-probe/` is intentionally kept as an open-source, isolated experiment with its
+own README and tests. It is not built by `npm run build` and is not included in release ZIPs.
 
 ## Releasing
 

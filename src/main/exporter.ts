@@ -10,8 +10,10 @@ import {
   detachInstances,
   extractText,
   hideTextGlyphs,
-  screenTextNode
+  screenTextNode,
+  TextCandidate
 } from './text'
+import { TextPlanCache } from './textPlan'
 
 const EXPORT_TIMEOUT_MS = 30_000
 
@@ -89,7 +91,13 @@ export async function exportFrame(
     if (context.isCancelled()) return cancelledFrame(id, node.name)
 
     const text = context.settings.embedText
-      ? await prepareText(current, node, context)
+      ? await prepareText(
+          current,
+          node,
+          context,
+          // A plain export has no second pass, so retaining its SVG strings only wastes memory.
+          context.settings.fitToSize ? id : undefined
+        )
       : {
           sources: [] as TextRunSource[],
           fallbacks: [] as Array<{ nodeId: string; reason: Reason }>
@@ -172,16 +180,26 @@ function parkOffscreen(clone: ExportableNode, index: number): void {
 async function prepareText(
   clone: ExportableNode,
   original: ExportableNode,
-  context: FrameContext
+  context: FrameContext,
+  planKey?: string
 ): Promise<{ sources: TextRunSource[]; fallbacks: Array<{ nodeId: string; reason: Reason }> }> {
-  const fallbacks: Array<{ nodeId: string; reason: Reason }> = []
-  const candidates = []
-
   // 리포트의 nodeId 는 원본 것이어야 한다 — 클론은 내보내고 나면 지워져서
   // "이 사유를 클릭해 해당 텍스트 보기" 가 갈 곳이 없어진다.
   // clone() 은 자식 순서를 보존하므로 순회 순서로 짝을 맞춘다.
   const cloneTexts = collectTextNodes(clone)
   const originalTexts = collectTextNodes(original)
+  const originalIds = originalTexts.map((node) => node.id)
+
+  if (planKey !== undefined) {
+    const known = textPlans.get(planKey, originalIds, cloneTexts.length)
+    if (known !== undefined) {
+      for (const index of known.hidden) hideTextGlyphs(cloneTexts[index])
+      return { sources: [...known.sources], fallbacks: [...known.fallbacks] }
+    }
+  }
+
+  const fallbacks: Array<{ nodeId: string; reason: Reason }> = []
+  const candidates: Array<{ index: number; candidate: TextCandidate }> = []
 
   for (let index = 0; index < cloneTexts.length; index += 1) {
     const node = cloneTexts[index]
@@ -199,23 +217,50 @@ async function prepareText(
       continue
     }
     extracted.source.nodeId = reportId
-    candidates.push(extracted)
+    candidates.push({ index, candidate: extracted })
   }
 
-  if (candidates.length === 0) return { sources: [], fallbacks }
+  if (candidates.length === 0) {
+    if (planKey !== undefined)
+      textPlans.set(planKey, {
+        originalIds,
+        cloneCount: cloneTexts.length,
+        hidden: [],
+        sources: [],
+        fallbacks
+      })
+    return { sources: [], fallbacks }
+  }
 
-  const verdict = await context.validateText(candidates.map((candidate) => candidate.source))
+  const verdict = await context.validateText(candidates.map(({ candidate }) => candidate.source))
   fallbacks.push(...verdict.rejected)
 
   const approved = new Set(verdict.eligible)
   const sources: TextRunSource[] = []
-  for (const candidate of candidates) {
+  const hidden: number[] = []
+  for (const { index, candidate } of candidates) {
     if (!approved.has(candidate.source.nodeId)) continue
     hideTextGlyphs(candidate.node)
     sources.push(candidate.source)
+    hidden.push(index)
   }
 
+  if (planKey !== undefined)
+    textPlans.set(planKey, {
+      originalIds,
+      cloneCount: cloneTexts.length,
+      hidden,
+      sources,
+      fallbacks
+    })
   return { sources, fallbacks }
+}
+
+const textPlans = new TextPlanCache()
+
+/** Text decisions are valid only while repeated passes of one export are in progress. */
+export function forgetTextPlans(): void {
+  textPlans.clear()
 }
 
 /**

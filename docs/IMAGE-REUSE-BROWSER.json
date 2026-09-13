@@ -1,0 +1,114 @@
+{
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "rows": [
+    {
+      "sample": "EXIF photo",
+      "quality": 0.74,
+      "equal": true,
+      "coldMs": [
+        130.10000002384186,
+        128.79999995231628,
+        133.10000002384186
+      ],
+      "cachedMs": [
+        0.09999990463256836,
+        0,
+        0
+      ],
+      "cache": {
+        "originalBytes": 2796292,
+        "encodedBytes": 103765,
+        "reuseHits": 6
+      },
+      "probe": {
+        "totalBytes": 6092,
+        "failed": 0,
+        "cropped": 1,
+        "recovered": 0
+      }
+    },
+    {
+      "sample": "EXIF photo",
+      "quality": 0.8,
+      "equal": true,
+      "coldMs": [
+        206.5,
+        184.5,
+        141.29999995231628
+      ],
+      "cachedMs": [
+        0,
+        0.20000004768371582,
+        0
+      ],
+      "cache": {
+        "originalBytes": 2796292,
+        "encodedBytes": 119421,
+        "reuseHits": 6
+      },
+      "probe": {
+        "totalBytes": 6783,
+        "failed": 0,
+        "cropped": 1,
+        "recovered": 0
+      }
+    },
+    {
+      "sample": "transparent PNG",
+      "quality": 0.74,
+      "equal": true,
+      "coldMs": [
+        62.10000002384186,
+        61.89999997615814,
+        63.90000009536743
+      ],
+      "cachedMs": [
+        0,
+        0.10000002384185791,
+        0.09999990463256836
+      ],
+      "cache": {
+        "originalBytes": 3326545,
+        "encodedBytes": 2676023,
+        "reuseHits": 6
+      },
+      "probe": {
+        "totalBytes": 128927,
+        "failed": 0,
+        "cropped": 1,
+        "recovered": 0
+      }
+    },
+    {
+      "sample": "transparent PNG",
+      "quality": 0.8,
+      "equal": true,
+      "coldMs": [
+        65.20000004768372,
+        60.799999952316284,
+        65.40000009536743
+      ],
+      "cachedMs": [
+        0,
+        0,
+        0
+      ],
+      "cache": {
+        "originalBytes": 3326545,
+        "encodedBytes": 2676023,
+        "reuseHits": 6
+      },
+      "probe": {
+        "totalBytes": 128927,
+        "failed": 0,
+        "cropped": 1,
+        "recovered": 0
+      }
+    }
+  ],
+  "afterClear": {
+    "originalBytes": 0,
+    "encodedBytes": 0,
+    "reuseHits": 0
+  }
+}

@@ -13,6 +13,8 @@ MIT · plugin id `1672509720278498323`
 npm run lint && npm test && npm run verify:catalog   # verify:catalog hits the network
 npm run install:local                                # load the build into Figma for manual QA
 # work through docs/CHECKLIST.md (Manual QA)
+# for export-pipeline changes, repeat the smoke protocol in docs/EXPORT-PERFORMANCE.md
+npm run package && unzip -l dist/featherweight-*.zip # runtime files only; no development probes
 
 npm version patch                                    # or minor / major
 git push --follow-tags                               # CI builds the GitHub Release + zip
@@ -36,6 +38,10 @@ corner matches what you intend to ship.
 
 The zip is for people who want a development build (unzip → Import plugin from
 manifest). Regular users install from the Community.
+
+Development experiments are welcome in the open-source repository, including
+`tools/pdf-direct-probe/`, but never in the distributed plugin. `npm run package` copies only
+`build/main.js` and `build/ui.js`; if its listing contains another build, stop the release.
 
 ## Why Community publishing isn't automated
 

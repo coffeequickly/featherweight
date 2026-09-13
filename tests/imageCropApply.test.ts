@@ -10,7 +10,12 @@ import {
   PaintWindow,
   pieceTransform
 } from '../src/lib/cropWindow'
-import { DEFAULT_SETTINGS, Settings } from '../src/lib/types'
+import {
+  DEFAULT_SETTINGS,
+  Settings,
+  ResizeRequestPayload,
+  ResizeManyRequestPayload
+} from '../src/lib/types'
 import { settleResponse } from '../src/main/bridge'
 import { forgetReplacements, ImageStats, imageUsagesOf, shrinkImages } from '../src/main/images'
 import { windowOf } from '../src/lib/imageCrop'
@@ -205,6 +210,35 @@ const counts = (stats: ImageStats) => ({
   processed: stats.processed.length,
   cropped: stats.cropped.length,
   recovered: stats.recovered.length
+})
+
+describe('image request identity for candidate reuse', () => {
+  it.each([false, true])(
+    'carries hashes independently of original retention (%s)',
+    async (keep) => {
+      const full: ResizeRequestPayload[] = []
+      const crops: ResizeManyRequestPayload[] = []
+      await shrinkImages(
+        frameA() as unknown as SceneNode,
+        SETTINGS,
+        (payload) => {
+          full.push(payload)
+          send(payload)
+        },
+        () => undefined,
+        () => false,
+        keep ? () => undefined : undefined,
+        (payload) => {
+          crops.push(payload)
+          sendMany(payload)
+        }
+      )
+      expect(full).toHaveLength(1)
+      expect(full[0]).toMatchObject({ imageHash: 'photo', keepOriginal: keep })
+      expect(crops).toHaveLength(1)
+      expect(crops[0].imageHash).toBe('photo')
+    }
+  )
 })
 
 describe('shrinkImages — 보이는 창만 잘라 넣기', () => {

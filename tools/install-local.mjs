@@ -47,7 +47,10 @@ const firstInstall = !(await exists(join(TARGET, 'manifest.json')))
 
 await mkdir(TARGET, { recursive: true })
 await rm(join(TARGET, 'build'), { recursive: true, force: true })
-await cp(build, join(TARGET, 'build'), { recursive: true })
+await mkdir(join(TARGET, 'build'), { recursive: true })
+await Promise.all(
+  ['main.js', 'ui.js'].map((file) => cp(join(build, file), join(TARGET, 'build', file)))
+)
 await cp(manifest, join(TARGET, 'manifest.json'))
 
 const { name } = JSON.parse(await readFile(manifest, 'utf8'))

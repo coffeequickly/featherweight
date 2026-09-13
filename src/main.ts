@@ -5,6 +5,7 @@ import {
   applyProfile,
   BASELINE_INDEX,
   calibrationRatio,
+  canUseDirectFitResult,
   decideFit,
   FitAttempt,
   fitAttemptPlan,
@@ -27,7 +28,7 @@ import {
 import { PixelSize } from './lib/imageDensity'
 import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
-import { exportFrame, removeLeftoverClones } from './main/exporter'
+import { exportFrame, forgetTextPlans, removeLeftoverClones } from './main/exporter'
 import { forgetReplacements, forgetSeenImages, OriginalSink, probeItemsOf } from './main/images'
 import { loadEdgeCache } from './main/imageSize'
 import {
@@ -69,6 +70,9 @@ import {
   PdfPartHandler,
   DocNameHandler,
   EditorHandler,
+  FitDirectHandler,
+  FitDirectResultHandler,
+  DirectFitPage,
   FitMeasuredHandler,
   FitReport,
   ImageProbeResultHandler,
@@ -152,6 +156,10 @@ export default async function main(): Promise<void> {
   })
 
   on<FitMeasuredHandler>('fit:measured', (payload) => {
+    settleResponse(payload.reqId, payload)
+  })
+
+  on<FitDirectResultHandler>('fit:direct:result', (payload) => {
     settleResponse(payload.reqId, payload)
   })
 
@@ -286,6 +294,7 @@ async function runExport({ order, settings, fileName }: ExportRequest): Promise<
     removeLeftoverClones()
     forgetSeenImages()
     forgetReplacements()
+    forgetTextPlans()
 
     const outName = pdfFileName(fileName === '' ? figma.root.name : fileName)
 
@@ -311,6 +320,7 @@ async function runExport({ order, settings, fileName }: ExportRequest): Promise<
     removeLeftoverClones()
     forgetSeenImages()
     forgetReplacements()
+    forgetTextPlans()
     exporting = false
     // 정리되는 동안 들어온 요청이 있으면 이어서
     const next = pendingExport
@@ -402,7 +412,20 @@ async function runFitExport(order: string[], settings: Settings, outName: string
 
   reportProgress(t('progress.measure'), 1, FIT_BASELINE)
   // 목표 안이면 이 병합본을 보관본에도 둔다 — 더 선명한 후보와 재시도가 전부 넘치면 이걸로 돌아온다
-  const measured = await requestMeasurement(outName, targetBytes)
+  let measured = await requestMeasurement(outName, targetBytes)
+  if (!measured.imagesValid) {
+    reportProgress(t('progress.renderRetry'), 0, FIT_BASELINE)
+    await waitForImageRenderer()
+    const retry = await runPass(order, baseline, FIT_BASELINE, (imageHash, bytes) => {
+      emit<ImageCacheHandler>('image:cache', { imageHash, bytes })
+    })
+    if (cancelled) {
+      emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: retry.skipped })
+      return
+    }
+    measured = await requestMeasurement(outName, targetBytes)
+    if (!measured.imagesValid) throw new Error(t('export.imagesMissing'))
+  }
 
   // 크기를 못 쟀으면(머지 실패) 예측할 근거가 없다 — 기준 결과로 조용히 마무리한다
   if (measured.pdfBytes <= 0) {
@@ -505,14 +528,54 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     profile: PROFILE_LADDER[BASELINE_INDEX],
     actual: measured.pdfBytes
   }
+  const direct = await tryDirectFit(
+    order,
+    settings.cropToVisible,
+    outName,
+    targetBytes,
+    baselineActual,
+    outcome.profile,
+    outcome.kind
+  )
+  if (cancelled) {
+    emit<DoneHandler>('done', { fileName: outName, cancelled, skipped: first.skipped, fit })
+    return
+  }
+  if (direct !== null) {
+    fit.outcome = direct.outcome
+    fit.profile = { ...direct.profile }
+    fit.attempts = direct.attempts.map((attempt) => ({
+      ...attempt.profile,
+      actual: attempt.actual
+    }))
+    emit<DoneHandler>('done', {
+      fileName: outName,
+      cancelled: false,
+      skipped: first.skipped,
+      fit,
+      saveBest: direct.saveBest
+    })
+    return
+  }
+
   const plan = fitAttemptPlan(outcome.profile)
   const attempts: FitAttempt[] = []
   let skipped: DoneReport['skipped'] = []
   let measureFailed = false
+  let reusedBaseline = false
   /** 병합·측정이 실패한 패스의 설정 — 저장되는 것이 그 재병합본이면 설정도 그것으로 적는다 */
   let failedProfile: CompressionProfile | null = null
   for (let index = 0; index < plan.length; index += 1) {
     const profile = plan[index]
+    // 기준과 같은 설정은 이미 실측·검증한 PDF가 있다. 다시 Figma export를 돌리면 느릴 뿐 아니라
+    // 연속 export 뒤 렌더러가 이미지를 누락할 수도 있으므로 그 측정본을 그대로 재사용한다.
+    if (sameProfile(profile, PROFILE_LADDER[BASELINE_INDEX])) {
+      attempts.push(baselineActual)
+      skipped = first.skipped
+      reusedBaseline = true
+      console.log('[fit] reused verified baseline instead of duplicate Figma export')
+      break
+    }
     reportProgress(
       index === 0
         ? t('progress.refine')
@@ -524,7 +587,16 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     skipped = pass.skipped
     if (cancelled) break
     reportProgress(t('progress.measure'), 1, FIT_FINAL)
-    const check = await requestMeasurement(outName, targetBytes)
+    let check = await requestMeasurement(outName, targetBytes)
+    if (!check.imagesValid) {
+      reportProgress(t('progress.renderRetry'), 0, FIT_FINAL)
+      await waitForImageRenderer()
+      const retry = await runPass(order, applyProfile(settings, profile), FIT_FINAL)
+      skipped = retry.skipped
+      if (cancelled) break
+      check = await requestMeasurement(outName, targetBytes)
+      if (!check.imagesValid) throw new Error(t('export.imagesMissing'))
+    }
     // 크기를 못 쟀으면(머지 실패) 판단할 근거가 없다 — 이 패스의 결과로 마무리한다
     if (check.pdfBytes <= 0) {
       measureFailed = true
@@ -560,6 +632,8 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     baselineActual.actual <= targetBytes ||
     attempts.some((attempt) => attempt.actual <= targetBytes)
   const save = resolveSave(decision, measureFailed, keptFits, failedProfile)
+  const saveBaseline =
+    reusedBaseline && !save.saveBest && sameProfile(save.profile, PROFILE_LADDER[BASELINE_INDEX])
   fit.outcome = decision.outcome
   fit.profile = { ...save.profile }
   fit.attempts = attempts.map((attempt) => ({ ...attempt.profile, actual: attempt.actual }))
@@ -570,7 +644,131 @@ async function runFitExport(order: string[], settings: Settings, outName: string
     decision.outcome,
     measureFailed ? '(measure failed)' : ''
   )
-  emit<DoneHandler>('done', { fileName: outName, cancelled, skipped, fit, saveBest: save.saveBest })
+  emit<DoneHandler>('done', {
+    fileName: outName,
+    cancelled,
+    skipped,
+    fit,
+    saveBest: save.saveBest,
+    saveBaseline
+  })
+}
+
+type DirectFitDone = {
+  attempts: FitAttempt[]
+  saveBest: boolean
+  profile: CompressionProfile
+  outcome: FitReport['outcome']
+}
+
+/**
+ * 기준 부분 PDF의 이미지 객체만 바꿔 최종 패스를 만든다. 확실히 식별된 불투명 JPEG만 바꾸고
+ * 나머지는 기준 상태로 둔다. PDF 구조가 안전하지 않으면 null — 기존 runPass로 같은 결과를 만든다.
+ */
+async function tryDirectFit(
+  order: string[],
+  cropToVisible: boolean,
+  outName: string,
+  targetBytes: number,
+  baseline: FitAttempt,
+  chosen: CompressionProfile,
+  predicted: 'fits' | 'already-small' | 'unreachable'
+): Promise<DirectFitDone | null> {
+  const baselinePages = await probeItemsForPages(
+    order,
+    PROFILE_LADDER[BASELINE_INDEX],
+    cropToVisible
+  )
+  const attempts: FitAttempt[] = []
+
+  for (const [index, profile] of fitAttemptPlan(chosen).entries()) {
+    if (cancelled) return null
+    reportProgress(
+      index === 0
+        ? t('progress.refine')
+        : t('progress.retry', { current: index, total: MAX_FIT_RETRIES }),
+      0,
+      FIT_FINAL
+    )
+
+    const pagesFor = async (): Promise<DirectFitPage[]> => {
+      const targetPages = await probeItemsForPages(order, profile, cropToVisible)
+      const targetByIndex = new Map(targetPages.map((page) => [page.index, page.items]))
+      return baselinePages.map((page) => ({
+        index: page.index,
+        baseline: page.items,
+        target: targetByIndex.get(page.index) ?? []
+      }))
+    }
+
+    let pages = await pagesFor()
+    // 첫 설정은 runProbes가 방금 인코딩했다. 캐시에 남아 있으면 바로 써서 같은 q92를
+    // 두 번 만들지 않는다. retry 설정이나 LRU 누락 때만 기존처럼 한 번 채운다.
+    let check =
+      index === 0
+        ? await requestDirectMeasurement(
+            outName,
+            targetBytes,
+            PROFILE_LADDER[BASELINE_INDEX],
+            profile,
+            pages
+          )
+        : null
+    if (
+      check === null ||
+      (!check.ok &&
+        (check.reason.includes('missing baseline/candidate') ||
+          check.reason.includes('missing crop candidate')))
+    ) {
+      const probed = await probeBytes(order, profile, cropToVisible)
+      if (probed === null) return null
+      pages = await pagesFor()
+      check = await requestDirectMeasurement(
+        outName,
+        targetBytes,
+        PROFILE_LADDER[BASELINE_INDEX],
+        profile,
+        pages
+      )
+    }
+    if (!check.ok) return null
+    if (!canUseDirectFitResult(check.pdfBytes, targetBytes, check.complete)) {
+      console.log('[fit] incomplete direct result exceeded target; using full Figma export')
+      return null
+    }
+
+    attempts.push({ profile, actual: check.pdfBytes })
+    console.log(
+      '[fit] direct attempt',
+      index,
+      describeProfile(profile),
+      'actual',
+      check.pdfBytes,
+      'target',
+      targetBytes
+    )
+    if (check.pdfBytes <= targetBytes) break
+  }
+
+  const decision = decideFit(
+    targetBytes,
+    baseline,
+    attempts,
+    retryCandidates(chosen).length > 0,
+    predicted
+  )
+  console.log(
+    '[fit] direct decision',
+    decision.save,
+    describeProfile(decision.profile),
+    decision.outcome
+  )
+  return {
+    attempts,
+    saveBest: decision.save === 'best',
+    profile: decision.profile,
+    outcome: decision.outcome
+  }
 }
 
 /**
@@ -666,13 +864,25 @@ async function probeItemsFor(
   profile: CompressionProfile,
   cropToVisible: boolean
 ): Promise<ImageProbeItem[]> {
-  const items: ImageProbeItem[] = []
-  for (const id of order) {
+  return (await probeItemsForPages(order, profile, cropToVisible)).flatMap((page) => page.items)
+}
+
+async function probeItemsForPages(
+  order: string[],
+  profile: CompressionProfile,
+  cropToVisible: boolean
+): Promise<Array<{ index: number; items: ImageProbeItem[] }>> {
+  const pages: Array<{ index: number; items: ImageProbeItem[] }> = []
+  for (let index = 0; index < order.length; index += 1) {
+    const id = order[index]
     const node = await figma.getNodeByIdAsync(id)
-    if (node === null || node.removed || !('absoluteTransform' in node)) continue
-    items.push(...probeItemsOf(node as SceneNode, profile, cropToVisible))
+    const items =
+      node === null || node.removed || !('absoluteTransform' in node)
+        ? []
+        : probeItemsOf(node as SceneNode, profile, cropToVisible)
+    pages.push({ index, items })
   }
-  return items
+  return pages
 }
 
 /**
@@ -684,6 +894,14 @@ type Measured = {
   imageBytes: number
   pdfImageBytes: number
   pdfOwnImageBytes: number
+  imagesValid: boolean
+}
+
+/** 새 이미지가 빠진 PDF 를 받았을 때만 주는 렌더러 회복 시간. 정상 export에는 비용이 없다. */
+const IMAGE_RENDER_RETRY_DELAY_MS = 1_500
+
+async function waitForImageRenderer(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, IMAGE_RENDER_RETRY_DELAY_MS))
 }
 
 async function requestMeasurement(outName: string, keepUnder?: number): Promise<Measured> {
@@ -696,6 +914,36 @@ async function requestMeasurement(outName: string, keepUnder?: number): Promise<
     fileName: outName,
     cancelled: false,
     skipped: []
+  })
+  return await promise
+}
+
+type DirectMeasured =
+  | {
+      ok: true
+      pdfBytes: number
+      pdfImageBytes: number
+      pdfOwnImageBytes: number
+      complete: boolean
+    }
+  | { ok: false; reason: string }
+
+async function requestDirectMeasurement(
+  outName: string,
+  targetBytes: number,
+  baselineProfile: CompressionProfile,
+  profile: CompressionProfile,
+  pages: DirectFitPage[]
+): Promise<DirectMeasured> {
+  const reqId = nextRequestId('direct')
+  const promise = awaitResponse<DirectMeasured>(reqId, MEASURE_TIMEOUT_MS)
+  emit<FitDirectHandler>('fit:direct', {
+    reqId,
+    fileName: outName,
+    targetBytes,
+    baselineProfile,
+    profile,
+    pages
   })
   return await promise
 }
