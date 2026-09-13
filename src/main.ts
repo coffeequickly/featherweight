@@ -27,7 +27,7 @@ import {
 import { PixelSize } from './lib/imageDensity'
 import { snapSettings } from './lib/settingsOptions'
 import { awaitResponse, nextRequestId, rejectAllPending, settleResponse } from './main/bridge'
-import { exportFrame, removeLeftoverClones } from './main/exporter'
+import { exportFrame, forgetTextPlans, removeLeftoverClones } from './main/exporter'
 import { forgetReplacements, forgetSeenImages, OriginalSink, probeItemsOf } from './main/images'
 import { loadEdgeCache } from './main/imageSize'
 import {
@@ -286,6 +286,7 @@ async function runExport({ order, settings, fileName }: ExportRequest): Promise<
     removeLeftoverClones()
     forgetSeenImages()
     forgetReplacements()
+    forgetTextPlans()
 
     const outName = pdfFileName(fileName === '' ? figma.root.name : fileName)
 
@@ -311,6 +312,7 @@ async function runExport({ order, settings, fileName }: ExportRequest): Promise<
     removeLeftoverClones()
     forgetSeenImages()
     forgetReplacements()
+    forgetTextPlans()
     exporting = false
     // 정리되는 동안 들어온 요청이 있으면 이어서
     const next = pendingExport
