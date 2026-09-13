@@ -45,6 +45,13 @@ Options tab is the build you mean to ship.
 - [ ] Target: typing "0.8" works, an emptied field falls back to the previous
       value (never silently 0.5), and −/+ step by 1 MB (0.5 ↔ 1 at the bottom).
       Image size and quality are locked in the Images tab with a line saying why
+- [ ] Target with a large transparent PNG and an intentionally unreachable limit
+      keeps every image visible, reports that the target was missed, and never
+      downloads a suspiciously tiny blank PDF. `pdfimages -list` shows the image
+      objects and alpha masks
+- [ ] If Figma omits all processed images from a measured PDF, the plugin retries
+      once after a short renderer delay. A second omission shows an error and does
+      not open a save dialog
 - [ ] Selecting 30 frames shows the list at once and the canvas keeps
       responding while the counts fill in; thumbnails arrive in batches rather
       than all at the end; clicking around inside the same frames (or inside a
@@ -340,9 +347,9 @@ for a document with nothing to outline; `report=1` for the result card).
 
 ## Fit to Size
 
-Exports a baseline pass, then the chosen one, and up to two more if the finished
-file came out over the target. Budget time. Watch the progress bar — it must fill
-in one direction only, never restart at a later pass.
+Exports a baseline pass, then patches verified image streams directly. Unsupported structures fall
+back to the full chosen pass, with up to two retries if the finished file is over target. Budget time.
+Watch the progress bar — it must fill in one direction only, never restart at a later pass.
 
 - [ ] A target well above the document's size finishes in one pass and reports
       "already under" — the file is byte-identical to the same export with the
@@ -362,6 +369,10 @@ in one direction only, never restart at a later pass.
       prediction or candidate numbers — those live in the plugin console
 - [ ] A target the first candidate misses shows "The file came out over the
       target. Re-exporting with the next candidate (1/2)" and saves the retry
+- [ ] A mixed JPEG/transparent-PNG document whose partial direct result is over target falls back to
+      a full Figma pass and can still reach a target that requires shrinking the PNG
+- [ ] An image exported with an unverified RGB ICC profile falls back to the full Figma pass; colours
+      match Figma's own export
 - [ ] When nothing fits, the card says "could not meet …" with the number of
       re-exports, and the file is still saved
 - [ ] Cancelling during a retry pass saves nothing and leaves no `__sheaf_tmp__`

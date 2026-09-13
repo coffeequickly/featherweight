@@ -420,6 +420,8 @@ export interface FitMeasuredHandler extends EventHandler {
     pdfImageBytes: number
     /** pdfImageBytes 중 우리가 넣은 이미지(치수 일치) 몫 — 나머지는 Figma 가 그림자·마스크를 래스터화한 것 */
     pdfOwnImageBytes: number
+    /** 처리했다고 기록한 이미지가 PDF 에 하나도 없으면 false — 빈 PDF 를 목표 달성으로 오인하지 않는다 */
+    imagesValid: boolean
   }) => void
 }
 
@@ -480,6 +482,8 @@ export type DoneReport = {
   keepUnder?: number
   /** 마지막 done 에서: true 면 마지막 측정본 대신 목표 안 보관본을 저장한다 (fitToSize.decideFit) */
   saveBest?: boolean
+  /** 마지막 done 에서: true 면 중복 재-export 대신 검증된 기준 측정본을 저장한다 */
+  saveBaseline?: boolean
   fit?: FitReport
   fileName: string
   cancelled: boolean
@@ -680,6 +684,55 @@ export interface ImageProbeResultHandler extends EventHandler {
     /** totalBytes 중 우리가 만든 JPEG 몫 — 보정하지 않는다 */
     failed: number
   }) => void
+}
+
+/** PDF 직접 교체 fast path가 한 패스의 이미지 구성을 재현할 때 필요한 설정. */
+export type DirectFitProfile = {
+  multiplier: number
+  maxEdge: number
+  minEdge: number
+  quality: number
+  reencodeOpaquePng: boolean
+}
+
+/** 기준 패스와 목표 패스의 쪽별 이미지 계획. index는 PdfPart.index와 같다. */
+export type DirectFitPage = {
+  index: number
+  baseline: ImageProbeItem[]
+  target: ImageProbeItem[]
+}
+
+/**
+ * 기준 PDF의 이미지 객체만 목표 프로필 결과로 바꿔 실제 크기를 재 달라는 요청.
+ * 안전하게 연결할 수 없으면 UI는 ok:false로 답하고 메인이 기존 Figma 재-export로 물러선다.
+ */
+export interface FitDirectHandler extends EventHandler {
+  name: 'fit:direct'
+  handler: (payload: {
+    reqId: string
+    fileName: string
+    targetBytes: number
+    baselineProfile: DirectFitProfile
+    profile: DirectFitProfile
+    pages: DirectFitPage[]
+  }) => void
+}
+
+export interface FitDirectResultHandler extends EventHandler {
+  name: 'fit:direct:result'
+  handler: (
+    payload:
+      | {
+          reqId: string
+          ok: true
+          pdfBytes: number
+          pdfImageBytes: number
+          pdfOwnImageBytes: number
+          /** 후보 변경을 빠뜨린 이미지가 없었는가. 부분 교체가 목표를 넘으면 전체 export로 돌아간다. */
+          complete: boolean
+        }
+      | { reqId: string; ok: false; reason: string }
+  ) => void
 }
 
 /** 문서 이름 — UI 가 파일명 기본값을 제안할 때 쓴다. */

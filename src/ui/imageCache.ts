@@ -10,6 +10,7 @@
 import { Encoded, ProbeTally, tallyProbe } from '../lib/imageProbe'
 import { imageDimensions } from '../lib/imageHeader'
 import { ByteCache, ImageWorkQueue } from '../lib/imageWork'
+import { chooseCrop } from '../lib/imageCrop'
 import { KEEP_BYTES_FLOOR, keepsOriginal } from '../lib/imageTarget'
 import { CropRect, ImageProbeItem } from '../lib/types'
 import {
@@ -95,6 +96,18 @@ export async function resizeImageCached(
       checkGeneration(expected)
       const result = await resizeImage(request)
       checkGeneration(expected)
+      if (result.ok && request.imageHash !== undefined) {
+        retain(
+          encodedKey(
+            request.imageHash,
+            request.targetLongEdge,
+            request.quality,
+            request.reencodeOpaquePng
+          ),
+          result,
+          expected
+        )
+      }
       return result
     })
   } catch (error) {
@@ -133,7 +146,22 @@ export async function resizeManyCached(
       })
       if (!fresh.ok) return fresh
       missing.forEach(({ at }, index) => {
-        results[at] = { ...fresh.results[index], ok: true, changed: true }
+        const result: CachedImage = { ...fresh.results[index], ok: true, changed: true }
+        results[at] = result
+        if (request.imageHash !== undefined) {
+          const job = missing[index].job
+          retain(
+            encodedKey(
+              request.imageHash,
+              job.targetLongEdge,
+              request.quality,
+              request.reencodeOpaquePng,
+              job.crop
+            ),
+            result,
+            expected
+          )
+        }
       })
     }
     checkGeneration(expected)
@@ -208,9 +236,114 @@ export function forgetOriginals(): void {
 
 export type ProbeItem = ImageProbeItem
 
+export type DirectImageSource = {
+  key: string
+  bytes: Uint8Array
+  mime: 'image/jpeg' | 'image/png'
+  width: number
+  height: number
+}
+
+export type DirectImageSelection = {
+  imageHash: string
+  images: Array<{ slot: string; source: DirectImageSource }>
+}
+
 /** 조각 캐시 키 — 같은 원본·같은 사각형·같은 목표면 같은 조각 (품질·PNG 설정은 호출마다 하나) */
 const pieceKeyOf = (crop: CropRect, targetLongEdge: number): string =>
   `${crop.x0},${crop.y0},${crop.w},${crop.h}|${targetLongEdge}`
+
+function originalSource(imageHash: string): DirectImageSource {
+  const bytes = originals.get(imageHash)
+  if (bytes === undefined) throw new Error(`direct: missing original ${imageHash.slice(0, 8)}`)
+  const size = imageDimensions(bytes)
+  if (size === null) throw new Error(`direct: unknown image size ${imageHash.slice(0, 8)}`)
+  return {
+    key: `original:${imageHash}`,
+    bytes,
+    mime: isPng(bytes) ? 'image/png' : 'image/jpeg',
+    width: size.width,
+    height: size.height
+  }
+}
+
+/**
+ * probeItems를 실제 export와 같은 규칙으로 원본/W0/조각에 귀결시킨다.
+ * 기준 패스와 후보 probe가 만들어 둔 바이트만 쓴다. 하나라도 빠지면 직접 교체 전체를 거절한다.
+ */
+export function directImageSelections(
+  items: readonly ImageProbeItem[],
+  quality: number,
+  reencodeOpaquePng: boolean
+): DirectImageSelection[] {
+  const out: DirectImageSelection[] = []
+
+  for (const item of items) {
+    const original = (): DirectImageSelection => ({
+      imageHash: item.imageHash,
+      images: [{ slot: 'whole', source: originalSource(item.imageHash) }]
+    })
+    if (item.originalBytes <= KEEP_BYTES_FLOOR || item.skip) {
+      out.push(original())
+      continue
+    }
+
+    const wholeKey = encodedKey(item.imageHash, item.targetLongEdge, quality, reencodeOpaquePng)
+    const whole = encodedImages.get(wholeKey)
+    if (whole === undefined) {
+      throw new Error(`direct: missing baseline/candidate ${item.imageHash.slice(0, 8)}`)
+    }
+    if (!whole.changed || keepsOriginal(item.originalBytes, whole.bytes.length)) {
+      out.push(original())
+      continue
+    }
+
+    let selected: DirectImageSelection['images'] = [
+      {
+        slot: 'whole',
+        source: {
+          key: wholeKey,
+          bytes: whole.bytes,
+          mime: whole.mime,
+          width: whole.width,
+          height: whole.height
+        }
+      }
+    ]
+    if (item.pieces !== undefined && item.pieces.length > 0) {
+      const candidates = item.pieces.map((piece) => {
+        const key = encodedKey(
+          item.imageHash,
+          piece.targetLongEdge,
+          quality,
+          reencodeOpaquePng,
+          piece.crop
+        )
+        const found = encodedImages.get(key)
+        if (found === undefined) return null
+        return {
+          slot: `${piece.crop.x0},${piece.crop.y0},${piece.crop.w},${piece.crop.h}`,
+          source: {
+            key,
+            bytes: found.bytes,
+            mime: found.mime,
+            width: found.width,
+            height: found.height
+          }
+        }
+      })
+      if (candidates.some((candidate) => candidate === null)) {
+        throw new Error(`direct: missing crop candidate ${item.imageHash.slice(0, 8)}`)
+      }
+      const pieces = candidates as DirectImageSelection['images']
+      const pieceBytes = pieces.reduce((sum, piece) => sum + piece.source.bytes.length, 0)
+      if (chooseCrop(whole.bytes.length, pieceBytes, item.densityGain ?? 1).crop) selected = pieces
+    }
+    out.push({ imageHash: item.imageHash, images: selected })
+  }
+
+  return out
+}
 
 /**
  * 주어진 설정으로 인코딩했을 때의 이미지 바이트 합계를 잰다. 실제 교체는 하지 않는다.

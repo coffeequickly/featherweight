@@ -21,6 +21,7 @@ import { CROP_RULES } from '../src/lib/imageCrop'
 import { CropRect, ImageProbeItem } from '../src/lib/types'
 import {
   forgetOriginals,
+  directImageSelections,
   imageCacheGeneration,
   imageCacheStats,
   resizeImageCached,
@@ -59,6 +60,41 @@ beforeEach(() => {
   mocks.decodeImage.mockImplementation(async () => bitmap())
   mocks.cloneBitmap.mockImplementation(async () => bitmap())
   mocks.isPng.mockReturnValue(false)
+})
+
+describe('directImageSelections — export와 같은 후보 선택', () => {
+  it('retained whole encodings provide the exact candidate bytes', async () => {
+    const result = encoded(50_000)
+    mocks.resizeImage.mockResolvedValue(result)
+    await resizeImageCached({
+      imageHash: 'photo',
+      bytes: new Uint8Array(200_000),
+      targetLongEdge: 1000,
+      quality: 0.8,
+      reencodeOpaquePng: true
+    })
+    expect(
+      directImageSelections([item('photo', 200_000)], 0.8, true)[0].images[0].source
+    ).toMatchObject({ bytes: result.bytes, width: 1, height: 1, mime: 'image/jpeg' })
+  })
+
+  it('refuses a missing candidate so the caller can refill or fall back', () => {
+    expect(() => directImageSelections([item('missing', 200_000)], 0.8, true)).toThrow(
+      'missing baseline/candidate'
+    )
+  })
+
+  it('keeps skipped originals with their original dimensions', () => {
+    const bytes = new Uint8Array(200_000)
+    bytes.set([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 24, 0, 32, 0, 0, 0, 0])
+    rememberOriginal('logo', bytes)
+    expect(
+      directImageSelections([item('logo', bytes.length, { skip: true })], 0.8, true)[0]
+    ).toMatchObject({
+      imageHash: 'logo',
+      images: [{ slot: 'whole', source: { key: 'original:logo', bytes, width: 24, height: 32 } }]
+    })
+  })
 })
 
 describe('ownImageSizes — PDF 안에서 우리 이미지를 알아보는 치수', () => {

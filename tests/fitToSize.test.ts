@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BASELINE_INDEX,
   calibrationRatio,
+  canUseDirectFitResult,
   candidateIndices,
   chooseProfile,
   clampTargetMb,
@@ -32,6 +33,17 @@ import {
 } from '../src/lib/fitToSize'
 
 const MB = 1024 * 1024
+
+describe('direct fit result safety', () => {
+  it('accepts complete results so actual-size retries can decide', () => {
+    expect(canUseDirectFitResult(6 * MB, 5 * MB, true)).toBe(true)
+  })
+
+  it('accepts partial replacement only when the finished PDF actually fits', () => {
+    expect(canUseDirectFitResult(5 * MB, 5 * MB, false)).toBe(true)
+    expect(canUseDirectFitResult(5 * MB + 1, 5 * MB, false)).toBe(false)
+  })
+})
 
 /** 사다리 칸(또는 품질만 바꾼 변형)을 잰 결과 */
 const probe = (index: number, imageBytes: number, quality?: number): Probe => ({
@@ -449,6 +461,8 @@ describe('decideFit — 저장할 PDF 와 결과 상태는 실제 바이트로 �
     expect(savedSource(false, true, true)).toBe('best')
     expect(savedSource(false, false, true)).toBe('stash')
     expect(savedSource(false, true, false)).toBe('stash')
+    expect(savedSource(false, false, false, true, true)).toBe('baseline')
+    expect(savedSource(false, false, false, true, false)).toBe('stash')
   })
 })
 

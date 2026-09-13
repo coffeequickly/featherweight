@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_SETTINGS } from '../src/lib/types'
 import { settleResponse } from '../src/main/bridge'
 import { forgetReplacements, shrinkImages } from '../src/main/images'
+
+afterEach(() => vi.restoreAllMocks())
 
 /** 4000×3000 PNG 머리 — 크기는 파일 머리에서 읽고 나머지는 부피만 채운다 */
 function fakePng(width: number, height: number, length: number): Uint8Array {
@@ -79,6 +81,20 @@ const send = (payload: { reqId: string }): void => {
 
 describe('shrinkImages — 프레임 간 교체 이미지 재사용', () => {
   it('같은 원본을 같은 설정으로 쓰는 다음 프레임은 인코딩 없이 같은 교체 해시를 받는다', async () => {
+    const nativeSetTimeout = globalThis.setTimeout
+    const settleDelays: number[] = []
+    const immediateSettle = (
+      ...parameters: Parameters<typeof setTimeout>
+    ): ReturnType<typeof setTimeout> => {
+      const [handler, delay, ...args] = parameters
+      if (delay === 700) {
+        settleDelays.push(delay)
+        if (typeof handler === 'function') handler(...args)
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }
+      return nativeSetTimeout(handler, delay, ...args)
+    }
+    const timer = vi.spyOn(globalThis, 'setTimeout').mockImplementation(immediateSettle)
     const first = frameWithImage('bg')
     const second = frameWithImage('bg')
     const run = (root: FakeNode) =>
@@ -92,11 +108,13 @@ describe('shrinkImages — 프레임 간 교체 이미지 재사용', () => {
 
     const statsA = await run(first)
     const statsB = await run(second)
+    timer.mockRestore()
 
     expect(sent).toBe(1) // UI 인코딩은 한 번
     expect(created).toEqual(['new-1']) // createImage 도 한 번
     expect(first.fills[0].imageHash).toBe('new-1')
     expect(second.fills[0].imageHash).toBe('new-1')
+    expect(settleDelays).toEqual([700]) // 두 번째 프레임의 캐시 해시는 다시 기다리지 않는다
     // 바이트는 프레임마다 그 쪽에 실리는 만큼 — 기준 측정과 같은 단위.
     // 손댄 원본은 해시로 쌓이고, 두 쪽이 같은 해시라 결과 카드에서는 한 장으로 센다
     expect(statsA).toMatchObject({

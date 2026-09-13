@@ -275,8 +275,9 @@ export async function shrinkImages(
 
   const byHash = new Map<string, string>()
   const byFill = new Map<string, FillSwap>()
-  // 새로 꽂은 서로 다른 이미지 수 — 준비를 기다리는 시간은 장수에 비례한다
-  let applied = 0
+  // 이번 프레임에서 실제로 createImage 한 수. 앞 프레임에서 준비·export까지 끝난 해시는
+  // 새 클론에 다시 꽂아도 데이터 준비를 기다릴 필요가 없다.
+  let freshApplied = 0
 
   for (let index = 0; index < plans.length; index += 1) {
     if (isCancelled()) break
@@ -288,7 +289,7 @@ export async function shrinkImages(
       if (whole === null) continue
 
       const crop = crops.get(plan.imageHash)
-      let chosen: Piece[] | null = null
+      let chosen: ReadyPiece[] | null = null
       // 설정이 꺼져 있으면 통로가 있어도 묻지 않는다 — exporter 가 통로를 안 주지만 여기서도 막는다
       if (crop !== undefined && sendMany !== undefined && settings.cropToVisible) {
         try {
@@ -307,7 +308,7 @@ export async function shrinkImages(
       stats.processed.push(plan.imageHash)
       if (chosen === null || crop === undefined) {
         byHash.set(plan.imageHash, whole.hash)
-        applied += 1
+        if (whole.fresh) freshApplied += 1
         stats.bytesAfter += whole.bytes
         continue
       }
@@ -315,7 +316,7 @@ export async function shrinkImages(
       stats.cropped.push(plan.imageHash)
       for (let at = 0; at < crop.pieces.length; at += 1) {
         const piece = chosen[at]
-        applied += 1
+        if (piece.fresh) freshApplied += 1
         stats.bytesAfter += piece.bytes
         for (const fill of crop.pieces[at].fills) {
           byFill.set(fillKey(fill.nodeId, fill.fillIndex), {
@@ -337,8 +338,9 @@ export async function shrinkImages(
 
   if (byHash.size > 0 || byFill.size > 0) {
     applyReplacements(root, byHash, byFill)
-    // 여기서 안 기다리면 방금 꽂은 이미지가 export 에서 통째로 빠진다 (settleDelayMs 참고)
-    await new Promise((resolve) => setTimeout(resolve, settleDelayMs(applied)))
+    // 방금 만든 이미지에만 필요하다. 캐시 해시는 앞 프레임의 대기와 export를 이미 통과했다.
+    const delay = settleDelayMs(freshApplied)
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
   }
   void persistEdgeCache() // 선택 때 못 읽은 크기를 여기서 새로 읽었을 수 있다
   return stats
@@ -351,6 +353,8 @@ type Whole = {
   mime: string
   original: Uint8Array | null
   image: Image
+  /** 이 프레임에서 createImage 한 해시인가. false면 앞 프레임에서 이미 렌더 준비가 끝났다. */
+  fresh: boolean
 }
 
 /**
@@ -364,8 +368,11 @@ async function cropOne(
   sendMany: ImageManySender
 ): Promise<CropAttempt> {
   const keys = crop.pieces.map((piece) => pieceKey(crop.imageHash, piece, settings))
-  const encoded: Array<Piece | { bytes: Uint8Array; mime: string } | null> = keys.map(
-    (key) => pieces.get(key) ?? null
+  const encoded: Array<ReadyPiece | { bytes: Uint8Array; mime: string } | null> = keys.map(
+    (key) => {
+      const cached = pieces.get(key)
+      return cached === undefined ? null : { ...cached, fresh: false }
+    }
   )
 
   const missing = crop.pieces
@@ -400,11 +407,11 @@ async function cropOne(
   }
   if (!chooseCrop(whole.bytes, total, crop.densityGain).crop) return { kind: 'declined' }
 
-  const out: Piece[] = []
+  const out: ReadyPiece[] = []
   for (let at = 0; at < encoded.length; at += 1) {
-    const item = encoded[at] as Piece | { bytes: Uint8Array; mime: string }
+    const item = encoded[at] as ReadyPiece | { bytes: Uint8Array; mime: string }
     if (!(item.bytes instanceof Uint8Array)) {
-      out.push(item as Piece)
+      out.push(item as ReadyPiece)
       continue
     }
     // createImage 는 형식·크기 제한에 걸리면 throw 한다 — 조각 하나가 안 되면 통째로 W₀ 다
@@ -412,13 +419,15 @@ async function cropOne(
     await withTimeout(created.getBytesAsync(), READY_TIMEOUT_MS, crop.imageHash.slice(0, 8))
     const piece: Piece = { hash: created.hash, bytes: item.bytes.length, mime: item.mime }
     pieces.set(keys[at], piece)
-    out.push(piece)
+    out.push({ ...piece, fresh: true })
   }
   return { kind: 'pieces', pieces: out }
 }
 
 /** 조각 시도의 결말 — 채택 / 절감 부족으로 W₀ / 인코딩 실패로 W₀(복구로 센다) */
-type CropAttempt = { kind: 'pieces'; pieces: Piece[] } | { kind: 'declined' } | { kind: 'failed' }
+type ReadyPiece = Piece & { fresh: boolean }
+type CropAttempt =
+  { kind: 'pieces'; pieces: ReadyPiece[] } | { kind: 'declined' } | { kind: 'failed' }
 
 /**
  * 전체본 W₀ 하나를 만든다(또는 캐시에서 찾는다). 손대지 않기로 했거나 실패하면 null — 그 사유의
@@ -464,7 +473,14 @@ async function shrinkOne(
       stats.bytesAfter += known.bytes
       return null
     }
-    return { hash: known.hash, bytes: known.bytes, mime: known.mime, original: null, image }
+    return {
+      hash: known.hash,
+      bytes: known.bytes,
+      mime: known.mime,
+      original: null,
+      image,
+      fresh: false
+    }
   }
 
   original ??= await bytesOf(image, plan.imageHash)
@@ -534,7 +550,14 @@ async function shrinkOne(
       mime: result.mime,
       originalBytes: original.length
     })
-    return { hash: created.hash, bytes: result.bytes.length, mime: result.mime, original, image }
+    return {
+      hash: created.hash,
+      bytes: result.bytes.length,
+      mime: result.mime,
+      original,
+      image,
+      fresh: true
+    }
   } catch (error) {
     // createImage 는 형식·크기 제한(4096)에 걸리면 throw 한다 (C4)
     stats.bytesAfter += original.length

@@ -9,6 +9,8 @@ import {
   DoneReport,
   ErrorHandler,
   ExportHandler,
+  FitDirectHandler,
+  FitDirectResultHandler,
   FitMeasuredHandler,
   FitReport,
   PdfPart,
@@ -22,9 +24,11 @@ import {
 } from '../lib/types'
 import { formatBytes } from '../lib/fontStore'
 import { formatReason, t } from '../lib/i18n'
+import { processedImagesArePresent } from '../lib/pdfIntegrity'
 import { forgetOriginals, ownImageSizes } from './imageCache'
 import { savedSource } from '../lib/fitToSize'
 import { downloadPdf, ImageWeight, MergeOutput, mergePdfs, OutlineCost } from './pdf'
+import { patchFitParts } from './pdfDirect'
 import { drawTextLayer, FontCache } from './textLayer'
 import { loadFontBytes } from './fontSource'
 
@@ -123,6 +127,8 @@ export function useExport(
   const parts = useRef<PdfPart[]>([])
   // 목표 용량 탐색 1회차 결과. 2회차가 없으면(이미 목표 이하) 이걸 그대로 저장한다.
   const measured = useRef<{ parts: PdfPart[]; merged: MergeOutput | null } | null>(null)
+  /** 직접 교체는 매 시도마다 이 기준 부분들에서 시작한다 — 직전 후보를 또 교체하지 않는다. */
+  const directBase = useRef<{ parts: PdfPart[]; merged: MergeOutput } | null>(null)
   /** 목표 안에 든 병합본 — 더 선명한 후보와 재시도가 전부 넘치면 이걸 저장한다 (fitToSize.decideFit) */
   const best = useRef<{ parts: PdfPart[]; merged: MergeOutput } | null>(null)
   const startedAt = useRef(0)
@@ -158,6 +164,7 @@ export function useExport(
       // 실패로 끝난 실행의 조각을 남기면 다음 실행에 섞여 들어간다
       parts.current = []
       measured.current = null
+      directBase.current = null
       best.current = null
       forgetOriginals()
       setError(payload.message)
@@ -198,16 +205,27 @@ export function useExport(
       try {
         const merged = await mergeCollected(collected, done.fileName)
         if (mine !== run.current) return // 늦게 끝난 옛 실행 — 새 실행의 측정을 덮어쓰지 않는다
-        measured.current = { parts: collected, merged }
-        if (done.keepUnder !== undefined && merged.bytes.length <= done.keepUnder) {
-          best.current = { parts: collected, merged }
+        const imagesValid = processedImagesArePresent(collected, merged.images.count)
+        // 깨진 측정본으로 마지막 정상 슬롯을 덮지 않는다. 메인이 같은 프로필을 한 번 더 내보낸 뒤에도
+        // 실패하면 저장 자체를 중단한다.
+        if (imagesValid) {
+          measured.current = { parts: collected, merged }
+          directBase.current ??= { parts: collected, merged }
+          if (done.keepUnder !== undefined && merged.bytes.length <= done.keepUnder) {
+            best.current = { parts: collected, merged }
+          }
+        } else {
+          console.warn(
+            '[fit] rejected PDF measurement: processed images are absent; retrying the Figma export'
+          )
         }
         emit<FitMeasuredHandler>('fit:measured', {
           reqId: done.reqId ?? '',
           pdfBytes: merged.bytes.length,
           imageBytes: imageBytesOf(collected),
           pdfImageBytes: merged.images.bytes,
-          pdfOwnImageBytes: merged.images.own
+          pdfOwnImageBytes: merged.images.own,
+          imagesValid
         })
       } catch {
         if (mine !== run.current) return
@@ -217,10 +235,71 @@ export function useExport(
           pdfBytes: 0,
           imageBytes: 0,
           pdfImageBytes: 0,
-          pdfOwnImageBytes: 0
+          pdfOwnImageBytes: 0,
+          imagesValid: true
         })
       }
     }
+
+    const offDirect = on<FitDirectHandler>('fit:direct', (payload) => {
+      const mine = run.current
+      void (async (): Promise<void> => {
+        const base = directBase.current
+        if (base === null) {
+          emit<FitDirectResultHandler>('fit:direct:result', {
+            reqId: payload.reqId,
+            ok: false,
+            reason: 'direct: baseline PDF is unavailable'
+          })
+          return
+        }
+
+        try {
+          const patched = await patchFitParts(
+            base.parts,
+            payload.pages,
+            payload.baselineProfile,
+            payload.profile
+          )
+          const merged = await mergeCollected(patched.parts, payload.fileName)
+          if (mine !== run.current || !active.current) {
+            emit<FitDirectResultHandler>('fit:direct:result', {
+              reqId: payload.reqId,
+              ok: false,
+              reason: 'direct: export cancelled'
+            })
+            return
+          }
+          measured.current = { parts: patched.parts, merged }
+          if (merged.bytes.length <= payload.targetBytes) {
+            best.current = { parts: patched.parts, merged }
+          }
+          console.log(
+            '[fit] direct PDF attempt',
+            merged.bytes.length,
+            `bytes; replaced ${patched.matched}, kept baseline ${patched.skipped}; skipped second Figma export`
+          )
+          emit<FitDirectResultHandler>('fit:direct:result', {
+            reqId: payload.reqId,
+            ok: true,
+            pdfBytes: merged.bytes.length,
+            pdfImageBytes: merged.images.bytes,
+            pdfOwnImageBytes: merged.images.own,
+            complete: patched.complete
+          })
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error)
+          if (mine === run.current && active.current) {
+            console.warn('[fit] direct PDF fallback:', reason)
+          }
+          emit<FitDirectResultHandler>('fit:direct:result', {
+            reqId: payload.reqId,
+            ok: false,
+            reason
+          })
+        }
+      })()
+    })
 
     async function finish(done: DoneReport): Promise<void> {
       const mine = run.current
@@ -231,6 +310,7 @@ export function useExport(
       // 취소 버튼이 이미 화면을 정리했으므로 여기서는 남은 것만 버린다
       if (done.cancelled || !active.current) {
         measured.current = null
+        directBase.current = null
         best.current = null
         forgetOriginals()
         return
@@ -243,25 +323,37 @@ export function useExport(
 
       const stash = measured.current
       const kept = best.current
+      const baseline = directBase.current
       measured.current = null
+      directBase.current = null
       best.current = null
       forgetOriginals()
 
       // 새 조각이 없으면 메인이 고른 슬롯을 쓴다 — 목표 안 보관본이거나 마지막 측정본.
       // 측정한 병합본을 그대로 저장하므로 잰 바이트와 저장 바이트가 같다
-      const source = savedSource(arrived.length > 0, kept !== null, done.saveBest === true)
+      const source = savedSource(
+        arrived.length > 0,
+        kept !== null,
+        done.saveBest === true,
+        done.saveBaseline === true,
+        baseline !== null
+      )
       const collected =
         source === 'arrived'
           ? arrived
           : source === 'best'
             ? (kept?.parts ?? [])
-            : (stash?.parts ?? [])
+            : source === 'baseline'
+              ? (baseline?.parts ?? [])
+              : (stash?.parts ?? [])
       const premerged =
         source === 'arrived'
           ? null
           : source === 'best'
             ? (kept?.merged ?? null)
-            : (stash?.merged ?? null)
+            : source === 'baseline'
+              ? (baseline?.merged ?? null)
+              : (stash?.merged ?? null)
 
       try {
         if (collected.length === 0) {
@@ -367,6 +459,7 @@ export function useExport(
       offPart()
       offDone()
       offError()
+      offDirect()
     }
   }, [])
 
@@ -378,6 +471,7 @@ export function useExport(
     active.current = true
     parts.current = []
     measured.current = null
+    directBase.current = null
     best.current = null
     // 앞 실행이 취소된 뒤 늦게 도착한 원본이 남아 있을 수 있다 — 새 실행은 빈 캐시에서 시작한다
     forgetOriginals()
@@ -404,6 +498,7 @@ export function useExport(
     active.current = false
     parts.current = []
     measured.current = null
+    directBase.current = null
     best.current = null
     forgetOriginals()
     emit<CancelHandler>('cancel')

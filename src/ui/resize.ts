@@ -277,7 +277,7 @@ export function hasAlphaPixels(data: Uint8ClampedArray | Uint8Array): boolean {
  * 인코딩한 크기. 알파는 버린다(Figma 는 SMask 를 따로 얹지만 그 몫은 작다, 실측 257 B).
  * 실패하면 입력 크기를 그대로 돌려준다 — 예측이 커지는 쪽이라 목표를 넘기지는 않는다.
  */
-export async function figmaSizeOf(bytes: Uint8Array): Promise<number> {
+async function figmaJpegBlobOf(bytes: Uint8Array): Promise<Blob> {
   let bitmap: ImageBitmap | undefined
   try {
     bitmap = await createImageBitmap(new Blob([bytes as BlobPart]), {
@@ -285,13 +285,23 @@ export async function figmaSizeOf(bytes: Uint8Array): Promise<number> {
     })
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
     const context = canvas.getContext('2d')
-    if (context === null) return bytes.length
+    if (context === null) throw new Error(t('resize.noContext'))
     context.drawImage(bitmap, 0, 0)
-    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: FIGMA_JPEG_QUALITY })
-    return blob.size
-  } catch {
-    return bytes.length
+    return await canvas.convertToBlob({ type: 'image/jpeg', quality: FIGMA_JPEG_QUALITY })
   } finally {
     bitmap?.close()
+  }
+}
+
+export async function figmaJpegOf(bytes: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await (await figmaJpegBlobOf(bytes)).arrayBuffer())
+}
+
+export async function figmaSizeOf(bytes: Uint8Array): Promise<number> {
+  try {
+    // 후보 크기만 잴 때는 큰 JPEG를 다시 Uint8Array로 복사하지 않는다.
+    return (await figmaJpegBlobOf(bytes)).size
+  } catch {
+    return bytes.length
   }
 }
