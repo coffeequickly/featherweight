@@ -42,6 +42,19 @@ describe('freezeLayout', () => {
     expect(outer.layoutMode).toBe('VERTICAL')
   })
 
+  it('FILL 로 늘어난 프레임도 굳힌다 — HUG 행 안의 FILL 셀이 줄던 버그', () => {
+    const row = autoFrame(page)
+    const cell: Fake = {
+      ...autoFrame(row),
+      layoutSizingHorizontal: 'FILL',
+      layoutSizingVertical: 'FILL'
+    }
+    freezeLayout(cell as unknown as BaseNode)
+    expect(cell.layoutMode).toBe('NONE')
+    expect(cell.layoutSizingHorizontal).toBe('FIXED')
+    expect(cell.layoutSizingVertical).toBe('FIXED')
+  })
+
   it('페이지까지 올라가도 없으면 아무것도 안 한다', () => {
     const group: Fake = { type: 'GROUP', parent: page }
     expect(() => freezeLayout(group as unknown as BaseNode)).not.toThrow()

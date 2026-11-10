@@ -8,6 +8,7 @@ import { isTemporary, markTemporary } from './temporary'
 import {
   collectTextNodes,
   detachInstances,
+  restoreDetachedText,
   extractText,
   hideTextGlyphs,
   screenTextNode,
@@ -76,6 +77,8 @@ export async function exportFrame(
     current = detachInstances(current) as ExportableNode
     clone = current
     markTemporary(current)
+    // detach 가 잃은 텍스트 크기 설정을 원본대로 — 안 그러면 글자만 어긋난다 (text.ts)
+    await restoreDetachedText(current, node)
 
     const images = await shrinkImages(
       current,
