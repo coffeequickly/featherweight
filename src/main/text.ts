@@ -317,6 +317,7 @@ export async function restoreDetachedText(clone: SceneNode, original: SceneNode)
   const cloneRoot = clone.absoluteBoundingBox
   const originalRoot = original.absoluteBoundingBox
   if (cloneRoot === null || originalRoot === null) return
+  const slack = positionSlack(cloneRoot, originalRoot)
 
   for (const [index, text] of cloneTexts.entries()) {
     const source = originalTexts[index]
@@ -325,10 +326,10 @@ export async function restoreDetachedText(clone: SceneNode, original: SceneNode)
     if (want === null || have === null) continue
     const target = { x: want.x - originalRoot.x, y: want.y - originalRoot.y }
     const moved =
-      Math.abs(have.x - cloneRoot.x - target.x) > 0.01 ||
-      Math.abs(have.y - cloneRoot.y - target.y) > 0.01 ||
-      Math.abs(have.width - want.width) > 0.01 ||
-      Math.abs(have.height - want.height) > 0.01
+      Math.abs(have.x - cloneRoot.x - target.x) > slack ||
+      Math.abs(have.y - cloneRoot.y - target.y) > slack ||
+      Math.abs(have.width - want.width) > slack ||
+      Math.abs(have.height - want.height) > slack
     if (!moved) continue
 
     try {
@@ -349,9 +350,45 @@ export async function restoreDetachedText(clone: SceneNode, original: SceneNode)
     }
     const now = text.absoluteBoundingBox
     if (now === null) continue
-    text.x += cloneRoot.x + target.x - now.x
-    text.y += cloneRoot.y + target.y - now.y
+    const shift = toParentSpace(
+      text,
+      cloneRoot.x + target.x - now.x,
+      cloneRoot.y + target.y - now.y
+    )
+    text.x += shift.x
+    text.y += shift.y
   }
+}
+
+/**
+ * 이 좌표 크기에서 "안 움직였다" 로 볼 오차.
+ *
+ * 좌표는 32비트 실수라 원점에서 멀수록 거칠다. 클론은 x=100,000 너머에 서 있어서(exporter 의
+ * parkOffscreen) 고정 문턱 0.01 로는 그대로인 텍스트도 움직였다고 본다. 실측: x=400,000 에서
+ * 텍스트 4,356개 중 29개가 잘못 걸렸다. 눈금 하나는 좌표 × 2⁻²³ 이하이고, 클론 쪽과 원본 쪽
+ * 뺄셈이 한 눈금씩 틀릴 수 있어 그 두 배를 본다.
+ */
+function positionSlack(...roots: Array<{ x: number; y: number }>): number {
+  const far = Math.max(...roots.map((root) => Math.max(Math.abs(root.x), Math.abs(root.y))))
+  return Math.max(0.01, far * 2 ** -22)
+}
+
+/**
+ * 절대 좌표의 이동량을 노드의 x·y 가 쓰는 좌표계로 옮긴다.
+ *
+ * x·y 는 부모 좌표계 값이라, 부모가 돌아가 있으면 절대 좌표의 차이를 그대로 더할 수 없다.
+ * 실측: 90° 돌린 인스턴스에서 그대로 더하자 3pt 어긋남이 4.2pt 로 커졌다.
+ * 부모의 축 = 절대 변환 × 상대 변환의 역 — 그룹처럼 좌표계를 안 만드는 부모가 끼어도 맞다.
+ */
+function toParentSpace(node: TextNode, dx: number, dy: number): { x: number; y: number } {
+  const [[a, c], [b, d]] = node.absoluteTransform
+  const [[p, r], [q, s]] = node.relativeTransform
+  const det = a * d - b * c
+  if (Math.abs(det) < 1e-9) return { x: dx, y: dy }
+  // 절대 → 노드 자신의 축 → 부모의 축
+  const u = (d * dx - c * dy) / det
+  const v = (a * dy - b * dx) / det
+  return { x: p * u + r * v, y: q * u + s * v }
 }
 
 /**
